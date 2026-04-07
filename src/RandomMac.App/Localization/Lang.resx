@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter</value></resheader>
+
+  <!-- Navigation -->
+  <data name="Nav_Dashboard"><value>Dashboard</value></data>
+  <data name="Nav_Settings"><value>Settings</value></data>
+  <data name="Nav_Log"><value>Log</value></data>
+  <data name="Nav_Update"><value>Update</value></data>
+  <data name="Nav_About"><value>About</value></data>
+
+  <!-- Dashboard -->
+  <data name="Dashboard_SelectAdapter"><value>Select a network adapter...</value></data>
+  <data name="Dashboard_CurrentMac"><value>Current MAC</value></data>
+  <data name="Dashboard_OriginalMac"><value>Original MAC</value></data>
+  <data name="Dashboard_PreviewMac"><value>Preview MAC</value></data>
+  <data name="Dashboard_Randomize"><value>Randomize</value></data>
+  <data name="Dashboard_Apply"><value>Apply</value></data>
+  <data name="Dashboard_Restore"><value>Restore</value></data>
+  <data name="Dashboard_Refresh"><value>Refresh</value></data>
+  <data name="Dashboard_RefreshAdapter"><value>Refresh Adapter</value></data>
+  <data name="Dashboard_RecentHistory"><value>Recent History</value></data>
+  <data name="Dashboard_SelectPrompt"><value>Select an adapter to get started.</value></data>
+  <data name="Dashboard_Detecting"><value>Detecting adapters...</value></data>
+  <data name="Dashboard_Found"><value>Found {0} adapter(s).</value></data>
+  <data name="Dashboard_MacChanged"><value>MAC changed successfully to {0}</value></data>
+  <data name="Dashboard_MacFailed"><value>Failed: {0}</value></data>
+  <data name="Dashboard_Restoring"><value>Restoring original MAC...</value></data>
+  <data name="Dashboard_Restored"><value>Original MAC restored.</value></data>
+  <data name="Dashboard_Applying"><value>Applying MAC address...</value></data>
+  <data name="Dashboard_PreviewGenerated"><value>Preview generated. Click 'Apply' to change.</value></data>
+
+  <!-- Settings -->
+  <data name="Settings_General"><value>General</value></data>
+  <data name="Settings_System"><value>System</value></data>
+  <data name="Settings_Data"><value>Data</value></data>
+  <data name="Settings_Language"><value>Language</value></data>
+  <data name="Settings_Mode"><value>Mode</value></data>
+  <data name="Settings_AccentColor"><value>Accent Color</value></data>
+  <data name="Settings_Notifications"><value>Show Notifications</value></data>
+  <data name="Settings_Startup"><value>Run at Startup</value></data>
+  <data name="Settings_Tray"><value>Minimize to Tray</value></data>
+  <data name="Settings_Export"><value>Export Settings</value></data>
+  <data name="Settings_Import"><value>Import Settings</value></data>
+  <data name="Settings_OpenFile"><value>Open Settings File</value></data>
+  <data name="Settings_OpenBlacklist"><value>Open Blacklist File</value></data>
+  <data name="Settings_Save"><value>Save Settings</value></data>
+  <data name="Settings_Saved"><value>Settings saved.</value></data>
+
+  <!-- Update -->
+  <data name="Update_Check"><value>Check for Updates</value></data>
+  <data name="Update_Download"><value>Download Update</value></data>
+  <data name="Update_ViewRelease"><value>View Release Page</value></data>
+  <data name="Update_CurrentVersion"><value>Current Version: v{0}</value></data>
+
+  <!-- Log -->
+  <data name="Log_Filter"><value>Filter logs...</value></data>
+  <data name="Log_Export"><value>Export</value></data>
+  <data name="Log_Clear"><value>Clear</value></data>
+  <data name="Log_Entries"><value>{0} entries</value></data>
+
+  <!-- About -->
+  <data name="About_Developer"><value>Developer</value></data>
+  <data name="About_ThirdParty"><value>Third-party Libraries</value></data>
+  <data name="About_Legal"><value>Legal</value></data>
+  <data name="About_LegalText"><value>This software is provided 'as-is' without warranty. Changing your MAC address may violate network policies. Use responsibly and in compliance with applicable laws and regulations.</value></data>
+  <data name="About_GitHubRepo"><value>GitHub Repository</value></data>
+  <data name="About_GitHubProfile"><value>GitHub Profile</value></data>
+
+  <!-- Additional keys -->
+  <data name="App_Title"><value>RANDOM MAC</value></data>
+  <data name="Titlebar_Minimize"><value>Minimize</value></data>
+  <data name="Titlebar_Close"><value>Close</value></data>
+  <data name="Settings_StartMinimized"><value>Start Minimized</value></data>
+  <data name="Settings_AutoChange"><value>Auto-Change MAC on Startup</value></data>
+  <data name="Settings_AutoChangeEnable"><value>Enable</value></data>
+  <data name="Settings_AutoChangeSelect"><value>Select adapters to auto-randomize:</value></data>
+  <data name="Settings_AutoChangeNote"><value>MAC will be randomized automatically when app starts with OS.</value></data>
+  <data name="Dashboard_RevertFactory"><value>Revert to Factory</value></data>
+  <data name="Dashboard_Clear"><value>Clear</value></data>
+  <data name="Dashboard_CopyTip"><value>Click to copy</value></data>
+  <data name="Dashboard_Time"><value>Time</value></data>
+  <data name="Dashboard_Adapter"><value>Adapter</value></data>
+  <data name="Dashboard_Previous"><value>Previous</value></data>
+  <data name="Dashboard_New"><value>New</value></data>
+  <data name="Dashboard_Status"><value>Status</value></data>
+
+  <!-- Notifications -->
+  <data name="Notif_MacChanged"><value>MAC changed to {0}</value></data>
+  <data name="Notif_MacFailed"><value>MAC change failed: {0}</value></data>
+  <data name="Notif_Restored"><value>Original MAC restored.</value></data>
+  <data name="Notif_RestoreFailed"><value>Restore failed: {0}</value></data>
+  <data name="Notif_Disconnected"><value>Adapter has no connection.</value></data>
+  <data name="Notif_Copied"><value>Copied: {0}</value></data>
+  <data name="Notif_AutoChangeOk"><value>Auto-changed MAC for {0} adapter(s).</value></data>
+  <data name="Notif_AutoChangeFail"><value>Auto-change failed for {0} adapter(s). Check logs.</value></data>
+  <data name="Notif_AutoChangeError"><value>Auto-change error: {0}</value></data>
+
+  <!-- Update notifications -->
+  <data name="Notif_UpdateAvailable"><value>Update available: v{0}</value></data>
+  <data name="Notif_UpToDate"><value>You are up to date.</value></data>
+  <data name="Notif_UpdateDownloaded"><value>Update downloaded. Restart to apply.</value></data>
+
+  <!-- Update view -->
+  <data name="Update_VersionFormat"><value>Current Version: v{0}</value></data>
+  <data name="Update_PublishedFormat"><value>Published: {0}</value></data>
+</root>

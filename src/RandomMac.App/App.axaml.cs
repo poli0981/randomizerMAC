@@ -1,0 +1,210 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Markup.Xaml;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RandomMac.App.ViewModels;
+using RandomMac.App.Views;
+using RandomMac.App.Services;
+using RandomMac.Core.Helpers;
+using RandomMac.Core.Models;
+using RandomMac.Core.Services.Implementations;
+using RandomMac.Core.Services.Interfaces;
+using Serilog;
+
+namespace RandomMac.App;
+
+public partial class App : Application
+{
+    private ServiceProvider? _serviceProvider;
+
+    public static IServiceProvider Services { get; private set; } = null!;
+
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+    }
+
+    public override async void OnFrameworkInitializationCompleted()
+    {
+        ConfigureServices();
+
+        // Admin check
+        if (!AdminHelper.IsRunningAsAdmin())
+            Log.Warning("Application is not running as Administrator. Some features may not work.");
+
+        // Load persisted data
+        await Services.GetRequiredService<ISettingsService>().LoadAsync();
+        await Services.GetRequiredService<IBlacklistService>().LoadAsync();
+        await Services.GetRequiredService<IHistoryService>().LoadAsync();
+
+        // Apply saved theme + language
+        var settings = Services.GetRequiredService<ISettingsService>().Settings;
+        Services.GetRequiredService<ThemeService>().Apply(settings.ThemeMode, settings.AccentColor);
+        Localization.Loc.SetLanguage(settings.Language);
+
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var mainWindow = Services.GetRequiredService<MainWindow>();
+            desktop.MainWindow = mainWindow;
+            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
+
+            // Initialize tray icon
+            var trayService = Services.GetRequiredService<TrayIconService>();
+            trayService.Initialize(mainWindow);
+
+            // Handle --minimized startup (only from OS startup via Task Scheduler)
+            var isOsStartup = desktop.Args?.Contains("--minimized") == true;
+            Log.Information("Startup args: [{Args}], isOsStartup={IsOsStartup}",
+                string.Join(", ", desktop.Args ?? []), isOsStartup);
+            if (isOsStartup)
+            {
+                Log.Information("Starting minimized to system tray");
+                mainWindow.WindowState = WindowState.Minimized;
+                mainWindow.ShowInTaskbar = false;
+                mainWindow.Opened += (_, _) => mainWindow.Hide();
+            }
+            else
+            {
+                Log.Information("Starting with visible window");
+            }
+
+            // Auto-change MAC on startup (when enabled, regardless of minimized state)
+            if (settings.AutoChangeOnStartup && settings.AutoChangeAdapterIds.Count > 0)
+            {
+                _ = PerformAutoChangeAsync(settings.AutoChangeAdapterIds);
+            }
+        }
+
+        base.OnFrameworkInitializationCompleted();
+    }
+
+    private static async Task PerformAutoChangeAsync(List<string> adapterPnpIds)
+    {
+        var logger = Services.GetRequiredService<ILogger<App>>();
+        var adapterService = Services.GetRequiredService<INetworkAdapterService>();
+        var macService = Services.GetRequiredService<IMacAddressService>();
+        var blacklistService = Services.GetRequiredService<IBlacklistService>();
+        var historyService = Services.GetRequiredService<IHistoryService>();
+        var notificationService = Services.GetRequiredService<NotificationService>();
+
+        logger.LogInformation("Auto-change MAC: starting for {Count} adapter(s)", adapterPnpIds.Count);
+
+        try
+        {
+            var allAdapters = await adapterService.GetPhysicalAdaptersAsync();
+            var targets = allAdapters.Where(a => adapterPnpIds.Contains(a.PnpDeviceId)).ToList();
+
+            var successCount = 0;
+            var failCount = 0;
+
+            foreach (var adapter in targets)
+            {
+                if (string.IsNullOrEmpty(adapter.RegistrySubKey))
+                {
+                    logger.LogWarning("Auto-change: skipping {Name} (no registry subkey)", adapter.Name);
+                    failCount++;
+                    continue;
+                }
+
+                var blacklist = blacklistService.GetEffectiveBlacklist(adapter.PnpDeviceId);
+                var newMac = MacAddressGenerator.Generate(blacklist);
+                if (newMac is null)
+                {
+                    logger.LogWarning("Auto-change: could not generate MAC for {Name}", adapter.Name);
+                    failCount++;
+                    continue;
+                }
+
+                var result = await macService.ChangeMacAsync(adapter, newMac.Value);
+
+                // Record history
+                historyService.Add(new MacHistoryEntry
+                {
+                    AdapterName = adapter.Name,
+                    AdapterDeviceId = adapter.DeviceId,
+                    PreviousMac = result.PreviousMac.ToDisplayString(),
+                    NewMac = result.NewMac.ToDisplayString(),
+                    Success = result.Success,
+                    ErrorMessage = result.ErrorMessage,
+                    Timestamp = result.Timestamp
+                });
+
+                if (result.Success)
+                {
+                    successCount++;
+                    logger.LogInformation("Auto-change: {Name} -> {Mac}", adapter.Name, result.VerifiedMac);
+                }
+                else
+                {
+                    failCount++;
+                    blacklistService.AddToAdapter(adapter.PnpDeviceId, newMac.Value);
+                    logger.LogWarning("Auto-change failed for {Name}: {Error}", adapter.Name, result.ErrorMessage);
+                }
+            }
+
+            await historyService.SaveAsync();
+            await blacklistService.SaveAsync();
+
+            if (successCount > 0)
+                notificationService.Success(Localization.Loc.Get("Notif_AutoChangeOk", successCount));
+            if (failCount > 0)
+                notificationService.Warning(Localization.Loc.Get("Notif_AutoChangeFail", failCount));
+
+            logger.LogInformation("Auto-change completed: {Success} success, {Fail} failed", successCount, failCount);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Auto-change MAC failed");
+            notificationService.Error(Localization.Loc.Get("Notif_AutoChangeError", ex.Message));
+        }
+    }
+
+    private void ConfigureServices()
+    {
+        var services = new ServiceCollection();
+
+        // Logging
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.Sink(LogEntrySink.Instance)
+            .WriteTo.File(
+                path: Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "RandomMac", "logs", "log-.txt"),
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 7,
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+            .CreateLogger();
+
+        services.AddLogging(builder => builder.AddSerilog(Log.Logger, dispose: true));
+
+        // Core services
+        services.AddSingleton<INetworkAdapterService, NetworkAdapterService>();
+        services.AddSingleton<IMacAddressService, MacAddressService>();
+        services.AddSingleton<IBlacklistService, BlacklistService>();
+        services.AddSingleton<IHistoryService, HistoryService>();
+        services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IUpdateService, UpdateService>();
+
+        // ViewModels
+        services.AddSingleton<MainWindowViewModel>();
+        services.AddTransient<DashboardViewModel>();
+        services.AddTransient<SettingsViewModel>();
+        services.AddTransient<AboutViewModel>();
+        services.AddTransient<UpdateViewModel>();
+        services.AddTransient<LogViewModel>();
+
+        // App services
+        services.AddSingleton<ThemeService>();
+        services.AddSingleton<TrayIconService>();
+        services.AddSingleton<NotificationService>();
+
+        // Views
+        services.AddSingleton<MainWindow>();
+
+        _serviceProvider = services.BuildServiceProvider();
+        Services = _serviceProvider;
+    }
+}

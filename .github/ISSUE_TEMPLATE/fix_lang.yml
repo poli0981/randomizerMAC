@@ -1,0 +1,56 @@
+name: Language / Translation Fix
+description: Report a translation error or request a new language
+title: "[Lang]: "
+labels: ["localization"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        All translations beyond English are AI-generated. Please help us improve them.
+
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      description: "Which language is affected? (e.g., Vietnamese, Spanish, etc.)"
+      placeholder: Vietnamese
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reason
+    attributes:
+      label: Reason
+      description: What type of language issue is this?
+      options:
+        - Translation error (wrong meaning)
+        - Unnatural phrasing
+        - Wrong terminology (technical terms)
+        - Missing translation (untranslated key)
+        - Add new language
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: |
+        Describe the issue. For errors, include:
+        - The resource key (if known)
+        - Current translation
+        - Suggested correction
+        - Why the current translation is wrong
+      placeholder: |
+        Key: Settings_Language
+        Current: "Ngôn ngử"
+        Suggested: "Ngôn ngữ"
+        Reason: Typo - wrong character
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Attach a screenshot showing the incorrect translation in the app.
