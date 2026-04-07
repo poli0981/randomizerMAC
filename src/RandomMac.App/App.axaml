@@ -1,0 +1,25 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="using:RandomMac.App.Converters"
+             x:Class="RandomMac.App.App"
+>
+
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
+    </Application.Styles>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://RandomMac.App/Styles/Theme.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <conv:BoolToColorConverter x:Key="BoolToColorConverter" />
+            <conv:BoolToStatusConverter x:Key="BoolToStatusConverter" />
+            <conv:NotifTypeToIconConverter x:Key="NotifTypeToIconConverter" />
+            <conv:StatusCodeToBrushConverter x:Key="StatusCodeToBrushConverter" />
+            <conv:NotifTypeToBrushConverter x:Key="NotifTypeToBrushConverter" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

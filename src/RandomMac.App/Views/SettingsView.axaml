@@ -1,0 +1,189 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:RandomMac.App.ViewModels"
+             xmlns:loc="using:RandomMac.App.Localization"
+             x:Class="RandomMac.App.Views.SettingsView"
+             x:CompileBindings="False">
+
+    <UserControl.Styles>
+        <Style Selector="Border.section">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="20,16" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style Selector="TextBlock.setting-label">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.settings-btn">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Hidden">
+        <StackPanel Spacing="0">
+
+            <!-- General -->
+            <Border Classes="section">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="{loc:L Settings_General}" />
+
+                    <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,12,Auto,12,Auto,12,Auto" Margin="0,0,0,0">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="setting-label" Text="{loc:L Settings_Language}" />
+                        <ComboBox Grid.Row="0" Grid.Column="1"
+                                  ItemsSource="{Binding AvailableLanguages}"
+                                  SelectedItem="{Binding SelectedLanguage}"
+                                  Width="160" HorizontalAlignment="Left"
+                                  Height="32" CornerRadius="6" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="setting-label" Text="{loc:L Settings_Mode}" />
+                        <ComboBox Grid.Row="2" Grid.Column="1"
+                                  ItemsSource="{Binding AvailableModes}"
+                                  SelectedItem="{Binding SelectedThemeMode}"
+                                  Width="160" HorizontalAlignment="Left"
+                                  Height="32" CornerRadius="6" />
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="setting-label" Text="{loc:L Settings_AccentColor}" />
+                        <ComboBox Grid.Row="4" Grid.Column="1"
+                                  ItemsSource="{Binding AvailableAccentColors}"
+                                  SelectedItem="{Binding SelectedAccentColor}"
+                                  Width="160" HorizontalAlignment="Left"
+                                  Height="32" CornerRadius="6" />
+
+                        <TextBlock Grid.Row="6" Grid.Column="0" Classes="setting-label" Text="{loc:L Settings_Notifications}" />
+                        <ToggleSwitch Grid.Row="6" Grid.Column="1"
+                                      IsChecked="{Binding ShowNotifications}"
+                                      OnContent="On" OffContent="Off" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- System -->
+            <Border Classes="section">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="{loc:L Settings_System}" />
+
+                    <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,12,Auto,12,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="setting-label" Text="{loc:L Settings_Startup}" />
+                        <ToggleSwitch Grid.Row="0" Grid.Column="1"
+                                      IsChecked="{Binding RunAtStartup}"
+                                      OnContent="On" OffContent="Off" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="setting-label" Text="{loc:L Settings_StartMinimized}" />
+                        <ToggleSwitch Grid.Row="2" Grid.Column="1"
+                                      IsChecked="{Binding StartMinimized}"
+                                      OnContent="Tray" OffContent="Window" />
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="setting-label" Text="{loc:L Settings_Tray}" />
+                        <ToggleSwitch Grid.Row="4" Grid.Column="1"
+                                      IsChecked="{Binding MinimizeToTray}"
+                                      OnContent="On" OffContent="Off" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Auto-Change on Startup -->
+            <Border Classes="section">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="{loc:L Settings_AutoChange}" />
+
+                    <Grid ColumnDefinitions="180,*" RowDefinitions="Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="setting-label" Text="{loc:L Settings_AutoChangeEnable}" />
+                        <ToggleSwitch Grid.Row="0" Grid.Column="1"
+                                      IsChecked="{Binding AutoChangeOnStartup}"
+                                      OnContent="On" OffContent="Off" />
+                    </Grid>
+
+                    <StackPanel IsVisible="{Binding AutoChangeOnStartup}" Margin="0,8,0,0" Spacing="4">
+                        <TextBlock Text="{loc:L Settings_AutoChangeSelect}"
+                                   FontSize="12" Opacity="0.6" />
+                        <ItemsControl ItemsSource="{Binding AutoChangeAdapters}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsSelected}"
+                                              Margin="0,2">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{Binding Type}" FontSize="11" Opacity="0.5"
+                                                       VerticalAlignment="Center" Width="50" />
+                                            <TextBlock Text="{Binding Name}" FontSize="13"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </CheckBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{loc:L Settings_AutoChangeNote}"
+                                   FontSize="11" Opacity="0.4" Margin="0,4,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Data -->
+            <Border Classes="section">
+                <StackPanel>
+                    <TextBlock Classes="section-title" Text="{loc:L Settings_Data}" />
+
+                    <WrapPanel Orientation="Horizontal">
+                        <Button Classes="settings-btn" Margin="0,0,8,8"
+                                Command="{Binding ExportSettingsCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <PathIcon Width="12" Height="12" Data="{StaticResource ExportIcon}" />
+                                <TextBlock Text="{loc:L Settings_Export}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="settings-btn" Margin="0,0,8,8"
+                                Command="{Binding ImportSettingsCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <PathIcon Width="12" Height="12" Data="{StaticResource ImportIcon}" />
+                                <TextBlock Text="{loc:L Settings_Import}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="settings-btn" Margin="0,0,8,8"
+                                Command="{Binding OpenSettingsFileCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <PathIcon Width="12" Height="12" Data="{StaticResource FolderOpenIcon}" />
+                                <TextBlock Text="{loc:L Settings_OpenFile}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="settings-btn" Margin="0,0,8,8"
+                                Command="{Binding OpenBlacklistFileCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <PathIcon Width="12" Height="12" Data="{StaticResource FolderOpenIcon}" />
+                                <TextBlock Text="{loc:L Settings_OpenBlacklist}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Save button + status -->
+            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
+                <Button Background="{DynamicResource AccentFillColorDefaultBrush}"
+                        Height="36" Padding="18,0" CornerRadius="6"
+                        FontSize="13" FontWeight="SemiBold" Cursor="Hand"
+                        VerticalContentAlignment="Center"
+                        Command="{Binding SaveSettingsCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Width="14" Height="14" Data="{StaticResource SaveIcon}" />
+                        <TextBlock Text="{loc:L Settings_Save}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="{Binding StatusMessage}"
+                           VerticalAlignment="Center"
+                           FontSize="12" Opacity="0.6" />
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

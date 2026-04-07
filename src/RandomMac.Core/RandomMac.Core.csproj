@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>13</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RandomMac.Core</RootNamespace>
+    <NoWarn>CA1416</NoWarn>
+    <Version>1.0.0</Version>
+    <Authors>poli0981</Authors>
+    <Company>poli0981</Company>
+    <Product>RANDOM MAC</Product>
+    <Description>Core library for RANDOM MAC - Windows MAC address randomizer</Description>
+    <Copyright>Copyright (c) 2026 poli0981</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.*" />
+    <PackageReference Include="System.Management" Version="9.0.*" />
+    <PackageReference Include="Velopack" Version="0.0.1298" />
+  </ItemGroup>
+
+</Project>

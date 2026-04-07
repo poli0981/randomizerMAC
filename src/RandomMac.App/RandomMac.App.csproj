@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>13</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>RandomMac.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon> -->
+    <Version>1.0.0</Version>
+    <Authors>poli0981</Authors>
+    <Company>poli0981</Company>
+    <Product>RANDOM MAC</Product>
+    <Description>A lightweight Windows utility for randomizing network adapter MAC addresses.</Description>
+    <Copyright>Copyright (c) 2026 poli0981</Copyright>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.2.*" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.2.*" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.*" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.2.*" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.*" />
+    <PackageReference Include="FluentAvaloniaUI" Version="2.2.*" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.*" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.*" />
+    <PackageReference Include="Serilog" Version="4.2.*" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.*" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.*" />
+    <PackageReference Include="Serilog.Sinks.Observable" Version="1.0.*" />
+    <PackageReference Include="Velopack" Version="0.0.1298" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RandomMac.Core\RandomMac.Core.csproj" />
+  </ItemGroup>
+
+</Project>
