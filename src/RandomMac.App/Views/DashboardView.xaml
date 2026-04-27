@@ -19,8 +19,19 @@
                 <ComboBox Grid.Column="1"
                           ItemsSource="{Binding Adapters}"
                           SelectedItem="{Binding SelectedAdapter, Mode=TwoWay}"
-                          DisplayMemberPath="Name"
-                          HorizontalAlignment="Stretch" />
+                          HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph="{Binding Type, Converter={StaticResource AdapterTypeToGlyphConverter}}"
+                                          FontSize="14"
+                                          Opacity="0.75" />
+                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <Button Grid.Column="2"
                         Command="{Binding LoadAdaptersCommand}"
                         ToolTipService.ToolTip="{Binding [Dashboard_Refresh], Source={StaticResource Loc}}">
@@ -29,20 +40,35 @@
             </Grid>
 
             <!-- Adapter status bar -->
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                <Ellipse Grid.Column="0"
-                         Width="10" Height="10"
-                         Fill="{Binding IsConnected, Converter={StaticResource BoolToColorConverter}}"
-                         VerticalAlignment="Center" />
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+
+                <!-- Connection icon — one visible at a time based on IsConnected -->
+                <Grid Grid.Column="0" Width="16" VerticalAlignment="Center">
+                    <FontIcon FontFamily="Segoe Fluent Icons"
+                              Glyph="&#xE703;"
+                              FontSize="13"
+                              Foreground="#A6E3A1"
+                              Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <FontIcon FontFamily="Segoe Fluent Icons"
+                              Glyph="&#xF384;"
+                              FontSize="13"
+                              Foreground="#F38BA8"
+                              Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=invert}" />
+                </Grid>
+
                 <TextBlock Grid.Column="1"
                            Text="{Binding AdapterType}"
                            VerticalAlignment="Center"
-                           Opacity="0.85" />
+                           FontWeight="SemiBold"
+                           FontSize="12" />
+
                 <TextBlock Grid.Column="2"
                            Text="{Binding CurrentVendor}"
                            VerticalAlignment="Center"
-                           Opacity="0.6"
-                           FontSize="12" />
+                           Opacity="0.55"
+                           FontSize="12"
+                           Margin="6,0,0,0"
+                           TextTrimming="CharacterEllipsis" />
             </Grid>
 
             <!-- 3 MAC info cards -->
@@ -137,10 +163,14 @@
                 </Border>
             </Grid>
 
-            <!-- Action buttons -->
+            <!-- Action buttons. Ctrl+R = Randomize, Ctrl+Enter = Apply. -->
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button Command="{Binding GeneratePreviewCommand}"
-                        IsEnabled="{Binding IsChanging, Converter={StaticResource InverseBoolConverter}}">
+                        IsEnabled="{Binding IsChanging, Converter={StaticResource InverseBoolConverter}}"
+                        ToolTipService.ToolTip="Ctrl+R">
+                    <Button.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="R" Modifiers="Control" />
+                    </Button.KeyboardAccelerators>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8B1;" FontSize="13" />
                         <TextBlock Text="{Binding [Dashboard_Randomize], Source={StaticResource Loc}}" />
@@ -149,7 +179,11 @@
 
                 <Button Command="{Binding ApplyMacCommand}"
                         IsEnabled="{Binding HasPreview}"
-                        Style="{ThemeResource AccentButtonStyle}">
+                        Style="{ThemeResource AccentButtonStyle}"
+                        ToolTipService.ToolTip="Ctrl+Enter">
+                    <Button.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="Enter" Modifiers="Control" />
+                    </Button.KeyboardAccelerators>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE73E;" FontSize="13" />
                         <TextBlock Text="{Binding [Dashboard_Apply], Source={StaticResource Loc}}" />
@@ -207,7 +241,7 @@
                              GridLinesVisibility="Horizontal"
                              Background="Transparent">
                     <tk:DataGrid.Columns>
-                        <tk:DataGridTextColumn Binding="{Binding Timestamp}"
+                        <tk:DataGridTextColumn Binding="{Binding Timestamp, Converter={StaticResource RelativeTimeConverter}}"
                                                Width="Auto" />
                         <tk:DataGridTextColumn Binding="{Binding AdapterName}"
                                                Width="*" />

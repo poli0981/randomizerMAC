@@ -23,6 +23,8 @@
             <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
             <conv:InverseBoolConverter x:Key="InverseBoolConverter" />
             <conv:NullToBoolConverter x:Key="NullToBoolConverter" />
+            <conv:RelativeTimeConverter x:Key="RelativeTimeConverter" />
+            <conv:AdapterTypeToGlyphConverter x:Key="AdapterTypeToGlyphConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

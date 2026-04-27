@@ -20,12 +20,13 @@ public partial class AboutViewModel : ViewModelBase
 
     public ObservableCollection<ThirdPartyInfo> ThirdParties { get; } =
     [
-        new("Avalonia UI", "11.2.x", "MIT", "Cross-platform .NET UI framework", "https://github.com/AvaloniaUI/Avalonia"),
-        new("FluentAvalonia", "2.2.x", "MIT", "Fluent Design controls for Avalonia", "https://github.com/amwx/FluentAvalonia"),
-        new("CommunityToolkit.Mvvm", "8.4.x", "MIT", "MVVM source generators", "https://github.com/CommunityToolkit/dotnet"),
-        new("Serilog", "4.2.x", "Apache-2.0", "Structured logging for .NET", "https://github.com/serilog/serilog"),
-        new("Velopack", "0.0.x", "MIT", "Auto-update and packaging", "https://github.com/velopack/velopack"),
-        new("Microsoft.Extensions.DI", "9.0.x", "MIT", "Dependency injection container", "https://github.com/dotnet/runtime"),
+        new("Microsoft.WindowsAppSDK",                     "1.8.x",   "MIT",        "WinUI 3 + Fluent Design platform",   "https://github.com/microsoft/WindowsAppSDK"),
+        new("CommunityToolkit.WinUI.UI.Controls.DataGrid", "7.1.2",   "MIT",        "DataGrid for WinUI 3",               "https://github.com/CommunityToolkit/Windows"),
+        new("H.NotifyIcon.WinUI",                          "2.2.x",   "MIT",        "System tray icon for WinUI 3",       "https://github.com/HavenDV/H.NotifyIcon"),
+        new("CommunityToolkit.Mvvm",                       "8.4.x",   "MIT",        "MVVM source generators",             "https://github.com/CommunityToolkit/dotnet"),
+        new("Serilog",                                     "4.2.x",   "Apache-2.0", "Structured logging for .NET",        "https://github.com/serilog/serilog"),
+        new("Velopack",                                    "0.0.x",   "MIT",        "Auto-update and packaging",          "https://github.com/velopack/velopack"),
+        new("Microsoft.Extensions.DI",                     "9.0.x",   "MIT",        "Dependency injection container",     "https://github.com/dotnet/runtime"),
     ];
 
     public AboutViewModel(IUpdateService updateService)
