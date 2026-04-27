@@ -201,11 +201,14 @@ jobs:
           draft: false
           prerelease: ${{ steps.meta.outputs.is_prerelease == 'true' }}
           fail_on_unmatched_files: false
+          # Explicit version in nupkg paths so we don't accidentally upload
+          # the previous release's full nupkg (which `vpk download github`
+          # places in releases/ for delta calculation).
           files: |
             releases/RandomMac-win-Setup.exe
             releases/RandomMac-win-Portable.zip
-            releases/RandomMac-*-full.nupkg
-            releases/RandomMac-*-delta.nupkg
+            releases/RandomMac-${{ steps.meta.outputs.version }}-full.nupkg
+            releases/RandomMac-${{ steps.meta.outputs.version }}-delta.nupkg
             releases/releases.win.json
             releases/RELEASES
             releases/assets.win.json
