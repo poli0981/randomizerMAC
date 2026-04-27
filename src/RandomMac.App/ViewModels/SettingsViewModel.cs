@@ -79,7 +79,18 @@ public partial class SettingsViewModel : ViewModelBase
         _isLoading = false;
 
         PopulateAutoChangeAdaptersFromCache();
-        _cache.AdaptersRefreshed += (_, _) => PopulateAutoChangeAdaptersFromCache();
+        _cache.AdaptersRefreshed += OnCacheRefreshed;
+    }
+
+    private void OnCacheRefreshed(object? sender, EventArgs e)
+    {
+        // Marshal to UI thread — cache fires this from threadpool because
+        // RefreshAsync uses ConfigureAwait(false) internally.
+        var dispatcher = App.MainDispatcher;
+        if (dispatcher is null || dispatcher.HasThreadAccess)
+            PopulateAutoChangeAdaptersFromCache();
+        else
+            dispatcher.TryEnqueue(PopulateAutoChangeAdaptersFromCache);
     }
 
     private void LoadFromSettings()

@@ -24,7 +24,7 @@
                 <Button Grid.Column="2"
                         Command="{Binding LoadAdaptersCommand}"
                         ToolTipService.ToolTip="{Binding [Dashboard_Refresh], Source={StaticResource Loc}}">
-                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="14" />
+                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="14" />
                 </Button>
             </Grid>
 
@@ -73,7 +73,7 @@
                                     CommandParameter="{Binding CurrentMacDisplay}"
                                     Padding="4"
                                     ToolTipService.ToolTip="{Binding [Dashboard_CopyTip], Source={StaticResource Loc}}">
-                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="12" />
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" FontSize="12" />
                             </Button>
                         </Grid>
                     </StackPanel>
@@ -98,7 +98,7 @@
                                 Padding="4"
                                 HorizontalAlignment="Right"
                                 ToolTipService.ToolTip="{Binding [Dashboard_CopyTip], Source={StaticResource Loc}}">
-                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="12" />
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" FontSize="12" />
                         </Button>
                     </StackPanel>
                 </Border>
@@ -130,7 +130,7 @@
                                     IsEnabled="{Binding HasPreview}"
                                     Padding="4"
                                     ToolTipService.ToolTip="{Binding [Dashboard_CopyTip], Source={StaticResource Loc}}">
-                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="12" />
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" FontSize="12" />
                             </Button>
                         </Grid>
                     </StackPanel>
@@ -142,7 +142,7 @@
                 <Button Command="{Binding GeneratePreviewCommand}"
                         IsEnabled="{Binding IsChanging, Converter={StaticResource InverseBoolConverter}}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="13" />
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8B1;" FontSize="13" />
                         <TextBlock Text="{Binding [Dashboard_Randomize], Source={StaticResource Loc}}" />
                     </StackPanel>
                 </Button>
@@ -151,7 +151,7 @@
                         IsEnabled="{Binding HasPreview}"
                         Style="{ThemeResource AccentButtonStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="13" />
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE73E;" FontSize="13" />
                         <TextBlock Text="{Binding [Dashboard_Apply], Source={StaticResource Loc}}" />
                     </StackPanel>
                 </Button>
@@ -159,7 +159,7 @@
                 <Button Command="{Binding RestoreOriginalCommand}"
                         IsEnabled="{Binding IsMacChanged}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="13" />
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7A7;" FontSize="13" />
                         <TextBlock Text="{Binding [Dashboard_Restore], Source={StaticResource Loc}}" />
                     </StackPanel>
                 </Button>
@@ -192,27 +192,30 @@
                     Background="{ThemeResource CardBackgroundBrush}"
                     MinHeight="120"
                     MaxHeight="220">
-                <tk:DataGrid ItemsSource="{Binding RecentHistory}"
+                <!--
+                    DataGridColumn is not in the visual tree, so XAML
+                    {Binding} on Header does NOT resolve (the Binding object
+                    itself becomes the Header value, rendering as
+                    "Microsoft.UI.Xaml.Data.Binding"). Header strings are
+                    set + refreshed in DashboardView.xaml.cs.
+                -->
+                <tk:DataGrid x:Name="HistoryGrid"
+                             ItemsSource="{Binding RecentHistory}"
                              AutoGenerateColumns="False"
                              HeadersVisibility="Column"
                              IsReadOnly="True"
                              GridLinesVisibility="Horizontal"
                              Background="Transparent">
                     <tk:DataGrid.Columns>
-                        <tk:DataGridTextColumn Header="{Binding [Dashboard_Time], Source={StaticResource Loc}}"
-                                               Binding="{Binding Timestamp}"
+                        <tk:DataGridTextColumn Binding="{Binding Timestamp}"
                                                Width="Auto" />
-                        <tk:DataGridTextColumn Header="{Binding [Dashboard_Adapter], Source={StaticResource Loc}}"
-                                               Binding="{Binding AdapterName}"
+                        <tk:DataGridTextColumn Binding="{Binding AdapterName}"
                                                Width="*" />
-                        <tk:DataGridTextColumn Header="{Binding [Dashboard_Previous], Source={StaticResource Loc}}"
-                                               Binding="{Binding PreviousMac}"
+                        <tk:DataGridTextColumn Binding="{Binding PreviousMac}"
                                                Width="Auto" />
-                        <tk:DataGridTextColumn Header="{Binding [Dashboard_New], Source={StaticResource Loc}}"
-                                               Binding="{Binding NewMac}"
+                        <tk:DataGridTextColumn Binding="{Binding NewMac}"
                                                Width="Auto" />
-                        <tk:DataGridTextColumn Header="{Binding [Dashboard_Status], Source={StaticResource Loc}}"
-                                               Binding="{Binding Success, Converter={StaticResource BoolToStatusConverter}}"
+                        <tk:DataGridTextColumn Binding="{Binding Success, Converter={StaticResource BoolToStatusConverter}}"
                                                Width="Auto" />
                     </tk:DataGrid.Columns>
                 </tk:DataGrid>

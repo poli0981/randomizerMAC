@@ -29,15 +29,17 @@
             </StackPanel>
         </Grid>
 
-        <!-- Pane-open NavigationView -->
+        <!-- NavigationView. Hamburger toggle expands/collapses the pane.
+             Open: 200px (label + icon); Collapsed: 48px (icon-only). -->
         <NavigationView x:Name="NavView"
                         Grid.Row="1"
                         PaneDisplayMode="Left"
                         IsPaneOpen="True"
-                        IsPaneToggleButtonVisible="False"
+                        IsPaneToggleButtonVisible="True"
                         IsBackButtonVisible="Collapsed"
                         IsSettingsVisible="False"
                         OpenPaneLength="200"
+                        CompactPaneLength="48"
                         Header="{Binding CurrentPage.Title}"
                         MenuItemsSource="{Binding NavItems}"
                         SelectedItem="{Binding SelectedNav, Mode=TwoWay}">

@@ -13,7 +13,7 @@
             <StackPanel Spacing="6">
                 <StackPanel Orientation="Horizontal" Spacing="14">
                     <FontIcon FontFamily="Segoe Fluent Icons"
-                              Glyph=""
+                              Glyph="&#xF22C;"
                               FontSize="36"
                               Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                     <StackPanel VerticalAlignment="Center">
@@ -87,7 +87,7 @@
                                                    TextWrapping="Wrap" />
                                     </StackPanel>
                                     <HyperlinkButton Grid.Column="1"
-                                                     Content=""
+                                                     Content="&#xE8A7;"
                                                      FontFamily="Segoe Fluent Icons"
                                                      NavigateUri="{Binding Url}"
                                                      ToolTipService.ToolTip="{Binding Url}" />

@@ -94,7 +94,17 @@ public partial class DashboardViewModel : ViewModelBase
 
     private void OnAdaptersRefreshed(object? sender, EventArgs e)
     {
-        PopulateAdaptersFromCache();
+        // The cache fires this event from whatever thread RefreshAsync's
+        // continuation lands on (threadpool, due to ConfigureAwait(false)).
+        // Marshal back to the UI thread before mutating the bound
+        // ObservableCollection — otherwise we get a cross-thread exception
+        // that LoadAdaptersAsync's catch block surfaces as "Error loading
+        // adapters" on every Refresh click.
+        var dispatcher = App.MainDispatcher;
+        if (dispatcher is null || dispatcher.HasThreadAccess)
+            PopulateAdaptersFromCache();
+        else
+            dispatcher.TryEnqueue(PopulateAdaptersFromCache);
     }
 
     private void PopulateAdaptersFromCache()
