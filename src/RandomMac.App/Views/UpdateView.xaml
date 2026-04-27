@@ -7,65 +7,96 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled"
                   Padding="0,0,8,0">
-        <StackPanel Spacing="16" Padding="24">
+        <StackPanel Spacing="16" Padding="24,16,24,16">
 
-            <!-- Current version + check -->
-            <Border CornerRadius="8"
-                    Padding="16"
+            <!-- Status hero card -->
+            <Border CornerRadius="10"
+                    Padding="20"
                     Background="{ThemeResource CardBackgroundBrush}">
-                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                    <TextBlock Grid.Row="0"
-                               Grid.Column="0"
-                               Text="{Binding CurrentVersionDisplay}"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center" />
+                <Grid ColumnDefinitions="56,*" ColumnSpacing="16">
 
-                    <Border Grid.Row="0"
-                            Grid.Column="1"
-                            CornerRadius="4"
-                            Padding="8,2"
-                            Background="{Binding StatusCode, Converter={StaticResource StatusCodeToBrushConverter}}">
-                        <TextBlock Text="{Binding StatusBadge}"
+                    <!-- One state icon visible at a time -->
+                    <Grid Grid.Column="0" Width="48" Height="48" VerticalAlignment="Top">
+                        <ProgressRing IsActive="{Binding IsChecking}"
+                                      Visibility="{Binding IsChecking, Converter={StaticResource BoolToVisibilityConverter}}"
+                                      Width="40" Height="40" />
+
+                        <FontIcon FontFamily="Segoe Fluent Icons"
+                                  Glyph=""
+                                  FontSize="40"
+                                  Foreground="#A6E3A1"
+                                  Visibility="{Binding IsUpToDateState, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                        <FontIcon FontFamily="Segoe Fluent Icons"
+                                  Glyph=""
+                                  FontSize="40"
+                                  Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                  Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                        <FontIcon FontFamily="Segoe Fluent Icons"
+                                  Glyph=""
+                                  FontSize="40"
+                                  Foreground="#F38BA8"
+                                  Visibility="{Binding IsErrorState, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                        <FontIcon FontFamily="Segoe Fluent Icons"
+                                  Glyph=""
+                                  FontSize="40"
+                                  Opacity="0.45"
+                                  Visibility="{Binding IsIdle, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    </Grid>
+
+                    <!-- Version + status text -->
+                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding CurrentVersionDisplay}"
+                                   FontSize="20"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   Opacity="0.85"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding LastCheckedDisplay}"
+                                   Opacity="0.55"
                                    FontSize="11"
-                                   FontWeight="SemiBold"
-                                   Foreground="Black" />
-                    </Border>
-
-                    <TextBlock Grid.Row="1"
-                               Grid.Column="0"
-                               Grid.ColumnSpan="2"
-                               Text="{Binding StatusMessage}"
-                               TextWrapping="Wrap"
-                               Margin="0,8,0,0"
-                               Opacity="0.85" />
+                                   Visibility="{Binding HasLastChecked, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    </StackPanel>
                 </Grid>
             </Border>
 
-            <Button Content="{Binding [Update_Check], Source={StaticResource Loc}}"
-                    Command="{Binding CheckForUpdateCommand}"
+            <!-- Check button -->
+            <Button Command="{Binding CheckForUpdateCommand}"
                     IsEnabled="{Binding IsChecking, Converter={StaticResource InverseBoolConverter}}"
                     HorizontalAlignment="Left"
-                    Padding="20,8" />
+                    Padding="20,8">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon FontFamily="Segoe Fluent Icons"
+                              Glyph=""
+                              FontSize="13" />
+                    <TextBlock Text="{Binding [Update_Check], Source={StaticResource Loc}}" />
+                </StackPanel>
+            </Button>
 
-            <!-- Update available block -->
-            <Border CornerRadius="8"
-                    Padding="16"
+            <!-- Update available card -->
+            <Border CornerRadius="10"
+                    Padding="20"
                     Background="{ThemeResource CardBackgroundBrush}"
+                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                    BorderThickness="0,0,0,3"
                     Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibilityConverter}}">
                 <StackPanel Spacing="12">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
                         <TextBlock Text="{Binding LatestVersion}"
-                                   FontWeight="SemiBold"
-                                   FontSize="16" />
+                                   FontSize="18"
+                                   FontWeight="SemiBold" />
                         <TextBlock Text="{Binding PublishedDateDisplay}"
                                    Opacity="0.6"
+                                   FontSize="12"
                                    VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <Border CornerRadius="4"
-                            Padding="12"
+                    <Border CornerRadius="6"
+                            Padding="14"
                             Background="{ThemeResource CardBackgroundTransparentBrush}">
-                        <ScrollViewer MaxHeight="240"
+                        <ScrollViewer MaxHeight="220"
                                       VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled">
                             <TextBlock Text="{Binding ReleaseNotes}"
@@ -75,11 +106,21 @@
                         </ScrollViewer>
                     </Border>
 
+                    <ProgressBar IsIndeterminate="True"
+                                 Height="3"
+                                 Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibilityConverter}}" />
+
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="{Binding [Update_Download], Source={StaticResource Loc}}"
-                                Command="{Binding DownloadUpdateCommand}"
+                        <Button Command="{Binding DownloadUpdateCommand}"
                                 IsEnabled="{Binding IsDownloading, Converter={StaticResource InverseBoolConverter}}"
-                                Style="{ThemeResource AccentButtonStyle}" />
+                                Style="{ThemeResource AccentButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontFamily="Segoe Fluent Icons"
+                                          Glyph=""
+                                          FontSize="13" />
+                                <TextBlock Text="{Binding [Update_Download], Source={StaticResource Loc}}" />
+                            </StackPanel>
+                        </Button>
 
                         <HyperlinkButton Content="{Binding [Update_ViewRelease], Source={StaticResource Loc}}"
                                          NavigateUri="{Binding ReleaseUrl}" />
