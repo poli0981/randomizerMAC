@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup .NET (from global.json)
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           # Pinned by global.json (11.0.100-preview.3.x for the App,
           # net9.0 for Core/tests is satisfied by the same SDK).
