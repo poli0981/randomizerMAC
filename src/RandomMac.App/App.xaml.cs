@@ -30,15 +30,18 @@ public partial class App : Application
     {
         InitializeComponent();
         ConfigureServices();
-
-        // Register the localization singleton as an Application resource so
-        // XAML can bind via {Binding [Key], Source={StaticResource Loc}}.
-        // Must happen AFTER InitializeComponent() so Resources is populated.
-        Resources["Loc"] = Localization.Loc.Instance;
     }
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
+        // Register the localization singleton as an Application resource so
+        // XAML can bind via {Binding [Key], Source={StaticResource Loc}}.
+        // Must happen here, NOT in the constructor — accessing Application.Resources
+        // before WinUI 3 has finished wiring the COM proxy throws E_UNEXPECTED
+        // (0x8000FFFF). OnLaunched is the first callback where the runtime
+        // guarantees the resource dictionary is reachable.
+        Resources["Loc"] = Localization.Loc.Instance;
+
         if (!AdminHelper.IsRunningAsAdmin())
             Log.Warning("Application is not running as Administrator. Some features may not work.");
 
