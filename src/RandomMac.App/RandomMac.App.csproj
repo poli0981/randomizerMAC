@@ -11,7 +11,7 @@
     <RootNamespace>RandomMac.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon> -->
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <Authors>poli0981</Authors>
     <Company>poli0981</Company>
     <Product>RANDOM MAC</Product>
@@ -57,5 +57,30 @@
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
+
+  <!--
+    WinUI 3 unpackaged + WindowsPackageType=None: dotnet publish does NOT
+    copy the compiled XAML (.xbf) artifacts or the app's PRI resource
+    index into the publish folder. The SDK PRI files (Microsoft.UI.pri,
+    Microsoft.UI.Xaml.Controls.pri, Microsoft.WindowsAppRuntime.pri) DO
+    get copied, but the app's own RandomMac.App.pri and every page's
+    *.xbf are missing. The result is an installer that succeeds but
+    crashes at startup with "Cannot find a Resource with the Name/Key
+    XamlControlsResources" or a XAML load failure on the first page.
+
+    This target re-injects them into the publish set after the SDK has
+    computed its file list. Globs from $(OutDir) (= bin/<Cfg>/<TFM>/<RID>/)
+    where the XBFs and the app PRI live after a build.
+  -->
+  <Target Name="CopyWinUIArtifactsToPublishDirectory" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <_WinUIArtifactsToPublish Include="$(OutDir)**\*.xbf" />
+      <_WinUIArtifactsToPublish Include="$(OutDir)$(AssemblyName).pri" />
+      <ResolvedFileToPublish Include="@(_WinUIArtifactsToPublish)">
+        <RelativePath>%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 
 </Project>
