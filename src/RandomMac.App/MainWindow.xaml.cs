@@ -2,11 +2,13 @@ using Microsoft.UI;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using RandomMac.App.Services;
 using RandomMac.App.ViewModels;
 using Serilog;
 using Windows.Graphics;
+using Windows.System;
 
 namespace RandomMac.App;
 
@@ -89,6 +91,31 @@ public sealed partial class MainWindow : Window
     {
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         return PInvoke.User32.GetDpiForWindow(hwnd);
+    }
+
+    /// <summary>
+    /// Ctrl+1..5 jumps to the corresponding nav item in
+    /// <see cref="MainWindowViewModel.NavItems"/>.
+    /// </summary>
+    private void OnNavShortcut(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        var index = sender.Key switch
+        {
+            VirtualKey.Number1 => 0,
+            VirtualKey.Number2 => 1,
+            VirtualKey.Number3 => 2,
+            VirtualKey.Number4 => 3,
+            VirtualKey.Number5 => 4,
+            _ => -1,
+        };
+
+        if (index >= 0
+            && RootGrid.DataContext is MainWindowViewModel vm
+            && index < vm.NavItems.Count)
+        {
+            vm.SelectedNav = vm.NavItems[index];
+            args.Handled = true;
+        }
     }
 }
 

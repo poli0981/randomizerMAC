@@ -39,6 +39,13 @@
                 </Button>
             </Grid>
 
+            <!-- Empty state: shown when no adapter is selected -->
+            <InfoBar IsOpen="{Binding SelectedAdapter, Converter={StaticResource NullToBoolConverter}, ConverterParameter=invert}"
+                     Title="Pick an adapter"
+                     Message="Choose a network adapter from the dropdown above to view its MAC and start randomizing."
+                     Severity="Informational"
+                     IsClosable="False" />
+
             <!-- Adapter status bar -->
             <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
 
@@ -203,10 +210,11 @@
                               VerticalAlignment="Center" />
             </StackPanel>
 
-            <!-- Status -->
-            <TextBlock Text="{Binding StatusMessage}"
-                       TextWrapping="Wrap"
-                       Opacity="0.85" />
+            <!-- Status (auto-collapses when StatusMessage is empty) -->
+            <InfoBar IsOpen="{Binding HasStatusMessage}"
+                     Message="{Binding StatusMessage}"
+                     Severity="Informational"
+                     IsClosable="True" />
 
             <!-- History grid -->
             <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">

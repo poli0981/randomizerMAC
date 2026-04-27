@@ -14,6 +14,15 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <!-- Ctrl+1..5 jump to nav items in order -->
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Number1" Modifiers="Control" Invoked="OnNavShortcut" />
+            <KeyboardAccelerator Key="Number2" Modifiers="Control" Invoked="OnNavShortcut" />
+            <KeyboardAccelerator Key="Number3" Modifiers="Control" Invoked="OnNavShortcut" />
+            <KeyboardAccelerator Key="Number4" Modifiers="Control" Invoked="OnNavShortcut" />
+            <KeyboardAccelerator Key="Number5" Modifiers="Control" Invoked="OnNavShortcut" />
+        </Grid.KeyboardAccelerators>
+
         <!-- Custom titlebar: dragable region drawn by SetTitleBar(AppTitleBar) -->
         <Grid x:Name="AppTitleBar" Grid.Row="0" Padding="12,0">
             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">

@@ -38,8 +38,38 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty]
     private string _previewMac = "--";
 
+    private const int StatusAutoClearMs = 5000;
+    private CancellationTokenSource? _statusClearCts;
+
     [ObservableProperty]
-    private string _statusMessage = "Select an adapter to get started.";
+    private string _statusMessage = "";
+
+    /// <summary>True when StatusMessage has user-facing content (drives the InfoBar).</summary>
+    public bool HasStatusMessage => !string.IsNullOrEmpty(StatusMessage);
+
+    partial void OnStatusMessageChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasStatusMessage));
+
+        _statusClearCts?.Cancel();
+        if (string.IsNullOrEmpty(value)) return;
+
+        _statusClearCts = new CancellationTokenSource();
+        _ = ClearStatusAfterDelayAsync(value, _statusClearCts.Token);
+    }
+
+    private async Task ClearStatusAfterDelayAsync(string snapshot, CancellationToken token)
+    {
+        try { await Task.Delay(StatusAutoClearMs, token); }
+        catch (OperationCanceledException) { return; }
+
+        if (StatusMessage != snapshot) return; // already replaced by a newer message
+
+        if (App.MainDispatcher is { } d && !d.HasThreadAccess)
+            d.TryEnqueue(() => { if (StatusMessage == snapshot) StatusMessage = ""; });
+        else
+            StatusMessage = "";
+    }
 
     [ObservableProperty]
     private bool _isLoading;
@@ -137,7 +167,9 @@ public partial class DashboardViewModel : ViewModelBase
             IsConnected = false;
             CurrentVendor = "";
             PreviewVendor = "";
-            StatusMessage = "Select an adapter to get started.";
+            // Empty-state hint is shown by the InfoBar in DashboardView; no
+            // need to populate StatusMessage with a "select an adapter" prompt.
+            StatusMessage = "";
             HasPreview = false;
             return;
         }
