@@ -29,11 +29,7 @@ public static class Win32FileDialog
         params (string Label, string Pattern)[] filters)
     {
         return Show(
-            ownerHwnd,
-            title,
-            suggestedFileName,
-            defaultExt,
-            filters,
+            ownerHwnd, title, suggestedFileName, defaultExt, filters,
             OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY | OFN_EXPLORER | OFN_NOCHANGEDIR | OFN_PATHMUSTEXIST,
             isSave: true);
     }
@@ -49,11 +45,7 @@ public static class Win32FileDialog
         params (string Label, string Pattern)[] filters)
     {
         return Show(
-            ownerHwnd,
-            title,
-            "",
-            defaultExt,
-            filters,
+            ownerHwnd, title, "", defaultExt, filters,
             OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_EXPLORER | OFN_NOCHANGEDIR,
             isSave: false);
     }
@@ -67,33 +59,57 @@ public static class Win32FileDialog
         uint flags,
         bool isSave)
     {
-        const int BufferLength = 2048;
-        var buffer = new StringBuilder(BufferLength);
-        if (!string.IsNullOrEmpty(suggestedFileName))
-            buffer.Append(suggestedFileName);
+        const int BufferChars = 2048;
+        const int BufferBytes = BufferChars * sizeof(char);
 
-        // Filter string layout: "Label1\0Pattern1\0Label2\0Pattern2\0\0"
-        var filterSb = new StringBuilder();
-        foreach (var f in filters)
+        // Heap buffer for the path string (in/out). The dialog writes the
+        // chosen path back into this buffer; we read it via PtrToStringUni
+        // afterwards. Using IntPtr (instead of StringBuilder) keeps the
+        // struct blittable so Marshal.SizeOf<OpenFileNameW>() can compute
+        // a layout — StringBuilder fields are non-blittable and trip
+        // "Type ... cannot be marshaled as an unmanaged structure".
+        var fileBuffer = Marshal.AllocHGlobal(BufferBytes);
+
+        try
         {
-            filterSb.Append(f.Label).Append('\0').Append(f.Pattern).Append('\0');
+            // Zero the buffer.
+            for (var i = 0; i < BufferChars; i++)
+                Marshal.WriteInt16(fileBuffer, i * sizeof(char), 0);
+
+            // Seed with the suggested filename.
+            if (!string.IsNullOrEmpty(suggestedFileName))
+            {
+                var bytes = Encoding.Unicode.GetBytes(suggestedFileName);
+                Marshal.Copy(bytes, 0, fileBuffer, Math.Min(bytes.Length, BufferBytes - 2));
+            }
+
+            // Filter string layout: "Label1\0Pattern1\0Label2\0Pattern2\0\0"
+            var filterSb = new StringBuilder();
+            foreach (var (label, pattern) in filters)
+            {
+                filterSb.Append(label).Append('\0').Append(pattern).Append('\0');
+            }
+            filterSb.Append('\0');
+
+            var ofn = new OpenFileNameW
+            {
+                structSize  = Marshal.SizeOf<OpenFileNameW>(),
+                hwnd        = ownerHwnd,
+                filter      = filterSb.ToString(),
+                file        = fileBuffer,
+                maxFile     = BufferChars,
+                title       = title,
+                defExt      = (defaultExt ?? "").TrimStart('.'),
+                flags       = flags,
+            };
+
+            var ok = isSave ? GetSaveFileNameW(ofn) : GetOpenFileNameW(ofn);
+            return ok ? Marshal.PtrToStringUni(fileBuffer) : null;
         }
-        filterSb.Append('\0');
-
-        var ofn = new OpenFileNameW
+        finally
         {
-            structSize = Marshal.SizeOf<OpenFileNameW>(),
-            hwnd = ownerHwnd,
-            filter = filterSb.ToString(),
-            file = buffer,
-            maxFile = BufferLength,
-            title = title,
-            defExt = (defaultExt ?? "").TrimStart('.'),
-            flags = flags,
-        };
-
-        var ok = isSave ? GetSaveFileNameW(ofn) : GetOpenFileNameW(ofn);
-        return ok ? buffer.ToString() : null;
+            Marshal.FreeHGlobal(fileBuffer);
+        }
     }
 
     // OFN_* flags from commdlg.h
@@ -113,28 +129,28 @@ public static class Win32FileDialog
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private sealed class OpenFileNameW
     {
-        public int structSize;
+        public int    structSize;
         public IntPtr hwnd;
         public IntPtr hInstance;
         public string? filter;
         public string? customFilter;
-        public int maxCustomFilter;
-        public int filterIndex;
-        public StringBuilder file = new();
-        public int maxFile;
-        public StringBuilder? fileTitle;
-        public int maxFileTitle;
+        public int    maxCustomFilter;
+        public int    filterIndex;
+        public IntPtr file;          // pointer to writable char buffer (out)
+        public int    maxFile;       // size of `file` in chars
+        public string? fileTitle;
+        public int    maxFileTitle;
         public string? initialDir;
         public string? title;
-        public uint flags;
-        public short fileOffset;
-        public short fileExtension;
+        public uint   flags;
+        public short  fileOffset;
+        public short  fileExtension;
         public string? defExt;
         public IntPtr custData;
         public IntPtr hook;
         public string? templateName;
         public IntPtr pvReserved;
-        public int dwReserved;
-        public int FlagsEx;
+        public uint   dwReserved;
+        public uint   FlagsEx;
     }
 }
