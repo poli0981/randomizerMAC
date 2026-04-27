@@ -12,6 +12,15 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private NavItem? _selectedNav;
 
+    /// <summary>
+    /// Two-way bound to NavigationView.IsPaneOpen. NavItem templates
+    /// observe this via NavItem.Owner to hide labels when the pane is
+    /// collapsed (DataTemplates don't see outside NameScope, so
+    /// ElementName binding to NavView won't resolve from inside).
+    /// </summary>
+    [ObservableProperty]
+    private bool _isPaneOpen = true;
+
     public ObservableCollection<NavItem> NavItems { get; }
 
     public MainWindowViewModel(
@@ -30,6 +39,10 @@ public partial class MainWindowViewModel : ObservableObject
             new NavItem("Nav_Update",    "", update),     // Refresh / Sync
             new NavItem("Nav_About",     "", about),      // Info
         ];
+
+        // Back-reference so item templates can bind to Owner.IsPaneOpen.
+        foreach (var item in NavItems)
+            item.Owner = this;
 
         _currentPage = dashboard;
         _selectedNav = NavItems[0];
@@ -54,6 +67,9 @@ public partial class NavItem : ObservableObject
     public string LabelKey { get; }
     public string Icon { get; }
     public ViewModelBase ViewModel { get; }
+
+    /// <summary>Set by <see cref="MainWindowViewModel"/> after construction.</summary>
+    public MainWindowViewModel? Owner { get; set; }
 
     [ObservableProperty]
     private string _label;

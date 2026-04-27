@@ -34,7 +34,7 @@
         <NavigationView x:Name="NavView"
                         Grid.Row="1"
                         PaneDisplayMode="Left"
-                        IsPaneOpen="True"
+                        IsPaneOpen="{Binding IsPaneOpen, Mode=TwoWay}"
                         IsPaneToggleButtonVisible="True"
                         IsBackButtonVisible="Collapsed"
                         IsSettingsVisible="False"
@@ -51,7 +51,8 @@
                                   Glyph="{Binding Icon}"
                                   FontSize="16" />
                         <TextBlock Text="{Binding Label}"
-                                   VerticalAlignment="Center" />
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding Owner.IsPaneOpen, Converter={StaticResource BoolToVisibilityConverter}}" />
                     </StackPanel>
                 </DataTemplate>
             </NavigationView.MenuItemTemplate>
