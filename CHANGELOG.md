@@ -5,6 +5,44 @@ All notable changes to RANDOM MAC will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-04-27
+
+### Changed
+
+- **UI/UX migrated from Avalonia 11.2 to WinUI 3 + Microsoft.WindowsAppSDK 1.8 (Fluent Design 2).**
+  Fixed window size 880x600 with resize and maximize disabled (and the maximize
+  button hidden). Mica backdrop on Windows 11; Desktop Acrylic fallback on
+  Windows 10; solid fallback otherwise. Custom titlebar via
+  `ExtendsContentIntoTitleBar` + `SetTitleBar(AppTitleBar)`. Pane-permanently-open
+  `NavigationView` with Segoe Fluent Icons glyphs. Logic in `RandomMac.Core`
+  is unchanged.
+- **Target framework moved to `net11.0-windows10.0.26100.0`** for the App
+  project (Core stays on `net9.0`); `global.json` pins the SDK to
+  `11.0.100-preview.3`. Self-contained Windows App SDK payload, unpackaged
+  (compatible with Velopack and the existing `requireAdministrator` manifest).
+- Localization: replaced the Avalonia-specific `{loc:L Key}` `MarkupExtension`
+  with `Loc.Instance` registered as an Application resource — XAML now binds
+  via `{Binding [Key], Source={StaticResource Loc}}`. Live language switching
+  preserved via `INotifyPropertyChanged.Item[]`.
+- Tray icon backed by `H.NotifyIcon.WinUI` (replacing `Avalonia.TrayIcon`).
+- Notifications routed through `App.MainDispatcher` (replacing
+  `Avalonia.Threading.Dispatcher.UIThread`).
+- File pickers (Settings export/import, Log export) use
+  `Windows.Storage.Pickers.FileSavePicker`/`FileOpenPicker` with
+  `WinRT.Interop.InitializeWithWindow.Initialize` (unpackaged HWND init).
+- Clipboard copy uses `Windows.ApplicationModel.DataTransfer.Clipboard`.
+
+### Fixed
+
+- **Duplicate "Detected adapter:" / "Excluded adapter:" log lines at cold
+  start.** Two ViewModels (`DashboardViewModel` and `SettingsViewModel`) used
+  to fire-and-forget `INetworkAdapterService.GetPhysicalAdaptersAsync()` from
+  their constructors. The two scans ran concurrently and each emitted its own
+  log block. Fixed by introducing `IAdapterCacheService` (single-flight load
+  guarded by `SemaphoreSlim`); `App.OnLaunched` warms the cache once before
+  the ViewModels resolve, and ViewModels read the cached list synchronously
+  in their constructors.
+
 ## [1.0.0] - 2026-04-07
 
 ### Initial Release
