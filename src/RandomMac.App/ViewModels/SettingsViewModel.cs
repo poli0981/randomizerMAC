@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using RandomMac.App.Helpers;
 using RandomMac.App.Localization;
 using RandomMac.App.Services;
 using RandomMac.Core.Helpers;
@@ -10,7 +11,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Compression;
-using Windows.Storage.Pickers;
 
 namespace RandomMac.App.ViewModels;
 
@@ -271,22 +271,17 @@ public partial class SettingsViewModel : ViewModelBase
     {
         try
         {
-            var picker = new FileSavePicker
-            {
-                SuggestedStartLocation = PickerLocationId.Desktop,
-                SuggestedFileName = "randommac-settings",
-                DefaultFileExtension = ".json"
-            };
-            picker.FileTypeChoices.Add("JSON", [".json"]);
+            var path = Win32FileDialog.PickSave(
+                MainWindowHwnd(),
+                "Export Settings",
+                "randommac-settings.json",
+                ".json",
+                ("JSON files (*.json)", "*.json"));
 
-            InitWithMainWindow(picker);
+            if (string.IsNullOrEmpty(path)) return;
 
-            var file = await picker.PickSaveFileAsync();
-            if (file is not null)
-            {
-                await _settingsService.ExportAsync(file.Path);
-                StatusMessage = "Settings exported.";
-            }
+            await _settingsService.ExportAsync(path);
+            StatusMessage = "Settings exported.";
         }
         catch (Exception ex)
         {
@@ -304,18 +299,14 @@ public partial class SettingsViewModel : ViewModelBase
     {
         try
         {
-            var picker = new FileSavePicker
-            {
-                SuggestedStartLocation = PickerLocationId.Desktop,
-                SuggestedFileName = $"randommac-bundle-{DateTime.Now:yyyyMMdd-HHmmss}",
-                DefaultFileExtension = ".zip"
-            };
-            picker.FileTypeChoices.Add("ZIP archive", [".zip"]);
+            var path = Win32FileDialog.PickSave(
+                MainWindowHwnd(),
+                "Export bundle (settings + blacklist + history)",
+                $"randommac-bundle-{DateTime.Now:yyyyMMdd-HHmmss}.zip",
+                ".zip",
+                ("ZIP archive (*.zip)", "*.zip"));
 
-            InitWithMainWindow(picker);
-
-            var file = await picker.PickSaveFileAsync();
-            if (file is null) return;
+            if (string.IsNullOrEmpty(path)) return;
 
             var sources = new (string label, string path)[]
             {
@@ -324,29 +315,25 @@ public partial class SettingsViewModel : ViewModelBase
                 ("history.json",   _historyService.GetFilePath()),
             };
 
-            // FileSavePicker has already created an empty placeholder at
-            // file.Path — ZipFile.Open(..., Create) refuses an existing
-            // file, and File.Delete may race with the picker's StorageFile
-            // handle. Open via FileStream(FileMode.Create) which truncates
-            // in place, then wrap in ZipArchive.
+            // FileMode.Create truncates if the path already exists.
             await using var stream = new FileStream(
-                file.Path, FileMode.Create, FileAccess.Write, FileShare.None);
+                path, FileMode.Create, FileAccess.Write, FileShare.None);
             using var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: false);
-            foreach (var (label, path) in sources)
+            foreach (var (label, src) in sources)
             {
-                if (!File.Exists(path))
+                if (!File.Exists(src))
                 {
-                    _logger.LogDebug("Export bundle: {Label} missing at {Path}, skipped", label, path);
+                    _logger.LogDebug("Export bundle: {Label} missing at {Path}, skipped", label, src);
                     continue;
                 }
 
                 var entry = zip.CreateEntry(label, CompressionLevel.Optimal);
                 using var entryStream = entry.Open();
-                await using var src = File.OpenRead(path);
-                await src.CopyToAsync(entryStream);
+                await using var srcStream = File.OpenRead(src);
+                await srcStream.CopyToAsync(entryStream);
             }
 
-            StatusMessage = $"Bundle exported to {Path.GetFileName(file.Path)}.";
+            StatusMessage = $"Bundle exported to {Path.GetFileName(path)}.";
         }
         catch (Exception ex)
         {
@@ -360,28 +347,24 @@ public partial class SettingsViewModel : ViewModelBase
     {
         try
         {
-            var picker = new FileOpenPicker
-            {
-                SuggestedStartLocation = PickerLocationId.Desktop,
-            };
-            picker.FileTypeFilter.Add(".json");
+            var path = Win32FileDialog.PickOpen(
+                MainWindowHwnd(),
+                "Import Settings",
+                ".json",
+                ("JSON files (*.json)", "*.json"));
 
-            InitWithMainWindow(picker);
+            if (string.IsNullOrEmpty(path)) return;
 
-            var file = await picker.PickSingleFileAsync();
-            if (file is not null)
-            {
-                await _settingsService.ImportAsync(file.Path);
+            await _settingsService.ImportAsync(path);
 
-                _isLoading = true;
-                LoadFromSettings();
-                _isLoading = false;
+            _isLoading = true;
+            LoadFromSettings();
+            _isLoading = false;
 
-                _themeService.Apply(SelectedThemeMode);
-                Loc.SetLanguage(SelectedLanguage);
-                PopulateAutoChangeAdaptersFromCache();
-                StatusMessage = "Settings imported.";
-            }
+            _themeService.Apply(SelectedThemeMode);
+            Loc.SetLanguage(SelectedLanguage);
+            PopulateAutoChangeAdaptersFromCache();
+            StatusMessage = "Settings imported.";
         }
         catch (Exception ex)
         {
@@ -390,12 +373,9 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    private static void InitWithMainWindow(object pickerOrDialog)
-    {
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(
+    private static IntPtr MainWindowHwnd() =>
+        WinRT.Interop.WindowNative.GetWindowHandle(
             App.Services.GetRequiredService<MainWindow>());
-        WinRT.Interop.InitializeWithWindow.Initialize(pickerOrDialog, hwnd);
-    }
 
     [RelayCommand]
     private void OpenSettingsFile() => OpenInExplorer(_settingsService.GetFilePath());

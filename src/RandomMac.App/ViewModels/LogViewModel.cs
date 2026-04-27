@@ -2,9 +2,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using RandomMac.App.Helpers;
 using RandomMac.App.Services;
 using System.Collections.ObjectModel;
-using Windows.Storage.Pickers;
 
 namespace RandomMac.App.ViewModels;
 
@@ -81,29 +81,22 @@ public partial class LogViewModel : ViewModelBase
     {
         try
         {
-            var picker = new FileSavePicker
-            {
-                SuggestedStartLocation = PickerLocationId.Desktop,
-                SuggestedFileName = $"randommac-log-{DateTime.Now:yyyyMMdd-HHmmss}",
-                DefaultFileExtension = ".txt"
-            };
-            // WinUI 3 FileSavePicker rejects wildcards (".*") with
-            // "File extensions must begin with '.' and contain no wildcards."
-            // List concrete extensions instead.
-            picker.FileTypeChoices.Add("Text File", [".txt"]);
-            picker.FileTypeChoices.Add("Log File", [".log"]);
-
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(
                 App.Services.GetRequiredService<MainWindow>());
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
 
-            var file = await picker.PickSaveFileAsync();
-            if (file is not null)
-            {
-                var content = string.Join(Environment.NewLine, LogLines);
-                await File.WriteAllTextAsync(file.Path, content);
-                _logger.LogInformation("Log exported to {Path}", file.Path);
-            }
+            var path = Win32FileDialog.PickSave(
+                hwnd,
+                "Export Log",
+                $"randommac-log-{DateTime.Now:yyyyMMdd-HHmmss}.txt",
+                ".txt",
+                ("Text File (*.txt)", "*.txt"),
+                ("Log File (*.log)",  "*.log"));
+
+            if (string.IsNullOrEmpty(path)) return;
+
+            var content = string.Join(Environment.NewLine, LogLines);
+            await File.WriteAllTextAsync(path, content);
+            _logger.LogInformation("Log exported to {Path}", path);
         }
         catch (Exception ex)
         {
