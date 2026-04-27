@@ -1,6 +1,5 @@
-using Avalonia.Data.Converters;
+using Microsoft.UI.Xaml.Data;
 using RandomMac.App.Services;
-using System.Globalization;
 
 namespace RandomMac.App.Converters;
 
@@ -8,7 +7,7 @@ public sealed class NotifTypeToIconConverter : IValueConverter
 {
     public static readonly NotifTypeToIconConverter Instance = new();
 
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object Convert(object value, Type targetType, object parameter, string language)
     {
         return value is NotificationType type ? type switch
         {
@@ -19,6 +18,6 @@ public sealed class NotifTypeToIconConverter : IValueConverter
         } : "INFO";
     }
 
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object ConvertBack(object value, Type targetType, object parameter, string language)
         => throw new NotSupportedException();
 }

@@ -1,81 +1,90 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
+using CommunityToolkit.Mvvm.Input;
+using H.NotifyIcon;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using RandomMac.Core.Services.Interfaces;
 
 namespace RandomMac.App.Services;
 
 /// <summary>
-/// Manages the system tray icon and its context menu.
+/// Manages the system tray icon and its context menu. Backed by
+/// <see cref="H.NotifyIcon.TaskbarIcon"/> (WinUI 3 port of WPF's NotifyIcon).
 /// </summary>
 public sealed class TrayIconService : IDisposable
 {
-    private TrayIcon? _trayIcon;
-    private readonly ISettingsService _settingsService;
+    private TaskbarIcon? _trayIcon;
+    private MainWindow? _window;
     private bool _isExiting;
+
+    private readonly ISettingsService _settingsService;
 
     public TrayIconService(ISettingsService settingsService)
     {
         _settingsService = settingsService;
     }
 
-    public void Initialize(Window mainWindow)
+    public void Initialize(MainWindow mainWindow)
     {
-        _trayIcon = new TrayIcon
+        _window = mainWindow;
+
+        _trayIcon = new TaskbarIcon
         {
             ToolTipText = "RANDOM MAC",
-            IsVisible = true,
-            Menu = CreateMenu(mainWindow)
+            ContextFlyout = BuildMenu(),
+            LeftClickCommand = new RelayCommand(ShowMainWindow),
         };
+        _trayIcon.ForceCreate();
 
-        _trayIcon.Clicked += (_, _) => ShowWindow(mainWindow);
-
-        // Handle minimize to tray (intercept close → hide, unless exiting)
-        mainWindow.Closing += (_, e) =>
+        // Intercept close → hide (unless exiting from tray menu)
+        if (mainWindow.AppWindow is not null)
         {
-            if (_isExiting) return; // Allow close when exiting
-
-            if (_settingsService.Settings.MinimizeToTray)
-            {
-                e.Cancel = true;
-                mainWindow.Hide();
-            }
-        };
+            mainWindow.AppWindow.Closing += OnAppWindowClosing;
+        }
     }
 
-    private NativeMenu CreateMenu(Window mainWindow)
+    private void OnAppWindowClosing(
+        Microsoft.UI.Windowing.AppWindow sender,
+        Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
     {
-        var menu = new NativeMenu();
+        if (_isExiting) return;
 
-        var showItem = new NativeMenuItem("Show");
-        showItem.Click += (_, _) => ShowWindow(mainWindow);
-        menu.Add(showItem);
+        if (_settingsService.Settings.MinimizeToTray)
+        {
+            args.Cancel = true;
+            _window?.AppWindow?.Hide();
+        }
+    }
 
-        menu.Add(new NativeMenuItemSeparator());
+    private MenuFlyout BuildMenu()
+    {
+        var menu = new MenuFlyout();
 
-        var exitItem = new NativeMenuItem("Exit");
-        exitItem.Click += (_, _) => ExitApp(mainWindow);
-        menu.Add(exitItem);
+        var showItem = new MenuFlyoutItem { Text = "Show" };
+        showItem.Click += (_, _) => ShowMainWindow();
+        menu.Items.Add(showItem);
+
+        menu.Items.Add(new MenuFlyoutSeparator());
+
+        var exitItem = new MenuFlyoutItem { Text = "Exit" };
+        exitItem.Click += (_, _) => ExitApp();
+        menu.Items.Add(exitItem);
 
         return menu;
     }
 
-    private void ExitApp(Window mainWindow)
+    private void ShowMainWindow()
     {
-        _isExiting = true; // Bypass Closing handler
-        Dispose();
+        if (_window?.AppWindow is null) return;
 
-        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            desktop.Shutdown();
-        }
+        _window.AppWindow.Show();
+        _window.Activate();
     }
 
-    private static void ShowWindow(Window window)
+    private void ExitApp()
     {
-        window.Show();
-        window.WindowState = WindowState.Normal;
-        window.Activate();
+        _isExiting = true;
+        Dispose();
+        Application.Current?.Exit();
     }
 
     public void Dispose()

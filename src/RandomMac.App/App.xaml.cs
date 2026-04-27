@@ -1,12 +1,9 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using RandomMac.App.ViewModels;
-using RandomMac.App.Views;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 using RandomMac.App.Services;
+using RandomMac.App.ViewModels;
 using RandomMac.Core.Helpers;
 using RandomMac.Core.Models;
 using RandomMac.Core.Services.Implementations;
@@ -18,19 +15,30 @@ namespace RandomMac.App;
 public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
+    private MainWindow? _mainWindow;
 
     public static IServiceProvider Services { get; private set; } = null!;
 
-    public override void Initialize()
-    {
-        AvaloniaXamlLoader.Load(this);
-    }
+    /// <summary>
+    /// Captured from <see cref="MainWindow"/> after activation. Used by
+    /// background-thread services (e.g. <see cref="NotificationService"/>)
+    /// to marshal back to the UI thread.
+    /// </summary>
+    public static DispatcherQueue MainDispatcher { get; private set; } = null!;
 
-    public override async void OnFrameworkInitializationCompleted()
+    public App()
     {
+        InitializeComponent();
         ConfigureServices();
 
-        // Admin check
+        // Register the localization singleton as an Application resource so
+        // XAML can bind via {Binding [Key], Source={StaticResource Loc}}.
+        // Must happen AFTER InitializeComponent() so Resources is populated.
+        Resources["Loc"] = Localization.Loc.Instance;
+    }
+
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
+    {
         if (!AdminHelper.IsRunningAsAdmin())
             Log.Warning("Application is not running as Administrator. Some features may not work.");
 
@@ -39,45 +47,38 @@ public partial class App : Application
         await Services.GetRequiredService<IBlacklistService>().LoadAsync();
         await Services.GetRequiredService<IHistoryService>().LoadAsync();
 
-        // Apply saved theme + language
         var settings = Services.GetRequiredService<ISettingsService>().Settings;
         Services.GetRequiredService<ThemeService>().Apply(settings.ThemeMode, settings.AccentColor);
         Localization.Loc.SetLanguage(settings.Language);
 
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        _mainWindow = Services.GetRequiredService<MainWindow>();
+        MainDispatcher = _mainWindow.DispatcherQueue;
+
+        // Tray icon must be initialized before --minimized handling
+        Services.GetRequiredService<TrayIconService>().Initialize(_mainWindow);
+
+        // Handle --minimized (only set by Task Scheduler at OS startup)
+        var cmdArgs = Environment.GetCommandLineArgs();
+        var isOsStartup = cmdArgs.Contains("--minimized");
+        Log.Information("Startup args: [{Args}], isOsStartup={IsOsStartup}",
+            string.Join(", ", cmdArgs), isOsStartup);
+
+        if (isOsStartup)
         {
-            var mainWindow = Services.GetRequiredService<MainWindow>();
-            desktop.MainWindow = mainWindow;
-            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
-
-            // Initialize tray icon
-            var trayService = Services.GetRequiredService<TrayIconService>();
-            trayService.Initialize(mainWindow);
-
-            // Handle --minimized startup (only from OS startup via Task Scheduler)
-            var isOsStartup = desktop.Args?.Contains("--minimized") == true;
-            Log.Information("Startup args: [{Args}], isOsStartup={IsOsStartup}",
-                string.Join(", ", desktop.Args ?? []), isOsStartup);
-            if (isOsStartup)
-            {
-                Log.Information("Starting minimized to system tray");
-                mainWindow.WindowState = WindowState.Minimized;
-                mainWindow.ShowInTaskbar = false;
-                mainWindow.Opened += (_, _) => mainWindow.Hide();
-            }
-            else
-            {
-                Log.Information("Starting with visible window");
-            }
-
-            // Auto-change MAC on startup (when enabled, regardless of minimized state)
-            if (settings.AutoChangeOnStartup && settings.AutoChangeAdapterIds.Count > 0)
-            {
-                _ = PerformAutoChangeAsync(settings.AutoChangeAdapterIds);
-            }
+            Log.Information("Starting minimized to system tray (window not activated)");
+            // Don't Activate() — tray icon is the visible affordance.
+        }
+        else
+        {
+            Log.Information("Starting with visible window");
+            _mainWindow.Activate();
         }
 
-        base.OnFrameworkInitializationCompleted();
+        // Auto-change MAC on startup (regardless of minimized state)
+        if (settings.AutoChangeOnStartup && settings.AutoChangeAdapterIds.Count > 0)
+        {
+            _ = PerformAutoChangeAsync(settings.AutoChangeAdapterIds);
+        }
     }
 
     private static async Task PerformAutoChangeAsync(List<string> adapterPnpIds)
@@ -119,7 +120,6 @@ public partial class App : Application
 
                 var result = await macService.ChangeMacAsync(adapter, newMac.Value);
 
-                // Record history
                 historyService.Add(new MacHistoryEntry
                 {
                     AdapterName = adapter.Name,

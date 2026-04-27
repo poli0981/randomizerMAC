@@ -10,7 +10,7 @@ public partial class MainWindowViewModel : ObservableObject
     private ViewModelBase _currentPage;
 
     [ObservableProperty]
-    private int _selectedNavIndex;
+    private NavItem? _selectedNav;
 
     public ObservableCollection<NavItem> NavItems { get; }
 
@@ -21,19 +21,20 @@ public partial class MainWindowViewModel : ObservableObject
         UpdateViewModel update,
         LogViewModel log)
     {
+        // Glyphs are Segoe Fluent Icons codepoints (https://aka.ms/SegoeFluentIcons).
         NavItems =
         [
-            new NavItem("Nav_Dashboard", "Home", dashboard),
-            new NavItem("Nav_Settings", "Settings", settings),
-            new NavItem("Nav_Log", "Document", log),
-            new NavItem("Nav_Update", "ArrowSync", update),
-            new NavItem("Nav_About", "Info", about),
+            new NavItem("Nav_Dashboard", "", dashboard),  // Home
+            new NavItem("Nav_Settings",  "", settings),   // Settings (gear)
+            new NavItem("Nav_Log",       "", log),        // Document
+            new NavItem("Nav_Update",    "", update),     // Refresh / Sync
+            new NavItem("Nav_About",     "", about),      // Info
         ];
 
         _currentPage = dashboard;
-        _selectedNavIndex = 0;
+        _selectedNav = NavItems[0];
 
-        // Update nav labels when language changes
+        // Refresh nav labels when language changes
         Loc.Instance.PropertyChanged += (_, _) =>
         {
             foreach (var item in NavItems)
@@ -41,12 +42,10 @@ public partial class MainWindowViewModel : ObservableObject
         };
     }
 
-    partial void OnSelectedNavIndexChanged(int value)
+    partial void OnSelectedNavChanged(NavItem? value)
     {
-        if (value >= 0 && value < NavItems.Count)
-        {
-            CurrentPage = NavItems[value].ViewModel;
-        }
+        if (value is not null)
+            CurrentPage = value.ViewModel;
     }
 }
 

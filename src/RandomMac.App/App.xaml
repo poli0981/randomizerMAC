@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="RandomMac.App.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:conv="using:RandomMac.App.Converters">
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <ResourceDictionary Source="ms-appx:///Themes/Theme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Typed converters used across views -->
+            <conv:BoolToColorConverter x:Key="BoolToColorConverter" />
+            <conv:BoolToStatusConverter x:Key="BoolToStatusConverter" />
+            <conv:NotifTypeToIconConverter x:Key="NotifTypeToIconConverter" />
+            <conv:NotifTypeToBrushConverter x:Key="NotifTypeToBrushConverter" />
+            <conv:StatusCodeToBrushConverter x:Key="StatusCodeToBrushConverter" />
+
+            <!-- Common converters -->
+            <conv:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <conv:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <conv:NullToBoolConverter x:Key="NullToBoolConverter" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

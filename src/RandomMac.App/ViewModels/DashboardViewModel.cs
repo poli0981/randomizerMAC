@@ -310,19 +310,16 @@ public partial class DashboardViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task CopyMacAsync(string? mac)
+    private void CopyMac(string? mac)
     {
         if (string.IsNullOrEmpty(mac) || mac == "--") return;
 
         try
         {
-            var topLevel = Avalonia.Controls.TopLevel.GetTopLevel(
-                (App.Services.GetService(typeof(Views.MainWindow)) as Avalonia.Controls.Window)!);
-            if (topLevel?.Clipboard is not null)
-            {
-                await topLevel.Clipboard.SetTextAsync(mac);
-                _notificationService.Info(Loc.Get("Notif_Copied", mac));
-            }
+            var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            package.SetText(mac);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+            _notificationService.Info(Loc.Get("Notif_Copied", mac));
         }
         catch (Exception ex)
         {

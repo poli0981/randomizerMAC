@@ -1,11 +1,10 @@
-using Avalonia.Controls;
-using Avalonia.Platform.Storage;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RandomMac.App.Services;
 using System.Collections.ObjectModel;
+using Windows.Storage.Pickers;
 
 namespace RandomMac.App.ViewModels;
 
@@ -31,22 +30,20 @@ public partial class LogViewModel : ViewModelBase
     {
         _logger = logger;
 
-        // Load existing entries
         foreach (var entry in LogEntrySink.Instance.Entries)
             LogLines.Add(entry.Display);
         LogCount = LogLines.Count;
 
-        // Subscribe to new entries
         LogEntrySink.Instance.SetCallback(OnNewLogEntry);
     }
 
     private void OnNewLogEntry(LogEntry entry)
     {
-        Dispatcher.UIThread.Post(() =>
+        // Marshal to UI thread via the dispatcher captured by App after MainWindow init.
+        App.MainDispatcher?.TryEnqueue(() =>
         {
             var line = entry.Display;
 
-            // Apply filter
             if (!string.IsNullOrEmpty(FilterText)
                 && !line.Contains(FilterText, StringComparison.OrdinalIgnoreCase))
                 return;
@@ -54,7 +51,6 @@ public partial class LogViewModel : ViewModelBase
             LogLines.Add(line);
             LogCount = LogLines.Count;
 
-            // Keep max 1000 lines in UI
             if (LogLines.Count > 1000)
                 LogLines.RemoveAt(0);
         });
@@ -62,7 +58,6 @@ public partial class LogViewModel : ViewModelBase
 
     partial void OnFilterTextChanged(string value)
     {
-        // Re-filter all entries
         LogLines.Clear();
         foreach (var entry in LogEntrySink.Instance.Entries)
         {
@@ -86,27 +81,25 @@ public partial class LogViewModel : ViewModelBase
     {
         try
         {
-            var topLevel = TopLevel.GetTopLevel(
-                (App.Services.GetService(typeof(Views.MainWindow)) as Window)!);
-            if (topLevel is null) return;
-
-            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            var picker = new FileSavePicker
             {
-                Title = "Export Log",
-                DefaultExtension = "txt",
-                FileTypeChoices =
-                [
-                    new FilePickerFileType("Text File") { Patterns = ["*.txt"] },
-                    new FilePickerFileType("All Files") { Patterns = ["*.*"] }
-                ],
-                SuggestedFileName = $"randommac-log-{DateTime.Now:yyyyMMdd-HHmmss}.txt"
-            });
+                SuggestedStartLocation = PickerLocationId.Desktop,
+                SuggestedFileName = $"randommac-log-{DateTime.Now:yyyyMMdd-HHmmss}",
+                DefaultFileExtension = ".txt"
+            };
+            picker.FileTypeChoices.Add("Text File", [".txt"]);
+            picker.FileTypeChoices.Add("All Files", [".*"]);
 
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(
+                App.Services.GetRequiredService<MainWindow>());
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+
+            var file = await picker.PickSaveFileAsync();
             if (file is not null)
             {
                 var content = string.Join(Environment.NewLine, LogLines);
-                await File.WriteAllTextAsync(file.Path.LocalPath, content);
-                _logger.LogInformation("Log exported to {Path}", file.Path.LocalPath);
+                await File.WriteAllTextAsync(file.Path, content);
+                _logger.LogInformation("Log exported to {Path}", file.Path);
             }
         }
         catch (Exception ex)

@@ -1,7 +1,6 @@
-using Avalonia.Controls;
-using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RandomMac.App.Localization;
 using RandomMac.App.Services;
@@ -9,6 +8,7 @@ using RandomMac.Core.Helpers;
 using RandomMac.Core.Services.Interfaces;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using Windows.Storage.Pickers;
 
 namespace RandomMac.App.ViewModels;
 
@@ -167,24 +167,20 @@ public partial class SettingsViewModel : ViewModelBase
     {
         try
         {
-            var topLevel = TopLevel.GetTopLevel(
-                (App.Services.GetService(typeof(Views.MainWindow)) as Window)!);
-            if (topLevel is null) return;
-
-            var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            var picker = new FileSavePicker
             {
-                Title = "Export Settings",
-                DefaultExtension = "json",
-                FileTypeChoices =
-                [
-                    new FilePickerFileType("JSON") { Patterns = ["*.json"] }
-                ],
-                SuggestedFileName = "randommac-settings.json"
-            });
+                SuggestedStartLocation = PickerLocationId.Desktop,
+                SuggestedFileName = "randommac-settings",
+                DefaultFileExtension = ".json"
+            };
+            picker.FileTypeChoices.Add("JSON", [".json"]);
 
+            InitWithMainWindow(picker);
+
+            var file = await picker.PickSaveFileAsync();
             if (file is not null)
             {
-                await _settingsService.ExportAsync(file.Path.LocalPath);
+                await _settingsService.ExportAsync(file.Path);
                 StatusMessage = "Settings exported.";
             }
         }
@@ -200,23 +196,18 @@ public partial class SettingsViewModel : ViewModelBase
     {
         try
         {
-            var topLevel = TopLevel.GetTopLevel(
-                (App.Services.GetService(typeof(Views.MainWindow)) as Window)!);
-            if (topLevel is null) return;
-
-            var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            var picker = new FileOpenPicker
             {
-                Title = "Import Settings",
-                AllowMultiple = false,
-                FileTypeFilter =
-                [
-                    new FilePickerFileType("JSON") { Patterns = ["*.json"] }
-                ]
-            });
+                SuggestedStartLocation = PickerLocationId.Desktop,
+            };
+            picker.FileTypeFilter.Add(".json");
 
-            if (files.Count > 0)
+            InitWithMainWindow(picker);
+
+            var file = await picker.PickSingleFileAsync();
+            if (file is not null)
             {
-                await _settingsService.ImportAsync(files[0].Path.LocalPath);
+                await _settingsService.ImportAsync(file.Path);
                 LoadFromSettings();
                 _themeService.Apply(SelectedThemeMode, SelectedAccentColor);
                 Loc.SetLanguage(SelectedLanguage);
@@ -228,6 +219,13 @@ public partial class SettingsViewModel : ViewModelBase
             StatusMessage = $"Import failed: {ex.Message}";
             _logger.LogError(ex, "Failed to import settings");
         }
+    }
+
+    private static void InitWithMainWindow(object pickerOrDialog)
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(
+            App.Services.GetRequiredService<MainWindow>());
+        WinRT.Interop.InitializeWithWindow.Initialize(pickerOrDialog, hwnd);
     }
 
     [RelayCommand]

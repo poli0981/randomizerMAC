@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="RandomMac.App.Controls.NotificationPopup"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ItemsControl ItemsSource="{Binding Notifications}">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <StackPanel Spacing="6" />
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate>
+                <Border MinWidth="260"
+                        MaxWidth="340"
+                        Padding="12,10"
+                        CornerRadius="8"
+                        Background="{Binding Type, Converter={StaticResource NotifTypeToBrushConverter}, ConverterParameter=Background}"
+                        BorderBrush="{Binding Type, Converter={StaticResource NotifTypeToBrushConverter}, ConverterParameter=Stripe}"
+                        BorderThickness="3,0,0,0">
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                </Border>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
+</UserControl>

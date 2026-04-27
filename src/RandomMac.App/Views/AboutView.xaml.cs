@@ -1,8 +1,8 @@
-using Avalonia.Controls;
+using Microsoft.UI.Xaml.Controls;
 
 namespace RandomMac.App.Views;
 
-public partial class AboutView : UserControl
+public sealed partial class AboutView : UserControl
 {
     public AboutView()
     {
