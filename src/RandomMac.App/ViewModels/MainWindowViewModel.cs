@@ -10,7 +10,16 @@ public partial class MainWindowViewModel : ObservableObject
     private ViewModelBase _currentPage;
 
     [ObservableProperty]
-    private int _selectedNavIndex;
+    private NavItem? _selectedNav;
+
+    /// <summary>
+    /// Two-way bound to NavigationView.IsPaneOpen. NavItem templates
+    /// observe this via NavItem.Owner to hide labels when the pane is
+    /// collapsed (DataTemplates don't see outside NameScope, so
+    /// ElementName binding to NavView won't resolve from inside).
+    /// </summary>
+    [ObservableProperty]
+    private bool _isPaneOpen = true;
 
     public ObservableCollection<NavItem> NavItems { get; }
 
@@ -21,19 +30,24 @@ public partial class MainWindowViewModel : ObservableObject
         UpdateViewModel update,
         LogViewModel log)
     {
+        // Glyphs are Segoe Fluent Icons codepoints (https://aka.ms/SegoeFluentIcons).
         NavItems =
         [
-            new NavItem("Nav_Dashboard", "Home", dashboard),
-            new NavItem("Nav_Settings", "Settings", settings),
-            new NavItem("Nav_Log", "Document", log),
-            new NavItem("Nav_Update", "ArrowSync", update),
-            new NavItem("Nav_About", "Info", about),
+            new NavItem("Nav_Dashboard", "", dashboard),  // Home
+            new NavItem("Nav_Settings",  "", settings),   // Settings (gear)
+            new NavItem("Nav_Log",       "", log),        // Document
+            new NavItem("Nav_Update",    "", update),     // Refresh / Sync
+            new NavItem("Nav_About",     "", about),      // Info
         ];
 
-        _currentPage = dashboard;
-        _selectedNavIndex = 0;
+        // Back-reference so item templates can bind to Owner.IsPaneOpen.
+        foreach (var item in NavItems)
+            item.Owner = this;
 
-        // Update nav labels when language changes
+        _currentPage = dashboard;
+        _selectedNav = NavItems[0];
+
+        // Refresh nav labels when language changes
         Loc.Instance.PropertyChanged += (_, _) =>
         {
             foreach (var item in NavItems)
@@ -41,12 +55,10 @@ public partial class MainWindowViewModel : ObservableObject
         };
     }
 
-    partial void OnSelectedNavIndexChanged(int value)
+    partial void OnSelectedNavChanged(NavItem? value)
     {
-        if (value >= 0 && value < NavItems.Count)
-        {
-            CurrentPage = NavItems[value].ViewModel;
-        }
+        if (value is not null)
+            CurrentPage = value.ViewModel;
     }
 }
 
@@ -55,6 +67,9 @@ public partial class NavItem : ObservableObject
     public string LabelKey { get; }
     public string Icon { get; }
     public ViewModelBase ViewModel { get; }
+
+    /// <summary>Set by <see cref="MainWindowViewModel"/> after construction.</summary>
+    public MainWindowViewModel? Owner { get; set; }
 
     [ObservableProperty]
     private string _label;

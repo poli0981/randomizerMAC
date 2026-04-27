@@ -5,6 +5,98 @@ All notable changes to RANDOM MAC will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-04-27
+
+UX polish + correctness fixes on top of the WinUI 3 migration.
+
+### Added
+
+- **Tray quick action** "Randomize Active Adapter" — one-click MAC change on the first connected adapter, no UI needed.
+- **Tray double-click** restores the window (was single-click only). Right-click menu items (Show / Randomize / Exit) now reliably fire.
+- **Hamburger toggle** on the navigation pane — collapses to 48px icon-only.
+- **Empty-state InfoBar** on Dashboard when no adapter is selected.
+- **Status InfoBar** with auto-clear after 5s (replaces the static status TextBlock).
+- **Keyboard shortcuts**: `Ctrl+1..5` jump between pages, `Ctrl+R` Randomize, `Ctrl+Enter` Apply.
+- **Page transitions** — `NavigationThemeTransition` slide+fade between pages.
+- **Auto-update check on launch** — throttled by `LastUpdateCheckedAt` (24h cooldown). Surfaces `Notif_UpdateAvailable` toast if a new version is found.
+- **History filter** — TextBox above the Recent History grid, live-filters by adapter name or MAC string.
+- **History retention** — entries older than 30 days are auto-pruned on Load and on every Add. Hard cap stays at 100 entries.
+- **Atomic history save** — writes to `history.json.tmp` then `File.Move(..., overwrite:true)`; a process kill mid-write no longer corrupts the file.
+- **Corrupt-history backup** — if `history.json` fails to parse on load, it's copied to `history.json.bak.<timestamp>` and SaveAsync refuses to write until the next clean parse, preventing silent data loss.
+- **Bundle export** — Settings → "Export All (zip)" packages `settings.json` + `blacklist.json` + `history.json` into a single ZIP for backup or migration.
+- **Connection icon** with text — replaces the 10px colored dot on the Dashboard adapter status row.
+- **Adapter dropdown icon** — WiFi / Ethernet glyph next to each adapter name.
+- **Relative timestamps** in Recent History — "just now", "5 min ago", "yesterday HH:mm", "yyyy-MM-dd HH:mm".
+
+### Changed
+
+- **Window size** 880×600 → **1024×680**. Fixed, non-resizable, no maximize button.
+- **Auto-apply Settings** — every toggle/combo applies immediately (theme, language, startup task) and persists asynchronously after a 500ms debounce. The "Save" button is removed.
+- **Accent color picker removed** — UI is now hardcoded to `#61AFEF`. The `AccentColor` field is dropped from `AppSettings`; existing `settings.json` files load without migration (System.Text.Json ignores unknown keys).
+- **Update view** — state-driven hero card (✓ green up-to-date, ⬆ accent update-available, ⚠ red error, ⓘ idle), "Last checked: 5 min ago" line, scrollable release notes, indeterminate ProgressBar during download.
+- **About view** — centered hero (icon + name + version), compact 4-column third-party rows, dependency list updated for v1.1.x (drops Avalonia / FluentAvalonia, adds Microsoft.WindowsAppSDK / CommunityToolkit.WinUI.UI.Controls.DataGrid / H.NotifyIcon.WinUI).
+- **Scrollbars** set to Hidden everywhere — scroll input still works (wheel / touch / keyboard) but the visible track is suppressed.
+- **JSON encoding** — `SettingsService` / `HistoryService` / `BlacklistService` now use `JavaScriptEncoder.UnsafeRelaxedJsonEscaping`, so `&` in PnpDeviceId no longer escapes to `&`.
+
+### Fixed
+
+- **Recent History DataGrid headers** showed `Microsoft.UI.Xaml.Data.Binding` instead of localized strings. Cause: `DataGridColumn` is not in the visual tree, so XAML `{Binding}` on `Header` doesn't resolve. Fixed by setting headers from `DashboardView.xaml.cs` code-behind, refreshed on `Loc.PropertyChanged`.
+- **Dashboard Refresh always reported "Error loading adapters"**. `IAdapterCacheService.RefreshAsync` uses `ConfigureAwait(false)`, so `AdaptersRefreshed` fired on the threadpool — VM subscribers then mutated bound `ObservableCollection` from a non-UI thread. Fixed by marshaling event handlers through `App.MainDispatcher.TryEnqueue`.
+- **Recent History timestamps always read "7 h ago"** on UTC+7 machines. `Timestamp` defaults to `DateTime.UtcNow` (correct), but `RelativeTimeConverter` computed delta as `DateTime.Now - when` (`local - utc`). Fixed by normalizing the input via `Kind`-aware `ToLocalTime()` before subtracting.
+- **Recent History wiped when in-memory list happened to be empty.** `LoadAsync` used to swallow JSON parse failures; the next `SaveAsync` then wrote the empty list, overwriting the user's on-disk entries. Hardened with a `_loadCompleted` gate, corrupt-file backup, and atomic `.tmp`+`File.Move` writes.
+- **FontIcon glyphs invisible** in `DashboardView` / `UpdateView` / `AboutView` (Refresh, Copy, Shuffle, etc.). Cause: raw Private-Use-Area chars in XAML attribute values were silently stripped to empty by the file write pipeline. Replaced all inline glyphs with XML entity references (`&#xE72C;`).
+- **Hamburger collapse left "first letter peek"** — the custom `MenuItemTemplate` rendered the label TextBlock independently of the auto-collapse logic. Added `IsPaneOpen` two-way binding on `MainWindowViewModel` and a back-reference (`NavItem.Owner`) so the template can hide the label when the pane is compact.
+- **Tray right-click menu items inert + double-click no-op + window not focused on Show**. Added `XamlRoot` lazy-init for the `MenuFlyout`, `DoubleClickCommand`, and Win32 `ShowWindow(SW_RESTORE)` + `SetForegroundWindow` after `AppWindow.Show`.
+- **Window 880×600 felt cramped**. Resized to 1024×680.
+- **LogView "Failed to export log: File extensions must begin with '.' and contain no wildcards"**. WinUI 3 `FileSavePicker.FileTypeChoices` rejected `.*`. Removed the wildcard entry and switched to concrete `.txt` / `.log` choices.
+- **Settings export / import / bundle export consistently failed in elevated unpackaged WinUI 3.** `Windows.Storage.Pickers.FileSavePicker` and `FileOpenPicker` route through a broker that can't elevate cross-process. Replaced all four pickers (Settings export, Settings import, Bundle export, Log export) with a Win32 `comdlg32` wrapper (`Helpers/Win32FileDialog.cs`) that runs in-process. Output buffer uses an `IntPtr` instead of `StringBuilder` so the `OPENFILENAMEW` struct is blittable for `Marshal.SizeOf`.
+- **Resources["Loc"] = Loc.Instance crashed at startup with `COMException 0x8000FFFF`**. The COM proxy isn't fully wired in the App constructor even after `InitializeComponent()`. Moved the assignment to the start of `OnLaunched` where `Application.Resources` is reachable.
+- **Plain `dotnet build` failed** with `WindowsAppSDKSelfContained requires a supported Windows architecture`. Added `<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>` to the csproj so Rider/VS builds pick a default RID without requiring an explicit `-r` flag.
+
+### Removed
+
+- `AppSettings.AccentColor` (dead since v1.1.0 Phase 6 removed the picker).
+- `ThemeService.Apply(string mode, string accentColor)` second parameter dropped.
+- The "All Files (`.*`)" choice from LogView's export dialog.
+
+## [1.1.0] - 2026-04-27
+
+### Changed
+
+- **UI/UX migrated from Avalonia 11.2 to WinUI 3 + Microsoft.WindowsAppSDK 1.8 (Fluent Design 2).**
+  Fixed window size 880x600 with resize and maximize disabled (and the maximize
+  button hidden). Mica backdrop on Windows 11; Desktop Acrylic fallback on
+  Windows 10; solid fallback otherwise. Custom titlebar via
+  `ExtendsContentIntoTitleBar` + `SetTitleBar(AppTitleBar)`. Pane-permanently-open
+  `NavigationView` with Segoe Fluent Icons glyphs. Logic in `RandomMac.Core`
+  is unchanged.
+- **Target framework moved to `net11.0-windows10.0.26100.0`** for the App
+  project (Core stays on `net9.0`); `global.json` pins the SDK to
+  `11.0.100-preview.3`. Self-contained Windows App SDK payload, unpackaged
+  (compatible with Velopack and the existing `requireAdministrator` manifest).
+- Localization: replaced the Avalonia-specific `{loc:L Key}` `MarkupExtension`
+  with `Loc.Instance` registered as an Application resource — XAML now binds
+  via `{Binding [Key], Source={StaticResource Loc}}`. Live language switching
+  preserved via `INotifyPropertyChanged.Item[]`.
+- Tray icon backed by `H.NotifyIcon.WinUI` (replacing `Avalonia.TrayIcon`).
+- Notifications routed through `App.MainDispatcher` (replacing
+  `Avalonia.Threading.Dispatcher.UIThread`).
+- File pickers (Settings export/import, Log export) use
+  `Windows.Storage.Pickers.FileSavePicker`/`FileOpenPicker` with
+  `WinRT.Interop.InitializeWithWindow.Initialize` (unpackaged HWND init).
+- Clipboard copy uses `Windows.ApplicationModel.DataTransfer.Clipboard`.
+
+### Fixed
+
+- **Duplicate "Detected adapter:" / "Excluded adapter:" log lines at cold
+  start.** Two ViewModels (`DashboardViewModel` and `SettingsViewModel`) used
+  to fire-and-forget `INetworkAdapterService.GetPhysicalAdaptersAsync()` from
+  their constructors. The two scans ran concurrently and each emitted its own
+  log block. Fixed by introducing `IAdapterCacheService` (single-flight load
+  guarded by `SemaphoreSlim`); `App.OnLaunched` warms the cache once before
+  the ViewModels resolve, and ViewModels read the cached list synchronously
+  in their constructors.
+
 ## [1.0.0] - 2026-04-07
 
 ### Initial Release
@@ -124,4 +216,6 @@ First public release of RANDOM MAC, a lightweight Windows utility for randomizin
 - **Start Minimized** toggle may not function correctly in all scenarios
 - **App Icon** is placeholder only (no custom icon designed yet)
 
+[1.1.1]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.1
+[1.1.0]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.0
 [1.0.0]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.0.0

@@ -1,12 +1,9 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using RandomMac.App.ViewModels;
-using RandomMac.App.Views;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 using RandomMac.App.Services;
+using RandomMac.App.ViewModels;
 using RandomMac.Core.Helpers;
 using RandomMac.Core.Models;
 using RandomMac.Core.Services.Implementations;
@@ -18,19 +15,33 @@ namespace RandomMac.App;
 public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
+    private MainWindow? _mainWindow;
 
     public static IServiceProvider Services { get; private set; } = null!;
 
-    public override void Initialize()
+    /// <summary>
+    /// Captured from <see cref="MainWindow"/> after activation. Used by
+    /// background-thread services (e.g. <see cref="NotificationService"/>)
+    /// to marshal back to the UI thread.
+    /// </summary>
+    public static DispatcherQueue MainDispatcher { get; private set; } = null!;
+
+    public App()
     {
-        AvaloniaXamlLoader.Load(this);
+        InitializeComponent();
+        ConfigureServices();
     }
 
-    public override async void OnFrameworkInitializationCompleted()
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
-        ConfigureServices();
+        // Register the localization singleton as an Application resource so
+        // XAML can bind via {Binding [Key], Source={StaticResource Loc}}.
+        // Must happen here, NOT in the constructor — accessing Application.Resources
+        // before WinUI 3 has finished wiring the COM proxy throws E_UNEXPECTED
+        // (0x8000FFFF). OnLaunched is the first callback where the runtime
+        // guarantees the resource dictionary is reachable.
+        Resources["Loc"] = Localization.Loc.Instance;
 
-        // Admin check
         if (!AdminHelper.IsRunningAsAdmin())
             Log.Warning("Application is not running as Administrator. Some features may not work.");
 
@@ -39,51 +50,106 @@ public partial class App : Application
         await Services.GetRequiredService<IBlacklistService>().LoadAsync();
         await Services.GetRequiredService<IHistoryService>().LoadAsync();
 
-        // Apply saved theme + language
+        // Warm up the adapter cache once. ViewModels resolved via MainWindow
+        // (Dashboard + Settings) read this cache synchronously in their
+        // constructors, so it MUST be loaded before MainWindow is resolved —
+        // otherwise both VMs would also race to GetPhysicalAdaptersAsync()
+        // and emit duplicate "Detected adapter" log blocks.
+        await Services.GetRequiredService<IAdapterCacheService>().EnsureLoadedAsync();
+
         var settings = Services.GetRequiredService<ISettingsService>().Settings;
-        Services.GetRequiredService<ThemeService>().Apply(settings.ThemeMode, settings.AccentColor);
+        Services.GetRequiredService<ThemeService>().Apply(settings.ThemeMode);
         Localization.Loc.SetLanguage(settings.Language);
 
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        _mainWindow = Services.GetRequiredService<MainWindow>();
+        MainDispatcher = _mainWindow.DispatcherQueue;
+
+        // Tray icon must be initialized before --minimized handling
+        Services.GetRequiredService<TrayIconService>().Initialize(_mainWindow);
+
+        // Handle --minimized (only set by Task Scheduler at OS startup)
+        var cmdArgs = Environment.GetCommandLineArgs();
+        var isOsStartup = cmdArgs.Contains("--minimized");
+        Log.Information("Startup args: [{Args}], isOsStartup={IsOsStartup}",
+            string.Join(", ", cmdArgs), isOsStartup);
+
+        if (isOsStartup)
         {
-            var mainWindow = Services.GetRequiredService<MainWindow>();
-            desktop.MainWindow = mainWindow;
-            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
-
-            // Initialize tray icon
-            var trayService = Services.GetRequiredService<TrayIconService>();
-            trayService.Initialize(mainWindow);
-
-            // Handle --minimized startup (only from OS startup via Task Scheduler)
-            var isOsStartup = desktop.Args?.Contains("--minimized") == true;
-            Log.Information("Startup args: [{Args}], isOsStartup={IsOsStartup}",
-                string.Join(", ", desktop.Args ?? []), isOsStartup);
-            if (isOsStartup)
-            {
-                Log.Information("Starting minimized to system tray");
-                mainWindow.WindowState = WindowState.Minimized;
-                mainWindow.ShowInTaskbar = false;
-                mainWindow.Opened += (_, _) => mainWindow.Hide();
-            }
-            else
-            {
-                Log.Information("Starting with visible window");
-            }
-
-            // Auto-change MAC on startup (when enabled, regardless of minimized state)
-            if (settings.AutoChangeOnStartup && settings.AutoChangeAdapterIds.Count > 0)
-            {
-                _ = PerformAutoChangeAsync(settings.AutoChangeAdapterIds);
-            }
+            Log.Information("Starting minimized to system tray (window not activated)");
+            // Don't Activate() — tray icon is the visible affordance.
+        }
+        else
+        {
+            Log.Information("Starting with visible window");
+            _mainWindow.Activate();
         }
 
-        base.OnFrameworkInitializationCompleted();
+        // Auto-change MAC on startup (regardless of minimized state)
+        if (settings.AutoChangeOnStartup && settings.AutoChangeAdapterIds.Count > 0)
+        {
+            _ = PerformAutoChangeAsync(settings.AutoChangeAdapterIds);
+        }
+
+        // Auto-check for updates (throttled by LastUpdateCheckedAt). Fire-and-
+        // forget so it doesn't block startup; UpdateService surfaces results
+        // via NotificationService and updates settings.LastUpdateCheckedAt.
+        _ = AutoCheckForUpdateAsync();
+    }
+
+    private const int UpdateCheckCooldownHours = 24;
+
+    /// <summary>
+    /// Runs an update check at startup if the last check is older than
+    /// <see cref="UpdateCheckCooldownHours"/> hours. Silent on
+    /// up-to-date / failure (logs only); shows an info toast when a new
+    /// version is available so users notice without opening the Update tab.
+    /// </summary>
+    private static async Task AutoCheckForUpdateAsync()
+    {
+        var logger = Services.GetRequiredService<ILogger<App>>();
+        var settingsService = Services.GetRequiredService<ISettingsService>();
+        var updateService = Services.GetRequiredService<IUpdateService>();
+        var notificationService = Services.GetRequiredService<NotificationService>();
+
+        var settings = settingsService.Settings;
+        var last = settings.LastUpdateCheckedAt;
+        if (last.HasValue && (DateTime.Now - last.Value).TotalHours < UpdateCheckCooldownHours)
+        {
+            logger.LogDebug("Auto update check: skipped (last={Last}, cooldown={Hours}h)",
+                last, UpdateCheckCooldownHours);
+            return;
+        }
+
+        // Tiny delay so the window finishes activating first.
+        await Task.Delay(TimeSpan.FromSeconds(5));
+
+        try
+        {
+            logger.LogInformation("Auto update check: running");
+            var result = await updateService.CheckForUpdateAsync();
+
+            settings.LastUpdateCheckedAt = DateTime.Now;
+            await settingsService.SaveAsync();
+
+            logger.LogInformation("Auto update check: status={Status}", result.Status);
+
+            if (result.Status == Core.Models.UpdateStatusCode.UpdateAvailable
+                && !string.IsNullOrEmpty(result.LatestVersion))
+            {
+                notificationService.Info(
+                    Localization.Loc.Get("Notif_UpdateAvailable", result.LatestVersion));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Auto update check failed (non-fatal)");
+        }
     }
 
     private static async Task PerformAutoChangeAsync(List<string> adapterPnpIds)
     {
         var logger = Services.GetRequiredService<ILogger<App>>();
-        var adapterService = Services.GetRequiredService<INetworkAdapterService>();
+        var cache = Services.GetRequiredService<IAdapterCacheService>();
         var macService = Services.GetRequiredService<IMacAddressService>();
         var blacklistService = Services.GetRequiredService<IBlacklistService>();
         var historyService = Services.GetRequiredService<IHistoryService>();
@@ -93,8 +159,8 @@ public partial class App : Application
 
         try
         {
-            var allAdapters = await adapterService.GetPhysicalAdaptersAsync();
-            var targets = allAdapters.Where(a => adapterPnpIds.Contains(a.PnpDeviceId)).ToList();
+            // Cache is already warmed up by EnsureLoadedAsync in OnLaunched.
+            var targets = cache.Adapters.Where(a => adapterPnpIds.Contains(a.PnpDeviceId)).ToList();
 
             var successCount = 0;
             var failCount = 0;
@@ -119,7 +185,6 @@ public partial class App : Application
 
                 var result = await macService.ChangeMacAsync(adapter, newMac.Value);
 
-                // Record history
                 historyService.Add(new MacHistoryEntry
                 {
                     AdapterName = adapter.Name,
@@ -182,6 +247,7 @@ public partial class App : Application
 
         // Core services
         services.AddSingleton<INetworkAdapterService, NetworkAdapterService>();
+        services.AddSingleton<IAdapterCacheService, AdapterCacheService>();
         services.AddSingleton<IMacAddressService, MacAddressService>();
         services.AddSingleton<IBlacklistService, BlacklistService>();
         services.AddSingleton<IHistoryService, HistoryService>();

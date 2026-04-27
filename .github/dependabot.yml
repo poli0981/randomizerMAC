@@ -1,0 +1,39 @@
+version: 2
+
+updates:
+  # NuGet packages — the bulk of the dependency tree.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '04:00'
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 5
+    groups:
+      microsoft:
+        patterns:
+          - 'Microsoft.*'
+          - 'System.*'
+      mvvm-toolkit:
+        patterns:
+          - 'CommunityToolkit.*'
+      serilog:
+        patterns:
+          - 'Serilog*'
+    labels:
+      - dependencies
+      - nuget
+
+  # GitHub Actions used in workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '04:00'
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - github-actions

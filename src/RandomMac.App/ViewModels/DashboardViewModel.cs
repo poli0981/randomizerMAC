@@ -13,6 +13,7 @@ namespace RandomMac.App.ViewModels;
 public partial class DashboardViewModel : ViewModelBase
 {
     private readonly INetworkAdapterService _adapterService;
+    private readonly IAdapterCacheService _cache;
     private readonly IMacAddressService _macService;
     private readonly IBlacklistService _blacklistService;
     private readonly IHistoryService _historyService;
@@ -24,6 +25,34 @@ public partial class DashboardViewModel : ViewModelBase
 
     public ObservableCollection<NetworkAdapterInfo> Adapters { get; } = [];
     public ObservableCollection<MacHistoryEntry> RecentHistory { get; } = [];
+
+    /// <summary>
+    /// View over <see cref="RecentHistory"/> filtered by <see cref="HistoryFilter"/>.
+    /// The DataGrid binds to this so the user can search by adapter name or
+    /// MAC string without losing the underlying list.
+    /// </summary>
+    public ObservableCollection<MacHistoryEntry> FilteredHistory { get; } = [];
+
+    [ObservableProperty]
+    private string _historyFilter = "";
+
+    partial void OnHistoryFilterChanged(string value) => RefreshHistoryFilter();
+
+    private void RefreshHistoryFilter()
+    {
+        FilteredHistory.Clear();
+        var filter = HistoryFilter?.Trim() ?? "";
+        foreach (var entry in RecentHistory)
+        {
+            if (filter.Length == 0 || MatchesFilter(entry, filter))
+                FilteredHistory.Add(entry);
+        }
+    }
+
+    private static bool MatchesFilter(MacHistoryEntry h, string filter)
+        => h.AdapterName.Contains(filter, StringComparison.OrdinalIgnoreCase)
+        || h.PreviousMac.Contains(filter, StringComparison.OrdinalIgnoreCase)
+        || h.NewMac.Contains(filter, StringComparison.OrdinalIgnoreCase);
 
     [ObservableProperty]
     private NetworkAdapterInfo? _selectedAdapter;
@@ -37,8 +66,38 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty]
     private string _previewMac = "--";
 
+    private const int StatusAutoClearMs = 5000;
+    private CancellationTokenSource? _statusClearCts;
+
     [ObservableProperty]
-    private string _statusMessage = "Select an adapter to get started.";
+    private string _statusMessage = "";
+
+    /// <summary>True when StatusMessage has user-facing content (drives the InfoBar).</summary>
+    public bool HasStatusMessage => !string.IsNullOrEmpty(StatusMessage);
+
+    partial void OnStatusMessageChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasStatusMessage));
+
+        _statusClearCts?.Cancel();
+        if (string.IsNullOrEmpty(value)) return;
+
+        _statusClearCts = new CancellationTokenSource();
+        _ = ClearStatusAfterDelayAsync(value, _statusClearCts.Token);
+    }
+
+    private async Task ClearStatusAfterDelayAsync(string snapshot, CancellationToken token)
+    {
+        try { await Task.Delay(StatusAutoClearMs, token); }
+        catch (OperationCanceledException) { return; }
+
+        if (StatusMessage != snapshot) return; // already replaced by a newer message
+
+        if (App.MainDispatcher is { } d && !d.HasThreadAccess)
+            d.TryEnqueue(() => { if (StatusMessage == snapshot) StatusMessage = ""; });
+        else
+            StatusMessage = "";
+    }
 
     [ObservableProperty]
     private bool _isLoading;
@@ -66,6 +125,7 @@ public partial class DashboardViewModel : ViewModelBase
 
     public DashboardViewModel(
         INetworkAdapterService adapterService,
+        IAdapterCacheService cache,
         IMacAddressService macService,
         IBlacklistService blacklistService,
         IHistoryService historyService,
@@ -73,13 +133,60 @@ public partial class DashboardViewModel : ViewModelBase
         ILogger<DashboardViewModel> logger)
     {
         _adapterService = adapterService;
+        _cache = cache;
         _macService = macService;
         _blacklistService = blacklistService;
         _historyService = historyService;
         _notificationService = notificationService;
         _logger = logger;
 
-        LoadAdaptersCommand.ExecuteAsync(null);
+        // Read the warmed-up cache synchronously. App.OnLaunched calls
+        // EnsureLoadedAsync before this VM is constructed.
+        PopulateAdaptersFromCache();
+        PopulateRecentHistory();
+
+        // Keep FilteredHistory in sync whenever RecentHistory mutates
+        // (Insert after Apply, Clear on user request, repopulate on load).
+        RecentHistory.CollectionChanged += (_, _) => RefreshHistoryFilter();
+
+        // Repopulate when the cache is refreshed (user clicks Refresh, or
+        // SettingsViewModel triggers a rescan).
+        _cache.AdaptersRefreshed += OnAdaptersRefreshed;
+    }
+
+    private void OnAdaptersRefreshed(object? sender, EventArgs e)
+    {
+        // The cache fires this event from whatever thread RefreshAsync's
+        // continuation lands on (threadpool, due to ConfigureAwait(false)).
+        // Marshal back to the UI thread before mutating the bound
+        // ObservableCollection — otherwise we get a cross-thread exception
+        // that LoadAdaptersAsync's catch block surfaces as "Error loading
+        // adapters" on every Refresh click.
+        var dispatcher = App.MainDispatcher;
+        if (dispatcher is null || dispatcher.HasThreadAccess)
+            PopulateAdaptersFromCache();
+        else
+            dispatcher.TryEnqueue(PopulateAdaptersFromCache);
+    }
+
+    private void PopulateAdaptersFromCache()
+    {
+        var current = SelectedAdapter?.PnpDeviceId;
+        Adapters.Clear();
+        foreach (var a in _cache.Adapters)
+            Adapters.Add(a);
+
+        if (current is not null)
+            SelectedAdapter = Adapters.FirstOrDefault(a => a.PnpDeviceId == current);
+
+        StatusMessage = $"Found {Adapters.Count} adapter(s).";
+    }
+
+    private void PopulateRecentHistory()
+    {
+        RecentHistory.Clear();
+        foreach (var entry in _historyService.GetHistory())
+            RecentHistory.Add(entry);
     }
 
     partial void OnSelectedAdapterChanged(NetworkAdapterInfo? value)
@@ -92,7 +199,9 @@ public partial class DashboardViewModel : ViewModelBase
             IsConnected = false;
             CurrentVendor = "";
             PreviewVendor = "";
-            StatusMessage = "Select an adapter to get started.";
+            // Empty-state hint is shown by the InfoBar in DashboardView; no
+            // need to populate StatusMessage with a "select an adapter" prompt.
+            StatusMessage = "";
             HasPreview = false;
             return;
         }
@@ -116,13 +225,9 @@ public partial class DashboardViewModel : ViewModelBase
 
         try
         {
-            var adapters = await _adapterService.GetPhysicalAdaptersAsync();
-            Adapters.Clear();
-            foreach (var a in adapters)
-                Adapters.Add(a);
-
-            StatusMessage = $"Found {adapters.Count} adapter(s).";
-            _logger.LogInformation("Loaded {Count} physical adapters", adapters.Count);
+            await _cache.RefreshAsync();
+            // PopulateAdaptersFromCache runs via the AdaptersRefreshed event.
+            _logger.LogInformation("Loaded {Count} physical adapters", _cache.Adapters.Count);
         }
         catch (Exception ex)
         {
@@ -134,10 +239,7 @@ public partial class DashboardViewModel : ViewModelBase
             IsLoading = false;
         }
 
-        // Load recent history
-        RecentHistory.Clear();
-        foreach (var entry in _historyService.GetHistory())
-            RecentHistory.Add(entry);
+        PopulateRecentHistory();
     }
 
     [RelayCommand]
@@ -310,19 +412,16 @@ public partial class DashboardViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task CopyMacAsync(string? mac)
+    private void CopyMac(string? mac)
     {
         if (string.IsNullOrEmpty(mac) || mac == "--") return;
 
         try
         {
-            var topLevel = Avalonia.Controls.TopLevel.GetTopLevel(
-                (App.Services.GetService(typeof(Views.MainWindow)) as Avalonia.Controls.Window)!);
-            if (topLevel?.Clipboard is not null)
-            {
-                await topLevel.Clipboard.SetTextAsync(mac);
-                _notificationService.Info(Loc.Get("Notif_Copied", mac));
-            }
+            var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            package.SetText(mac);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+            _notificationService.Info(Loc.Get("Notif_Copied", mac));
         }
         catch (Exception ex)
         {

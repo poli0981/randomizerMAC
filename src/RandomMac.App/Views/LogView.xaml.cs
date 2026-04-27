@@ -1,8 +1,8 @@
-using Avalonia.Controls;
+using Microsoft.UI.Xaml.Controls;
 
 namespace RandomMac.App.Views;
 
-public partial class LogView : UserControl
+public sealed partial class LogView : UserControl
 {
     public LogView()
     {

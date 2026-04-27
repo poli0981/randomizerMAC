@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel earlier runs on the same ref when a new commit lands.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          # Pinned by global.json (11.0.100-preview.3.x for the App,
+          # net9.0 for Core/tests is satisfied by the same SDK).
+          global-json-file: global.json
+          dotnet-quality: preview
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (Release)
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/test-results.trx'
+          if-no-files-found: ignore
+
+      - name: Verify XBF integrity
+        # All compiled XAML pages must produce non-zero XBFs. A 0-byte XBF
+        # signals a silent XamlCompiler.exe crash (see DEV_ENVIRONMENT.md
+        # WinUI 3 Pitfalls). Fail the build if any are empty.
+        shell: pwsh
+        run: |
+          $empty = Get-ChildItem -Path src/RandomMac.App/obj/Release -Recurse -Filter '*.xbf' |
+                   Where-Object { $_.Length -eq 0 }
+          if ($empty) {
+            Write-Error "Empty XBF files detected (XamlCompiler silent crash):`n$($empty.FullName -join "`n")"
+            exit 1
+          }
+          Write-Host "All XBF files non-zero."

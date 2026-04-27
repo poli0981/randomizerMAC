@@ -1,8 +1,8 @@
-using Avalonia.Controls;
+using Microsoft.UI.Xaml.Controls;
 
 namespace RandomMac.App.Controls;
 
-public partial class NotificationPopup : UserControl
+public sealed partial class NotificationPopup : UserControl
 {
     public NotificationPopup()
     {

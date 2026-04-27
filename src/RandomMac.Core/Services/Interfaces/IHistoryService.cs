@@ -9,4 +9,5 @@ public interface IHistoryService
     void Clear();
     Task LoadAsync();
     Task SaveAsync();
+    string GetFilePath();
 }

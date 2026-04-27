@@ -1,22 +1,28 @@
-using Avalonia;
+using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 using Velopack;
 
 namespace RandomMac.App;
 
-internal sealed class Program
+internal static class Program
 {
     [STAThread]
-    public static void Main(string[] args)
+    private static int Main(string[] args)
     {
-        // Velopack must be the first thing to run in Main
+        // Velopack must be the first thing in Main (handles --veloapp-* CLI args
+        // for install/update lifecycle before any UI is created).
         VelopackApp.Build().Run();
 
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
-    }
+        WinRT.ComWrappersSupport.InitializeComWrappers();
 
-    public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-            .WithInterFont()
-            .LogToTrace();
+        Application.Start(p =>
+        {
+            var context = new DispatcherQueueSynchronizationContext(
+                DispatcherQueue.GetForCurrentThread());
+            SynchronizationContext.SetSynchronizationContext(context);
+            new App();
+        });
+
+        return 0;
+    }
 }

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using RandomMac.Core.Models;
 using RandomMac.Core.Services.Interfaces;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace RandomMac.Core.Services.Implementations;
@@ -12,7 +13,12 @@ public sealed class SettingsService : ISettingsService
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        WriteIndented = true
+        WriteIndented = true,
+        // Default encoder escapes '&' and other ASCII to & etc, which
+        // makes PnpDeviceId strings (e.g. PCI\VEN_10EC&DEV_8125...) hard to
+        // read in the JSON. UnsafeRelaxedJsonEscaping keeps them as-is —
+        // safe here because we're writing to a local config file, not HTML.
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     public AppSettings Settings { get; private set; } = new();

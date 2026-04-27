@@ -1,4 +1,3 @@
-using Avalonia.Threading;
 using System.Collections.ObjectModel;
 
 namespace RandomMac.App.Services;
@@ -19,7 +18,9 @@ public sealed class NotificationItem
 }
 
 /// <summary>
-/// Manages in-app toast notifications displayed in the main window.
+/// In-app toast notifications shown by <c>NotificationPopup</c>. Marshals
+/// background-thread requests onto <see cref="App.MainDispatcher"/> so the
+/// observable collection is mutated on the UI thread.
 /// </summary>
 public sealed class NotificationService
 {
@@ -29,18 +30,27 @@ public sealed class NotificationService
     {
         var item = new NotificationItem { Message = message, Type = type };
 
-        Dispatcher.UIThread.Post(async () =>
+        var dispatcher = App.MainDispatcher;
+        if (dispatcher is null)
         {
-            Notifications.Add(item);
+            // Pre-launch: drop silently. Auto-change before MainWindow Activate
+            // is the only known caller and its outcome is logged to Serilog anyway.
+            return;
+        }
 
-            // Keep max 3 visible
-            while (Notifications.Count > 3)
-                Notifications.RemoveAt(0);
+        dispatcher.TryEnqueue(() => AddAndExpire(item, durationMs));
+    }
 
-            await Task.Delay(durationMs);
+    private async void AddAndExpire(NotificationItem item, int durationMs)
+    {
+        Notifications.Add(item);
 
-            Notifications.Remove(item);
-        });
+        while (Notifications.Count > 3)
+            Notifications.RemoveAt(0);
+
+        await Task.Delay(durationMs);
+
+        Notifications.Remove(item);
     }
 
     public void Success(string message) => Show(message, NotificationType.Success);

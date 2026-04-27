@@ -1,64 +1,69 @@
-using Avalonia;
-using Avalonia.Media;
-using Avalonia.Styling;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media;
+using Windows.UI;
 
 namespace RandomMac.App.Services;
 
 /// <summary>
-/// Manages runtime theme mode (Dark/Light) and accent color switching.
+/// Manages runtime theme mode (Dark/Light). Accent color is fixed to the
+/// brand blue — the v1.0.0 multi-color picker was removed in v1.1.x to
+/// simplify the Settings UI.
 /// </summary>
 public sealed class ThemeService
 {
     public static readonly string[] AvailableModes = ["Dark", "Light"];
-    public static readonly string[] AvailableAccentColors = ["Blue", "Red", "Green", "Purple", "Orange", "Teal"];
 
-    private static readonly Dictionary<string, Color> AccentColors = new()
-    {
-        ["Blue"] = Color.Parse("#61AFEF"),
-        ["Red"] = Color.Parse("#E06C75"),
-        ["Green"] = Color.Parse("#98C379"),
-        ["Purple"] = Color.Parse("#C678DD"),
-        ["Orange"] = Color.Parse("#E5C07B"),
-        ["Teal"] = Color.Parse("#56B6C2"),
-    };
+    /// <summary>
+    /// Hardcoded brand accent (#61AFEF) — same color as the v1.0.0 default.
+    /// </summary>
+    private static readonly Color BrandAccent = Color.FromArgb(0xFF, 0x61, 0xAF, 0xEF);
 
-    public void Apply(string mode, string accentColor)
+    public void Apply(string mode)
     {
         ApplyThemeMode(mode);
-        ApplyAccentColor(accentColor);
+        ApplyBrandAccent();
     }
 
     public void ApplyThemeMode(string mode)
     {
-        if (Application.Current is null) return;
+        var theme = mode == "Light" ? ElementTheme.Light : ElementTheme.Dark;
 
-        Application.Current.RequestedThemeVariant = mode switch
+        // WinUI 3: Application.Current.RequestedTheme can only be set before
+        // the first window. After that, walk to the root FrameworkElement and
+        // set RequestedTheme there — propagates to ThemeResource consumers.
+        try
         {
-            "Light" => ThemeVariant.Light,
-            _ => ThemeVariant.Dark
-        };
+            var window = App.Services?.GetService<MainWindow>();
+            if (window?.Content is FrameworkElement root)
+                root.RequestedTheme = theme;
+        }
+        catch
+        {
+            // Window not yet created — initial Apply() in OnLaunched runs
+            // before the window exists; that's fine, ElementTheme defaults
+            // to Default and inherits from Application later.
+        }
     }
 
-    public void ApplyAccentColor(string colorName)
+    private static void ApplyBrandAccent()
     {
         if (Application.Current is null) return;
 
-        if (!AccentColors.TryGetValue(colorName, out var color))
-            color = AccentColors["Blue"];
-
+        var color = BrandAccent;
         var brush = new SolidColorBrush(color);
-        var hoverBrush = new SolidColorBrush(Color.FromArgb(204, color.R, color.G, color.B));
+        var hoverBrush = new SolidColorBrush(Color.FromArgb(0xCC, color.R, color.G, color.B));
 
-        // Override Fluent accent resource keys
-        Application.Current.Resources["SystemAccentColor"] = color;
-        Application.Current.Resources["SystemAccentColorDark1"] = color;
-        Application.Current.Resources["SystemAccentColorDark2"] = DarkenColor(color, 0.2);
-        Application.Current.Resources["SystemAccentColorDark3"] = DarkenColor(color, 0.4);
-        Application.Current.Resources["SystemAccentColorLight1"] = LightenColor(color, 0.2);
-        Application.Current.Resources["SystemAccentColorLight2"] = LightenColor(color, 0.35);
-        Application.Current.Resources["SystemAccentColorLight3"] = LightenColor(color, 0.5);
-        Application.Current.Resources["AccentFillColorDefaultBrush"] = brush;
-        Application.Current.Resources["AccentFillColorSecondaryBrush"] = hoverBrush;
+        var res = Application.Current.Resources;
+        res["SystemAccentColor"] = color;
+        res["SystemAccentColorDark1"] = color;
+        res["SystemAccentColorDark2"] = DarkenColor(color, 0.2);
+        res["SystemAccentColorDark3"] = DarkenColor(color, 0.4);
+        res["SystemAccentColorLight1"] = LightenColor(color, 0.2);
+        res["SystemAccentColorLight2"] = LightenColor(color, 0.35);
+        res["SystemAccentColorLight3"] = LightenColor(color, 0.5);
+        res["AccentFillColorDefaultBrush"] = brush;
+        res["AccentFillColorSecondaryBrush"] = hoverBrush;
     }
 
     private static Color DarkenColor(Color c, double amount)
@@ -68,10 +73,8 @@ public sealed class ThemeService
     }
 
     private static Color LightenColor(Color c, double amount)
-    {
-        return Color.FromArgb(c.A,
+        => Color.FromArgb(c.A,
             (byte)(c.R + (255 - c.R) * amount),
             (byte)(c.G + (255 - c.G) * amount),
             (byte)(c.B + (255 - c.B) * amount));
-    }
 }
