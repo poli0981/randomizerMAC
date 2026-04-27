@@ -4,11 +4,85 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid Padding="24">
-        <StackPanel Spacing="8">
-            <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
-            <TextBlock Text="Update view — Phase 3 will fill in check button, status, release notes, download."
-                       Opacity="0.6" />
+    <ScrollViewer Padding="0,0,8,0">
+        <StackPanel Spacing="16" Padding="24">
+
+            <!-- Current version + check -->
+            <Border CornerRadius="8"
+                    Padding="16"
+                    Background="{ThemeResource CardBackgroundBrush}">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                    <TextBlock Grid.Row="0"
+                               Grid.Column="0"
+                               Text="{Binding CurrentVersionDisplay}"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
+
+                    <Border Grid.Row="0"
+                            Grid.Column="1"
+                            CornerRadius="4"
+                            Padding="8,2"
+                            Background="{Binding StatusCode, Converter={StaticResource StatusCodeToBrushConverter}}">
+                        <TextBlock Text="{Binding StatusBadge}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="Black" />
+                    </Border>
+
+                    <TextBlock Grid.Row="1"
+                               Grid.Column="0"
+                               Grid.ColumnSpan="2"
+                               Text="{Binding StatusMessage}"
+                               TextWrapping="Wrap"
+                               Margin="0,8,0,0"
+                               Opacity="0.85" />
+                </Grid>
+            </Border>
+
+            <Button Content="{Binding [Update_Check], Source={StaticResource Loc}}"
+                    Command="{Binding CheckForUpdateCommand}"
+                    IsEnabled="{Binding IsChecking, Converter={StaticResource InverseBoolConverter}}"
+                    HorizontalAlignment="Left"
+                    Padding="20,8" />
+
+            <!-- Update available block -->
+            <Border CornerRadius="8"
+                    Padding="16"
+                    Background="{ThemeResource CardBackgroundBrush}"
+                    Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding LatestVersion}"
+                                   FontWeight="SemiBold"
+                                   FontSize="16" />
+                        <TextBlock Text="{Binding PublishedDateDisplay}"
+                                   Opacity="0.6"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <Border CornerRadius="4"
+                            Padding="12"
+                            Background="{ThemeResource CardBackgroundTransparentBrush}">
+                        <ScrollViewer MaxHeight="240">
+                            <TextBlock Text="{Binding ReleaseNotes}"
+                                       TextWrapping="Wrap"
+                                       FontSize="13"
+                                       IsTextSelectionEnabled="True" />
+                        </ScrollViewer>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="{Binding [Update_Download], Source={StaticResource Loc}}"
+                                Command="{Binding DownloadUpdateCommand}"
+                                IsEnabled="{Binding IsDownloading, Converter={StaticResource InverseBoolConverter}}"
+                                Style="{ThemeResource AccentButtonStyle}" />
+
+                        <HyperlinkButton Content="{Binding [Update_ViewRelease], Source={StaticResource Loc}}"
+                                         NavigateUri="{Binding ReleaseUrl}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
         </StackPanel>
-    </Grid>
+    </ScrollViewer>
 </UserControl>

@@ -2,13 +2,220 @@
 <UserControl
     x:Class="RandomMac.App.Views.DashboardView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:tk="using:CommunityToolkit.WinUI.UI.Controls">
 
-    <Grid Padding="24">
-        <StackPanel Spacing="8">
-            <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
-            <TextBlock Text="Dashboard view — Phase 3 will fill in adapter selector, MAC cards, history grid."
-                       Opacity="0.6" />
+    <ScrollViewer Padding="0,0,8,0">
+        <StackPanel Spacing="14" Padding="24,16,24,16">
+
+            <!-- Adapter selector + refresh -->
+            <Grid ColumnDefinitions="120,*,Auto" ColumnSpacing="10">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding [Dashboard_SelectAdapter], Source={StaticResource Loc}}"
+                           VerticalAlignment="Center"
+                           FontWeight="SemiBold" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding Adapters}"
+                          SelectedItem="{Binding SelectedAdapter, Mode=TwoWay}"
+                          DisplayMemberPath="Name"
+                          HorizontalAlignment="Stretch" />
+                <Button Grid.Column="2"
+                        Command="{Binding LoadAdaptersCommand}"
+                        ToolTipService.ToolTip="{Binding [Dashboard_Refresh], Source={StaticResource Loc}}">
+                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="14" />
+                </Button>
+            </Grid>
+
+            <!-- Adapter status bar -->
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                <Ellipse Grid.Column="0"
+                         Width="10" Height="10"
+                         Fill="{Binding IsConnected, Converter={StaticResource BoolToColorConverter}}"
+                         VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding AdapterType}"
+                           VerticalAlignment="Center"
+                           Opacity="0.85" />
+                <TextBlock Grid.Column="2"
+                           Text="{Binding CurrentVendor}"
+                           VerticalAlignment="Center"
+                           Opacity="0.6"
+                           FontSize="12" />
+            </Grid>
+
+            <!-- 3 MAC info cards -->
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+
+                <!-- Current -->
+                <Border Grid.Column="0"
+                        CornerRadius="8"
+                        Padding="12"
+                        Background="{ThemeResource CardBackgroundBrush}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Dashboard_CurrentMac], Source={StaticResource Loc}}"
+                                   FontSize="11"
+                                   Opacity="0.6"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding CurrentMacDisplay}"
+                                   FontFamily="Cascadia Mono, Consolas, monospace"
+                                   FontSize="15"
+                                   FontWeight="SemiBold" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding CurrentVendor}"
+                                       Opacity="0.6"
+                                       FontSize="11"
+                                       TextTrimming="CharacterEllipsis" />
+                            <Button Grid.Column="1"
+                                    Command="{Binding CopyMacCommand}"
+                                    CommandParameter="{Binding CurrentMacDisplay}"
+                                    Padding="4"
+                                    ToolTipService.ToolTip="{Binding [Dashboard_CopyTip], Source={StaticResource Loc}}">
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="12" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Original -->
+                <Border Grid.Column="1"
+                        CornerRadius="8"
+                        Padding="12"
+                        Background="{ThemeResource CardBackgroundBrush}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Dashboard_OriginalMac], Source={StaticResource Loc}}"
+                                   FontSize="11"
+                                   Opacity="0.6"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding OriginalMacDisplay}"
+                                   FontFamily="Cascadia Mono, Consolas, monospace"
+                                   FontSize="15"
+                                   FontWeight="SemiBold" />
+                        <Button Command="{Binding CopyMacCommand}"
+                                CommandParameter="{Binding OriginalMacDisplay}"
+                                Padding="4"
+                                HorizontalAlignment="Right"
+                                ToolTipService.ToolTip="{Binding [Dashboard_CopyTip], Source={StaticResource Loc}}">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="12" />
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- Preview -->
+                <Border Grid.Column="2"
+                        CornerRadius="8"
+                        Padding="12"
+                        Background="{ThemeResource CardBackgroundBrush}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding [Dashboard_PreviewMac], Source={StaticResource Loc}}"
+                                   FontSize="11"
+                                   Opacity="0.6"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding PreviewMac}"
+                                   FontFamily="Cascadia Mono, Consolas, monospace"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding PreviewVendor}"
+                                       Opacity="0.6"
+                                       FontSize="11"
+                                       TextTrimming="CharacterEllipsis" />
+                            <Button Grid.Column="1"
+                                    Command="{Binding CopyMacCommand}"
+                                    CommandParameter="{Binding PreviewMac}"
+                                    IsEnabled="{Binding HasPreview}"
+                                    Padding="4"
+                                    ToolTipService.ToolTip="{Binding [Dashboard_CopyTip], Source={StaticResource Loc}}">
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="12" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Action buttons -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Command="{Binding GeneratePreviewCommand}"
+                        IsEnabled="{Binding IsChanging, Converter={StaticResource InverseBoolConverter}}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="13" />
+                        <TextBlock Text="{Binding [Dashboard_Randomize], Source={StaticResource Loc}}" />
+                    </StackPanel>
+                </Button>
+
+                <Button Command="{Binding ApplyMacCommand}"
+                        IsEnabled="{Binding HasPreview}"
+                        Style="{ThemeResource AccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="13" />
+                        <TextBlock Text="{Binding [Dashboard_Apply], Source={StaticResource Loc}}" />
+                    </StackPanel>
+                </Button>
+
+                <Button Command="{Binding RestoreOriginalCommand}"
+                        IsEnabled="{Binding IsMacChanged}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="" FontSize="13" />
+                        <TextBlock Text="{Binding [Dashboard_Restore], Source={StaticResource Loc}}" />
+                    </StackPanel>
+                </Button>
+
+                <ProgressRing IsActive="{Binding IsChanging}"
+                              Width="20" Height="20"
+                              VerticalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Status -->
+            <TextBlock Text="{Binding StatusMessage}"
+                       TextWrapping="Wrap"
+                       Opacity="0.85" />
+
+            <!-- History grid -->
+            <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding [Dashboard_RecentHistory], Source={StaticResource Loc}}"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Command="{Binding ClearHistoryCommand}"
+                        Content="{Binding [Dashboard_Clear], Source={StaticResource Loc}}"
+                        Padding="10,4"
+                        FontSize="12" />
+            </Grid>
+
+            <Border CornerRadius="6"
+                    Background="{ThemeResource CardBackgroundBrush}"
+                    MinHeight="120"
+                    MaxHeight="220">
+                <tk:DataGrid ItemsSource="{Binding RecentHistory}"
+                             AutoGenerateColumns="False"
+                             HeadersVisibility="Column"
+                             IsReadOnly="True"
+                             GridLinesVisibility="Horizontal"
+                             Background="Transparent">
+                    <tk:DataGrid.Columns>
+                        <tk:DataGridTextColumn Header="{Binding [Dashboard_Time], Source={StaticResource Loc}}"
+                                               Binding="{Binding Timestamp}"
+                                               Width="Auto" />
+                        <tk:DataGridTextColumn Header="{Binding [Dashboard_Adapter], Source={StaticResource Loc}}"
+                                               Binding="{Binding AdapterName}"
+                                               Width="*" />
+                        <tk:DataGridTextColumn Header="{Binding [Dashboard_Previous], Source={StaticResource Loc}}"
+                                               Binding="{Binding PreviousMac}"
+                                               Width="Auto" />
+                        <tk:DataGridTextColumn Header="{Binding [Dashboard_New], Source={StaticResource Loc}}"
+                                               Binding="{Binding NewMac}"
+                                               Width="Auto" />
+                        <tk:DataGridTextColumn Header="{Binding [Dashboard_Status], Source={StaticResource Loc}}"
+                                               Binding="{Binding Success, Converter={StaticResource BoolToStatusConverter}}"
+                                               Width="Auto" />
+                    </tk:DataGrid.Columns>
+                </tk:DataGrid>
+            </Border>
+
         </StackPanel>
-    </Grid>
+    </ScrollViewer>
 </UserControl>

@@ -4,11 +4,98 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid Padding="24">
-        <StackPanel Spacing="8">
-            <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
-            <TextBlock Text="About view — Phase 3 will fill in app info, version, third-party credits."
-                       Opacity="0.6" />
+    <ScrollViewer Padding="0,0,8,0">
+        <StackPanel Spacing="20" Padding="24">
+
+            <!-- App identity -->
+            <StackPanel Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="14">
+                    <FontIcon FontFamily="Segoe Fluent Icons"
+                              Glyph=""
+                              FontSize="36"
+                              Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding AppName}"
+                                   FontSize="22"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Version}"
+                                   FontSize="13"
+                                   Opacity="0.7" />
+                    </StackPanel>
+                </StackPanel>
+                <TextBlock Text="{Binding Description}"
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,0" />
+            </StackPanel>
+
+            <!-- Developer -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding [About_Developer], Source={StaticResource Loc}}"
+                           FontWeight="SemiBold"
+                           FontSize="15" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding Developer}" VerticalAlignment="Center" />
+                    <HyperlinkButton Content="{Binding [About_GitHubProfile], Source={StaticResource Loc}}"
+                                     NavigateUri="{Binding DeveloperUrl}" />
+                </StackPanel>
+                <HyperlinkButton Content="{Binding [About_GitHubRepo], Source={StaticResource Loc}}"
+                                 NavigateUri="{Binding RepositoryUrl}" />
+            </StackPanel>
+
+            <!-- License -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding [About_Legal], Source={StaticResource Loc}}"
+                           FontWeight="SemiBold"
+                           FontSize="15" />
+                <TextBlock Text="{Binding License}" Opacity="0.85" />
+                <TextBlock Text="{Binding [About_LegalText], Source={StaticResource Loc}}"
+                           TextWrapping="Wrap"
+                           FontSize="12"
+                           Opacity="0.7" />
+            </StackPanel>
+
+            <!-- Third-party -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding [About_ThirdParty], Source={StaticResource Loc}}"
+                           FontWeight="SemiBold"
+                           FontSize="15" />
+                <ItemsControl ItemsSource="{Binding ThirdParties}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="8" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="12,8"
+                                    CornerRadius="6"
+                                    Background="{ThemeResource CardBackgroundBrush}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Grid.Column="0" Spacing="2">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Version}" Opacity="0.6" />
+                                            <TextBlock Text="{Binding License}"
+                                                       Opacity="0.6"
+                                                       FontSize="12" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Description}"
+                                                   FontSize="12"
+                                                   Opacity="0.7"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <HyperlinkButton Grid.Column="1"
+                                                     Content=""
+                                                     FontFamily="Segoe Fluent Icons"
+                                                     NavigateUri="{Binding Url}"
+                                                     ToolTipService.ToolTip="{Binding Url}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
         </StackPanel>
-    </Grid>
+    </ScrollViewer>
 </UserControl>

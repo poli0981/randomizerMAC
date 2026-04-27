@@ -4,11 +4,156 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid Padding="24">
-        <StackPanel Spacing="8">
-            <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
-            <TextBlock Text="Settings view — Phase 3 will fill in language, theme, accent, startup, auto-change."
-                       Opacity="0.6" />
+    <ScrollViewer Padding="0,0,8,0">
+        <StackPanel Spacing="20" Padding="24,16,24,16">
+
+            <!-- General -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="{Binding [Settings_General], Source={StaticResource Loc}}"
+                           FontSize="16"
+                           FontWeight="SemiBold" />
+
+                <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto"
+                      RowSpacing="10" ColumnSpacing="12">
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="{Binding [Settings_Language], Source={StaticResource Loc}}"
+                               VerticalAlignment="Center" />
+                    <ComboBox Grid.Row="0" Grid.Column="1"
+                              ItemsSource="{Binding AvailableLanguages}"
+                              SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"
+                              MinWidth="200"
+                              HorizontalAlignment="Left" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0"
+                               Text="{Binding [Settings_Mode], Source={StaticResource Loc}}"
+                               VerticalAlignment="Center" />
+                    <ComboBox Grid.Row="1" Grid.Column="1"
+                              ItemsSource="{Binding AvailableModes}"
+                              SelectedItem="{Binding SelectedThemeMode, Mode=TwoWay}"
+                              MinWidth="200"
+                              HorizontalAlignment="Left" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0"
+                               Text="{Binding [Settings_AccentColor], Source={StaticResource Loc}}"
+                               VerticalAlignment="Center" />
+                    <ComboBox Grid.Row="2" Grid.Column="1"
+                              ItemsSource="{Binding AvailableAccentColors}"
+                              SelectedItem="{Binding SelectedAccentColor, Mode=TwoWay}"
+                              MinWidth="200"
+                              HorizontalAlignment="Left" />
+
+                    <TextBlock Grid.Row="3" Grid.Column="0"
+                               Text="{Binding [Settings_Notifications], Source={StaticResource Loc}}"
+                               VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Row="3" Grid.Column="1"
+                                  IsOn="{Binding ShowNotifications, Mode=TwoWay}"
+                                  HorizontalAlignment="Left" />
+                </Grid>
+            </StackPanel>
+
+            <!-- System -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="{Binding [Settings_System], Source={StaticResource Loc}}"
+                           FontSize="16"
+                           FontWeight="SemiBold" />
+
+                <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto"
+                      RowSpacing="6" ColumnSpacing="12">
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="{Binding [Settings_Startup], Source={StaticResource Loc}}"
+                               VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Row="0" Grid.Column="1"
+                                  IsOn="{Binding RunAtStartup, Mode=TwoWay}"
+                                  HorizontalAlignment="Left" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0"
+                               Text="{Binding [Settings_StartMinimized], Source={StaticResource Loc}}"
+                               VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Row="1" Grid.Column="1"
+                                  IsOn="{Binding StartMinimized, Mode=TwoWay}"
+                                  HorizontalAlignment="Left" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0"
+                               Text="{Binding [Settings_Tray], Source={StaticResource Loc}}"
+                               VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Row="2" Grid.Column="1"
+                                  IsOn="{Binding MinimizeToTray, Mode=TwoWay}"
+                                  HorizontalAlignment="Left" />
+                </Grid>
+            </StackPanel>
+
+            <!-- AutoChange on startup -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="{Binding [Settings_AutoChange], Source={StaticResource Loc}}"
+                           FontSize="16"
+                           FontWeight="SemiBold" />
+
+                <Grid ColumnDefinitions="180,*" RowSpacing="8" ColumnSpacing="12">
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding [Settings_AutoChangeEnable], Source={StaticResource Loc}}"
+                               VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Column="1"
+                                  IsOn="{Binding AutoChangeOnStartup, Mode=TwoWay}"
+                                  HorizontalAlignment="Left" />
+                </Grid>
+
+                <TextBlock Text="{Binding [Settings_AutoChangeSelect], Source={StaticResource Loc}}"
+                           Opacity="0.7"
+                           FontSize="12" />
+
+                <Border CornerRadius="6"
+                        Padding="8"
+                        Background="{ThemeResource CardBackgroundBrush}">
+                    <ItemsControl ItemsSource="{Binding AutoChangeAdapters}"
+                                  IsEnabled="{Binding AutoChangeOnStartup}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          Padding="6,4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="{Binding Name}" />
+                                        <TextBlock Text="{Binding Type}"
+                                                   Opacity="0.6"
+                                                   FontSize="12"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </CheckBox>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+
+                <TextBlock Text="{Binding [Settings_AutoChangeNote], Source={StaticResource Loc}}"
+                           Opacity="0.6"
+                           FontSize="11"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- Data -->
+            <StackPanel Spacing="10">
+                <TextBlock Text="{Binding [Settings_Data], Source={StaticResource Loc}}"
+                           FontSize="16"
+                           FontWeight="SemiBold" />
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="{Binding [Settings_Save], Source={StaticResource Loc}}"
+                            Command="{Binding SaveSettingsCommand}"
+                            Style="{ThemeResource AccentButtonStyle}" />
+                    <Button Content="{Binding [Settings_Export], Source={StaticResource Loc}}"
+                            Command="{Binding ExportSettingsCommand}" />
+                    <Button Content="{Binding [Settings_Import], Source={StaticResource Loc}}"
+                            Command="{Binding ImportSettingsCommand}" />
+                    <Button Content="{Binding [Settings_OpenFile], Source={StaticResource Loc}}"
+                            Command="{Binding OpenSettingsFileCommand}" />
+                    <Button Content="{Binding [Settings_OpenBlacklist], Source={StaticResource Loc}}"
+                            Command="{Binding OpenBlacklistFileCommand}" />
+                </StackPanel>
+
+                <TextBlock Text="{Binding StatusMessage}"
+                           Opacity="0.7"
+                           FontSize="12" />
+            </StackPanel>
+
         </StackPanel>
-    </Grid>
+    </ScrollViewer>
 </UserControl>
