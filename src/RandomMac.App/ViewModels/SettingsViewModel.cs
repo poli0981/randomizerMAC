@@ -44,9 +44,6 @@ public partial class SettingsViewModel : ViewModelBase
     private string _selectedThemeMode = "Dark";
 
     [ObservableProperty]
-    private string _selectedAccentColor = "Blue";
-
-    [ObservableProperty]
     private string _statusMessage = "";
 
     // Auto-change on startup
@@ -57,7 +54,6 @@ public partial class SettingsViewModel : ViewModelBase
 
     public string[] AvailableLanguages { get; } = ["en", "vi"];
     public string[] AvailableModes => ThemeService.AvailableModes;
-    public string[] AvailableAccentColors => ThemeService.AvailableAccentColors;
 
     public SettingsViewModel(
         ISettingsService settingsService,
@@ -118,7 +114,6 @@ public partial class SettingsViewModel : ViewModelBase
         StartMinimized = s.StartMinimized;
         ShowNotifications = s.ShowNotifications;
         SelectedThemeMode = s.ThemeMode;
-        SelectedAccentColor = s.AccentColor;
         AutoChangeOnStartup = s.AutoChangeOnStartup;
     }
 
@@ -146,15 +141,14 @@ public partial class SettingsViewModel : ViewModelBase
         s.StartMinimized = StartMinimized;
         s.ShowNotifications = ShowNotifications;
         s.ThemeMode = SelectedThemeMode;
-        s.AccentColor = SelectedAccentColor;
         s.AutoChangeOnStartup = AutoChangeOnStartup;
         s.AutoChangeAdapterIds = AutoChangeAdapters
             .Where(a => a.IsSelected)
             .Select(a => a.PnpDeviceId)
             .ToList();
 
-        // Apply theme + accent color immediately
-        _themeService.Apply(SelectedThemeMode, SelectedAccentColor);
+        // Apply theme immediately. Accent is fixed brand color (ignored arg).
+        _themeService.Apply(SelectedThemeMode, "");
 
         // Ensure language is applied (may already be applied via OnSelectedLanguageChanged)
         if (Loc.CurrentLanguage != SelectedLanguage)
@@ -217,7 +211,7 @@ public partial class SettingsViewModel : ViewModelBase
             {
                 await _settingsService.ImportAsync(file.Path);
                 LoadFromSettings();
-                _themeService.Apply(SelectedThemeMode, SelectedAccentColor);
+                _themeService.Apply(SelectedThemeMode, "");
                 Loc.SetLanguage(SelectedLanguage);
                 StatusMessage = "Settings imported.";
             }

@@ -6,27 +6,23 @@ using Windows.UI;
 namespace RandomMac.App.Services;
 
 /// <summary>
-/// Manages runtime theme mode (Dark/Light) and accent color switching.
+/// Manages runtime theme mode (Dark/Light). Accent color is fixed to the
+/// brand blue — the v1.0.0 multi-color picker was removed in v1.1.x to
+/// simplify the Settings UI.
 /// </summary>
 public sealed class ThemeService
 {
     public static readonly string[] AvailableModes = ["Dark", "Light"];
-    public static readonly string[] AvailableAccentColors = ["Blue", "Red", "Green", "Purple", "Orange", "Teal"];
 
-    private static readonly Dictionary<string, Color> AccentColors = new()
-    {
-        ["Blue"]   = Color.FromArgb(0xFF, 0x61, 0xAF, 0xEF),
-        ["Red"]    = Color.FromArgb(0xFF, 0xE0, 0x6C, 0x75),
-        ["Green"]  = Color.FromArgb(0xFF, 0x98, 0xC3, 0x79),
-        ["Purple"] = Color.FromArgb(0xFF, 0xC6, 0x78, 0xDD),
-        ["Orange"] = Color.FromArgb(0xFF, 0xE5, 0xC0, 0x7B),
-        ["Teal"]   = Color.FromArgb(0xFF, 0x56, 0xB6, 0xC2),
-    };
+    /// <summary>
+    /// Hardcoded brand accent (#61AFEF) — same color as the v1.0.0 default.
+    /// </summary>
+    private static readonly Color BrandAccent = Color.FromArgb(0xFF, 0x61, 0xAF, 0xEF);
 
-    public void Apply(string mode, string accentColor)
+    public void Apply(string mode, string accentColor /* ignored */)
     {
         ApplyThemeMode(mode);
-        ApplyAccentColor(accentColor);
+        ApplyBrandAccent();
     }
 
     public void ApplyThemeMode(string mode)
@@ -50,13 +46,11 @@ public sealed class ThemeService
         }
     }
 
-    public void ApplyAccentColor(string colorName)
+    private static void ApplyBrandAccent()
     {
         if (Application.Current is null) return;
 
-        if (!AccentColors.TryGetValue(colorName, out var color))
-            color = AccentColors["Blue"];
-
+        var color = BrandAccent;
         var brush = new SolidColorBrush(color);
         var hoverBrush = new SolidColorBrush(Color.FromArgb(0xCC, color.R, color.G, color.B));
 

@@ -41,7 +41,9 @@
                 CornerRadius="6"
                 Background="{ThemeResource CardBackgroundBrush}"
                 Padding="2">
-            <ScrollViewer x:Name="LogScroller">
+            <ScrollViewer x:Name="LogScroller"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding LogLines}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>

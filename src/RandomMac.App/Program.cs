@@ -19,7 +19,7 @@ internal static class Program
         {
             var context = new DispatcherQueueSynchronizationContext(
                 DispatcherQueue.GetForCurrentThread());
-            System.Threading.SynchronizationContext.SetSynchronizationContext(context);
+            SynchronizationContext.SetSynchronizationContext(context);
             new App();
         });
 

@@ -5,7 +5,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:tk="using:CommunityToolkit.WinUI.UI.Controls">
 
-    <ScrollViewer Padding="0,0,8,0">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="0,0,8,0">
         <StackPanel Spacing="14" Padding="24,16,24,16">
 
             <!-- Adapter selector + refresh -->

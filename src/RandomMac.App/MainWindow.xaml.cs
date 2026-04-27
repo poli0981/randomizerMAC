@@ -17,8 +17,8 @@ namespace RandomMac.App;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
-    private const int FixedWidth = 880;
-    private const int FixedHeight = 600;
+    private const int FixedWidth = 1024;
+    private const int FixedHeight = 680;
 
     public MainWindow(MainWindowViewModel viewModel, NotificationService notificationService)
     {
