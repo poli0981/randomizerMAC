@@ -133,6 +133,9 @@
                             Command="{Binding ExportSettingsCommand}" />
                     <Button Content="{Binding [Settings_Import], Source={StaticResource Loc}}"
                             Command="{Binding ImportSettingsCommand}" />
+                    <Button Content="Export All (zip)"
+                            Command="{Binding ExportBundleCommand}"
+                            ToolTipService.ToolTip="settings + blacklist + history" />
                     <Button Content="{Binding [Settings_OpenFile], Source={StaticResource Loc}}"
                             Command="{Binding OpenSettingsFileCommand}" />
                     <Button Content="{Binding [Settings_OpenBlacklist], Source={StaticResource Loc}}"

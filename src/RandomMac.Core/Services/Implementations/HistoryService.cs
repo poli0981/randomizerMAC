@@ -26,6 +26,8 @@ public sealed class HistoryService : IHistoryService
 
     public IReadOnlyList<MacHistoryEntry> GetHistory() => _history.AsReadOnly();
 
+    public string GetFilePath() => _filePath;
+
     public void Add(MacHistoryEntry entry)
     {
         _history.Insert(0, entry); // Most recent first

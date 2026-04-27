@@ -9,6 +9,7 @@ using RandomMac.Core.Services.Interfaces;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO.Compression;
 using Windows.Storage.Pickers;
 
 namespace RandomMac.App.ViewModels;
@@ -22,6 +23,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     private readonly ISettingsService _settingsService;
     private readonly IBlacklistService _blacklistService;
+    private readonly IHistoryService _historyService;
     private readonly IAdapterCacheService _cache;
     private readonly ThemeService _themeService;
     private readonly ILogger<SettingsViewModel> _logger;
@@ -64,12 +66,14 @@ public partial class SettingsViewModel : ViewModelBase
     public SettingsViewModel(
         ISettingsService settingsService,
         IBlacklistService blacklistService,
+        IHistoryService historyService,
         IAdapterCacheService cache,
         ThemeService themeService,
         ILogger<SettingsViewModel> logger)
     {
         _settingsService = settingsService;
         _blacklistService = blacklistService;
+        _historyService = historyService;
         _cache = cache;
         _themeService = themeService;
         _logger = logger;
@@ -288,6 +292,57 @@ public partial class SettingsViewModel : ViewModelBase
         {
             StatusMessage = $"Export failed: {ex.Message}";
             _logger.LogError(ex, "Failed to export settings");
+        }
+    }
+
+    /// <summary>
+    /// Export settings + blacklist + history into a single ZIP — convenient
+    /// for backing up the full app state or moving between machines.
+    /// </summary>
+    [RelayCommand]
+    private async Task ExportBundleAsync()
+    {
+        try
+        {
+            var picker = new FileSavePicker
+            {
+                SuggestedStartLocation = PickerLocationId.Desktop,
+                SuggestedFileName = $"randommac-bundle-{DateTime.Now:yyyyMMdd-HHmmss}",
+                DefaultFileExtension = ".zip"
+            };
+            picker.FileTypeChoices.Add("ZIP archive", [".zip"]);
+
+            InitWithMainWindow(picker);
+
+            var file = await picker.PickSaveFileAsync();
+            if (file is null) return;
+
+            var sources = new (string label, string path)[]
+            {
+                ("settings.json",  _settingsService.GetFilePath()),
+                ("blacklist.json", _blacklistService.GetFilePath()),
+                ("history.json",   _historyService.GetFilePath()),
+            };
+
+            // Recreate the archive each time. ZipFile.Open in Create mode
+            // overwrites if the file exists; FileSavePicker already handled
+            // the overwrite confirmation.
+            if (File.Exists(file.Path)) File.Delete(file.Path);
+            using var zip = ZipFile.Open(file.Path, ZipArchiveMode.Create);
+            foreach (var (label, path) in sources)
+            {
+                if (File.Exists(path))
+                    zip.CreateEntryFromFile(path, label);
+                else
+                    _logger.LogDebug("Export bundle: {Label} missing at {Path}, skipped", label, path);
+            }
+
+            StatusMessage = $"Bundle exported to {Path.GetFileName(file.Path)}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Export failed: {ex.Message}";
+            _logger.LogError(ex, "Failed to export bundle");
         }
     }
 

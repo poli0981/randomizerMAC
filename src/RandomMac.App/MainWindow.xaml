@@ -71,6 +71,11 @@
                 <ContentControl Content="{Binding CurrentPage}"
                                 HorizontalContentAlignment="Stretch"
                                 VerticalContentAlignment="Stretch">
+                    <ContentControl.ContentTransitions>
+                        <TransitionCollection>
+                            <NavigationThemeTransition />
+                        </TransitionCollection>
+                    </ContentControl.ContentTransitions>
                     <ContentControl.ContentTemplateSelector>
                         <views:PageTemplateSelector>
                             <views:PageTemplateSelector.DashboardTemplate>
