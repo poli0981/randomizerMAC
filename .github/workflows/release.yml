@@ -37,7 +37,7 @@ jobs:
           fetch-depth: 0   # Velopack delta needs prior tag history.
 
       - name: Setup .NET (from global.json)
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
           dotnet-quality: preview
