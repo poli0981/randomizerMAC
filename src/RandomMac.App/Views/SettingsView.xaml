@@ -129,9 +129,6 @@
                            FontWeight="SemiBold" />
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="{Binding [Settings_Save], Source={StaticResource Loc}}"
-                            Command="{Binding SaveSettingsCommand}"
-                            Style="{ThemeResource AccentButtonStyle}" />
                     <Button Content="{Binding [Settings_Export], Source={StaticResource Loc}}"
                             Command="{Binding ExportSettingsCommand}" />
                     <Button Content="{Binding [Settings_Import], Source={StaticResource Loc}}"
