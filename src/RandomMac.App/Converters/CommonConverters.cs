@@ -54,13 +54,25 @@ public sealed class RelativeTimeConverter : IValueConverter
     {
         if (value is not DateTime when) return string.Empty;
 
-        var delta = DateTime.Now - when;
-        if (delta.TotalSeconds < 0)            return when.ToString("HH:mm");
+        // Stored timestamps from MacChangeResult / MacHistoryEntry default to
+        // DateTime.UtcNow and serialize as "...Z" — they round-trip with
+        // Kind=Utc. JSON without an offset comes back as Unspecified; treat
+        // that as UTC too (existing model storage convention) so we don't
+        // double-shift. Kind=Local passes through.
+        var local = when.Kind switch
+        {
+            DateTimeKind.Utc         => when.ToLocalTime(),
+            DateTimeKind.Unspecified => DateTime.SpecifyKind(when, DateTimeKind.Utc).ToLocalTime(),
+            _                        => when,
+        };
+
+        var delta = DateTime.Now - local;
+        if (delta.TotalSeconds < 0)            return local.ToString("HH:mm");
         if (delta.TotalSeconds < 60)           return "just now";
         if (delta.TotalMinutes < 60)           return $"{(int)delta.TotalMinutes} min ago";
         if (delta.TotalHours   < 24)           return $"{(int)delta.TotalHours} h ago";
-        if (delta.TotalHours   < 48)           return "yesterday " + when.ToString("HH:mm");
-        return when.ToString("yyyy-MM-dd HH:mm");
+        if (delta.TotalHours   < 48)           return "yesterday " + local.ToString("HH:mm");
+        return local.ToString("yyyy-MM-dd HH:mm");
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)

@@ -324,17 +324,26 @@ public partial class SettingsViewModel : ViewModelBase
                 ("history.json",   _historyService.GetFilePath()),
             };
 
-            // Recreate the archive each time. ZipFile.Open in Create mode
-            // overwrites if the file exists; FileSavePicker already handled
-            // the overwrite confirmation.
-            if (File.Exists(file.Path)) File.Delete(file.Path);
-            using var zip = ZipFile.Open(file.Path, ZipArchiveMode.Create);
+            // FileSavePicker has already created an empty placeholder at
+            // file.Path — ZipFile.Open(..., Create) refuses an existing
+            // file, and File.Delete may race with the picker's StorageFile
+            // handle. Open via FileStream(FileMode.Create) which truncates
+            // in place, then wrap in ZipArchive.
+            await using var stream = new FileStream(
+                file.Path, FileMode.Create, FileAccess.Write, FileShare.None);
+            using var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: false);
             foreach (var (label, path) in sources)
             {
-                if (File.Exists(path))
-                    zip.CreateEntryFromFile(path, label);
-                else
+                if (!File.Exists(path))
+                {
                     _logger.LogDebug("Export bundle: {Label} missing at {Path}, skipped", label, path);
+                    continue;
+                }
+
+                var entry = zip.CreateEntry(label, CompressionLevel.Optimal);
+                using var entryStream = entry.Open();
+                await using var src = File.OpenRead(path);
+                await src.CopyToAsync(entryStream);
             }
 
             StatusMessage = $"Bundle exported to {Path.GetFileName(file.Path)}.";
