@@ -216,14 +216,19 @@
                      Severity="Informational"
                      IsClosable="True" />
 
-            <!-- History grid -->
-            <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+            <!-- History header + filter + clear -->
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Margin="0,8,0,0">
                 <TextBlock Grid.Column="0"
                            Text="{Binding [Dashboard_RecentHistory], Source={StaticResource Loc}}"
                            FontSize="14"
                            FontWeight="SemiBold"
                            VerticalAlignment="Center" />
-                <Button Grid.Column="1"
+                <TextBox Grid.Column="1"
+                         Text="{Binding HistoryFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         PlaceholderText="Filter by adapter or MAC..."
+                         FontSize="12"
+                         Padding="8,4" />
+                <Button Grid.Column="2"
                         Command="{Binding ClearHistoryCommand}"
                         Content="{Binding [Dashboard_Clear], Source={StaticResource Loc}}"
                         Padding="10,4"
@@ -242,7 +247,7 @@
                     set + refreshed in DashboardView.xaml.cs.
                 -->
                 <tk:DataGrid x:Name="HistoryGrid"
-                             ItemsSource="{Binding RecentHistory}"
+                             ItemsSource="{Binding FilteredHistory}"
                              AutoGenerateColumns="False"
                              HeadersVisibility="Column"
                              IsReadOnly="True"

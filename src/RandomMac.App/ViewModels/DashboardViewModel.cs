@@ -26,6 +26,34 @@ public partial class DashboardViewModel : ViewModelBase
     public ObservableCollection<NetworkAdapterInfo> Adapters { get; } = [];
     public ObservableCollection<MacHistoryEntry> RecentHistory { get; } = [];
 
+    /// <summary>
+    /// View over <see cref="RecentHistory"/> filtered by <see cref="HistoryFilter"/>.
+    /// The DataGrid binds to this so the user can search by adapter name or
+    /// MAC string without losing the underlying list.
+    /// </summary>
+    public ObservableCollection<MacHistoryEntry> FilteredHistory { get; } = [];
+
+    [ObservableProperty]
+    private string _historyFilter = "";
+
+    partial void OnHistoryFilterChanged(string value) => RefreshHistoryFilter();
+
+    private void RefreshHistoryFilter()
+    {
+        FilteredHistory.Clear();
+        var filter = HistoryFilter?.Trim() ?? "";
+        foreach (var entry in RecentHistory)
+        {
+            if (filter.Length == 0 || MatchesFilter(entry, filter))
+                FilteredHistory.Add(entry);
+        }
+    }
+
+    private static bool MatchesFilter(MacHistoryEntry h, string filter)
+        => h.AdapterName.Contains(filter, StringComparison.OrdinalIgnoreCase)
+        || h.PreviousMac.Contains(filter, StringComparison.OrdinalIgnoreCase)
+        || h.NewMac.Contains(filter, StringComparison.OrdinalIgnoreCase);
+
     [ObservableProperty]
     private NetworkAdapterInfo? _selectedAdapter;
 
@@ -116,6 +144,10 @@ public partial class DashboardViewModel : ViewModelBase
         // EnsureLoadedAsync before this VM is constructed.
         PopulateAdaptersFromCache();
         PopulateRecentHistory();
+
+        // Keep FilteredHistory in sync whenever RecentHistory mutates
+        // (Insert after Apply, Clear on user request, repopulate on load).
+        RecentHistory.CollectionChanged += (_, _) => RefreshHistoryFilter();
 
         // Repopulate when the cache is refreshed (user clicks Refresh, or
         // SettingsViewModel triggers a rescan).

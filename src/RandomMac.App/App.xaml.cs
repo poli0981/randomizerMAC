@@ -89,6 +89,61 @@ public partial class App : Application
         {
             _ = PerformAutoChangeAsync(settings.AutoChangeAdapterIds);
         }
+
+        // Auto-check for updates (throttled by LastUpdateCheckedAt). Fire-and-
+        // forget so it doesn't block startup; UpdateService surfaces results
+        // via NotificationService and updates settings.LastUpdateCheckedAt.
+        _ = AutoCheckForUpdateAsync();
+    }
+
+    private const int UpdateCheckCooldownHours = 24;
+
+    /// <summary>
+    /// Runs an update check at startup if the last check is older than
+    /// <see cref="UpdateCheckCooldownHours"/> hours. Silent on
+    /// up-to-date / failure (logs only); shows an info toast when a new
+    /// version is available so users notice without opening the Update tab.
+    /// </summary>
+    private static async Task AutoCheckForUpdateAsync()
+    {
+        var logger = Services.GetRequiredService<ILogger<App>>();
+        var settingsService = Services.GetRequiredService<ISettingsService>();
+        var updateService = Services.GetRequiredService<IUpdateService>();
+        var notificationService = Services.GetRequiredService<NotificationService>();
+
+        var settings = settingsService.Settings;
+        var last = settings.LastUpdateCheckedAt;
+        if (last.HasValue && (DateTime.Now - last.Value).TotalHours < UpdateCheckCooldownHours)
+        {
+            logger.LogDebug("Auto update check: skipped (last={Last}, cooldown={Hours}h)",
+                last, UpdateCheckCooldownHours);
+            return;
+        }
+
+        // Tiny delay so the window finishes activating first.
+        await Task.Delay(TimeSpan.FromSeconds(5));
+
+        try
+        {
+            logger.LogInformation("Auto update check: running");
+            var result = await updateService.CheckForUpdateAsync();
+
+            settings.LastUpdateCheckedAt = DateTime.Now;
+            await settingsService.SaveAsync();
+
+            logger.LogInformation("Auto update check: status={Status}", result.Status);
+
+            if (result.Status == Core.Models.UpdateStatusCode.UpdateAvailable
+                && !string.IsNullOrEmpty(result.LatestVersion))
+            {
+                notificationService.Info(
+                    Localization.Loc.Get("Notif_UpdateAvailable", result.LatestVersion));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Auto update check failed (non-fatal)");
+        }
     }
 
     private static async Task PerformAutoChangeAsync(List<string> adapterPnpIds)

@@ -16,4 +16,10 @@ public sealed class AppSettings
     // Auto-change MAC on OS startup
     public bool AutoChangeOnStartup { get; set; }
     public List<string> AutoChangeAdapterIds { get; set; } = [];
+
+    /// <summary>
+    /// Timestamp of the last successful update check. Used to throttle the
+    /// startup auto-check (default 24h cooldown).
+    /// </summary>
+    public DateTime? LastUpdateCheckedAt { get; set; }
 }
