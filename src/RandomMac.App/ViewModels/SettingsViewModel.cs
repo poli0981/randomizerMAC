@@ -377,7 +377,7 @@ public partial class SettingsViewModel : ViewModelBase
                 LoadFromSettings();
                 _isLoading = false;
 
-                _themeService.Apply(SelectedThemeMode, "");
+                _themeService.Apply(SelectedThemeMode);
                 Loc.SetLanguage(SelectedLanguage);
                 PopulateAutoChangeAdaptersFromCache();
                 StatusMessage = "Settings imported.";

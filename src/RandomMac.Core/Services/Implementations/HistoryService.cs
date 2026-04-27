@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using RandomMac.Core.Models;
 using RandomMac.Core.Services.Interfaces;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace RandomMac.Core.Services.Implementations;
@@ -26,7 +27,8 @@ public sealed class HistoryService : IHistoryService
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        WriteIndented = true
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     public HistoryService(ILogger<HistoryService> logger)

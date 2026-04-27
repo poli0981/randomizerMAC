@@ -87,8 +87,11 @@ public partial class LogViewModel : ViewModelBase
                 SuggestedFileName = $"randommac-log-{DateTime.Now:yyyyMMdd-HHmmss}",
                 DefaultFileExtension = ".txt"
             };
+            // WinUI 3 FileSavePicker rejects wildcards (".*") with
+            // "File extensions must begin with '.' and contain no wildcards."
+            // List concrete extensions instead.
             picker.FileTypeChoices.Add("Text File", [".txt"]);
-            picker.FileTypeChoices.Add("All Files", [".*"]);
+            picker.FileTypeChoices.Add("Log File", [".log"]);
 
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(
                 App.Services.GetRequiredService<MainWindow>());

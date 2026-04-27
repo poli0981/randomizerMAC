@@ -19,7 +19,7 @@ public sealed class ThemeService
     /// </summary>
     private static readonly Color BrandAccent = Color.FromArgb(0xFF, 0x61, 0xAF, 0xEF);
 
-    public void Apply(string mode, string accentColor /* ignored */)
+    public void Apply(string mode)
     {
         ApplyThemeMode(mode);
         ApplyBrandAccent();

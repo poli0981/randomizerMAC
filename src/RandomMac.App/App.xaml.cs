@@ -58,7 +58,7 @@ public partial class App : Application
         await Services.GetRequiredService<IAdapterCacheService>().EnsureLoadedAsync();
 
         var settings = Services.GetRequiredService<ISettingsService>().Settings;
-        Services.GetRequiredService<ThemeService>().Apply(settings.ThemeMode, settings.AccentColor);
+        Services.GetRequiredService<ThemeService>().Apply(settings.ThemeMode);
         Localization.Loc.SetLanguage(settings.Language);
 
         _mainWindow = Services.GetRequiredService<MainWindow>();

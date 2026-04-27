@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using RandomMac.Core.Models;
 using RandomMac.Core.Services.Interfaces;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -16,7 +17,8 @@ public sealed class BlacklistService : IBlacklistService
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     private static readonly MacAddress[] ReservedMacs =
