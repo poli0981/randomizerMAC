@@ -6,6 +6,11 @@ obj/
 *.userosscache
 *.sln.docstates
 
+## Velopack publish + pack output
+publish/
+releases/
+history.json
+
 ## IDE
 .vs/
 .idea/
