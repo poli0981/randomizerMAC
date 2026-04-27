@@ -1,0 +1,214 @@
+name: Release
+
+# Triggered by pushing a version tag like `v1.1.1` or `v1.2.0-rc1`.
+# Pre-release tags (containing a hyphen) are marked as GitHub pre-releases.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (without leading v), e.g. 1.1.1'
+        required: true
+        type: string
+
+permissions:
+  contents: write   # Create GitHub Releases + upload assets
+  attestations: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false   # Don't kill an in-flight release.
+
+jobs:
+  release:
+    name: Build, pack with Velopack, publish GitHub Release
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Velopack delta needs prior tag history.
+
+      - name: Setup .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          dotnet-quality: preview
+
+      - name: Resolve version + pre-release flag
+        id: meta
+        shell: pwsh
+        run: |
+          $tag = if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+                   "v${{ inputs.version }}"
+                 } else {
+                   "${{ github.ref_name }}"
+                 }
+          $version = $tag -replace '^v', ''
+          $isPrerelease = if ($version -match '-') { 'true' } else { 'false' }
+          "tag=$tag"                  | Out-File $env:GITHUB_OUTPUT -Append
+          "version=$version"          | Out-File $env:GITHUB_OUTPUT -Append
+          "is_prerelease=$isPrerelease" | Out-File $env:GITHUB_OUTPUT -Append
+          Write-Host "Tag=$tag  Version=$version  Prerelease=$isPrerelease"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Test
+        # Tests gate the release — a regression should never be packaged.
+        run: dotnet test -c Release --verbosity normal
+
+      - name: Publish self-contained
+        # The csproj's CopyWinUIArtifactsToPublishDirectory target ensures
+        # the 9 *.xbf and RandomMac.App.pri ride along — without that,
+        # the installer succeeds but the app crashes at first XAML load.
+        run: |
+          dotnet publish src/RandomMac.App/RandomMac.App.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output publish/RandomMac
+
+      - name: Verify publish output (XBF + app PRI present)
+        shell: pwsh
+        run: |
+          $xbfs = (Get-ChildItem -Path publish/RandomMac -Recurse -Filter '*.xbf').Count
+          $hasAppPri = Test-Path 'publish/RandomMac/RandomMac.App.pri'
+          if ($xbfs -lt 9) { throw "Expected at least 9 XBF files in publish, got $xbfs" }
+          if (-not $hasAppPri) { throw "RandomMac.App.pri missing from publish output" }
+          Write-Host "publish/ has $xbfs XBF files + RandomMac.App.pri ✓"
+
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk --version 0.0.1298
+
+      - name: Download previous releases (for delta)
+        # Velopack auto-generates a delta nupkg if the previous full nupkg
+        # is present in the output folder. continue-on-error so the very
+        # first release (no prior) doesn't fail the whole job.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path releases | Out-Null
+          vpk download github `
+            --repoUrl https://github.com/${{ github.repository }} `
+            --outputDir releases `
+            --token $env:GH_TOKEN
+
+      - name: Resolve release notes path
+        id: notes
+        shell: pwsh
+        run: |
+          $candidate = "docs/RELEASE_v${{ steps.meta.outputs.version }}.md"
+          if (Test-Path $candidate) {
+            "path=$candidate" | Out-File $env:GITHUB_OUTPUT -Append
+          } else {
+            # Fallback: write a minimal placeholder so vpk has something.
+            $placeholder = "$env:RUNNER_TEMP\release-notes.md"
+            "Release ${{ steps.meta.outputs.version }}." | Set-Content $placeholder
+            "path=$placeholder" | Out-File $env:GITHUB_OUTPUT -Append
+          }
+
+      - name: Pack with Velopack
+        # --delta BestSize maximizes the saving for users updating from a
+        # prior release; the full nupkg / Setup.exe / Portable.zip are
+        # always produced regardless.
+        shell: pwsh
+        run: |
+          vpk pack `
+            -u RandomMac `
+            -v ${{ steps.meta.outputs.version }} `
+            -p publish/RandomMac `
+            -e RandomMac.App.exe `
+            -o releases/ `
+            --packTitle "RANDOM MAC" `
+            --packAuthors "poli0981" `
+            --releaseNotes "${{ steps.notes.outputs.path }}" `
+            --delta BestSize
+
+      - name: Compute SHA256 checksums
+        shell: pwsh
+        run: |
+          $lines = Get-ChildItem releases -File |
+            Where-Object { $_.Extension -in '.exe', '.zip', '.nupkg', '.json' -or $_.Name -eq 'RELEASES' } |
+            Sort-Object Name |
+            ForEach-Object {
+              $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+              "$hash  $($_.Name)"
+            }
+          $lines | Out-File -Encoding ascii -NoNewline:$false releases/SHA256SUMS.txt
+          Write-Host "--- SHA256SUMS.txt ---"
+          $lines | ForEach-Object { Write-Host $_ }
+
+      - name: List release artifacts
+        shell: pwsh
+        run: |
+          Get-ChildItem releases | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
+
+      - name: Sign artifacts (manual setup required)
+        # Code signing is opt-in. To enable:
+        #   1. Add `CODE_SIGN_PFX_BASE64`  (base64-encoded .pfx)
+        #   2. Add `CODE_SIGN_PASSWORD`    (the cert's password)
+        #   3. Uncomment the body below.
+        if: env.CODE_SIGN_PFX_BASE64 != ''
+        env:
+          CODE_SIGN_PFX_BASE64: ${{ secrets.CODE_SIGN_PFX_BASE64 }}
+          CODE_SIGN_PASSWORD: ${{ secrets.CODE_SIGN_PASSWORD }}
+        shell: pwsh
+        run: |
+          $pfxPath = "$env:RUNNER_TEMP\sign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:CODE_SIGN_PFX_BASE64))
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Filter signtool.exe -Recurse |
+                      Where-Object { $_.FullName -match 'x64\\signtool.exe$' } |
+                      Select-Object -First 1 -ExpandProperty FullName
+          Get-ChildItem releases -Filter '*.exe' | ForEach-Object {
+            & $signtool sign /f $pfxPath /p $env:CODE_SIGN_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "signtool failed for $($_.Name)" }
+          }
+          Remove-Item $pfxPath -Force
+
+      - name: Upload artifacts to workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: velopack-release-${{ steps.meta.outputs.version }}
+          path: releases/
+          retention-days: 30
+
+      - name: Attest build provenance
+        # Cryptographic attestation that ties these binaries to this exact
+        # commit + workflow run. Verifiable with `gh attestation verify`.
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            releases/RandomMac-win-Setup.exe
+            releases/RandomMac-win-Portable.zip
+            releases/RandomMac-${{ steps.meta.outputs.version }}-full.nupkg
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: RANDOM MAC ${{ steps.meta.outputs.tag }}
+          body_path: ${{ steps.notes.outputs.path }}
+          draft: false
+          prerelease: ${{ steps.meta.outputs.is_prerelease == 'true' }}
+          fail_on_unmatched_files: false
+          files: |
+            releases/RandomMac-win-Setup.exe
+            releases/RandomMac-win-Portable.zip
+            releases/RandomMac-*-full.nupkg
+            releases/RandomMac-*-delta.nupkg
+            releases/releases.win.json
+            releases/RELEASES
+            releases/assets.win.json
+            releases/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
