@@ -47,6 +47,13 @@ public partial class App : Application
         await Services.GetRequiredService<IBlacklistService>().LoadAsync();
         await Services.GetRequiredService<IHistoryService>().LoadAsync();
 
+        // Warm up the adapter cache once. ViewModels resolved via MainWindow
+        // (Dashboard + Settings) read this cache synchronously in their
+        // constructors, so it MUST be loaded before MainWindow is resolved —
+        // otherwise both VMs would also race to GetPhysicalAdaptersAsync()
+        // and emit duplicate "Detected adapter" log blocks.
+        await Services.GetRequiredService<IAdapterCacheService>().EnsureLoadedAsync();
+
         var settings = Services.GetRequiredService<ISettingsService>().Settings;
         Services.GetRequiredService<ThemeService>().Apply(settings.ThemeMode, settings.AccentColor);
         Localization.Loc.SetLanguage(settings.Language);
@@ -84,7 +91,7 @@ public partial class App : Application
     private static async Task PerformAutoChangeAsync(List<string> adapterPnpIds)
     {
         var logger = Services.GetRequiredService<ILogger<App>>();
-        var adapterService = Services.GetRequiredService<INetworkAdapterService>();
+        var cache = Services.GetRequiredService<IAdapterCacheService>();
         var macService = Services.GetRequiredService<IMacAddressService>();
         var blacklistService = Services.GetRequiredService<IBlacklistService>();
         var historyService = Services.GetRequiredService<IHistoryService>();
@@ -94,8 +101,8 @@ public partial class App : Application
 
         try
         {
-            var allAdapters = await adapterService.GetPhysicalAdaptersAsync();
-            var targets = allAdapters.Where(a => adapterPnpIds.Contains(a.PnpDeviceId)).ToList();
+            // Cache is already warmed up by EnsureLoadedAsync in OnLaunched.
+            var targets = cache.Adapters.Where(a => adapterPnpIds.Contains(a.PnpDeviceId)).ToList();
 
             var successCount = 0;
             var failCount = 0;
@@ -182,6 +189,7 @@ public partial class App : Application
 
         // Core services
         services.AddSingleton<INetworkAdapterService, NetworkAdapterService>();
+        services.AddSingleton<IAdapterCacheService, AdapterCacheService>();
         services.AddSingleton<IMacAddressService, MacAddressService>();
         services.AddSingleton<IBlacklistService, BlacklistService>();
         services.AddSingleton<IHistoryService, HistoryService>();

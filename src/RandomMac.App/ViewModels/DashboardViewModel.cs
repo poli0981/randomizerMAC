@@ -13,6 +13,7 @@ namespace RandomMac.App.ViewModels;
 public partial class DashboardViewModel : ViewModelBase
 {
     private readonly INetworkAdapterService _adapterService;
+    private readonly IAdapterCacheService _cache;
     private readonly IMacAddressService _macService;
     private readonly IBlacklistService _blacklistService;
     private readonly IHistoryService _historyService;
@@ -66,6 +67,7 @@ public partial class DashboardViewModel : ViewModelBase
 
     public DashboardViewModel(
         INetworkAdapterService adapterService,
+        IAdapterCacheService cache,
         IMacAddressService macService,
         IBlacklistService blacklistService,
         IHistoryService historyService,
@@ -73,13 +75,46 @@ public partial class DashboardViewModel : ViewModelBase
         ILogger<DashboardViewModel> logger)
     {
         _adapterService = adapterService;
+        _cache = cache;
         _macService = macService;
         _blacklistService = blacklistService;
         _historyService = historyService;
         _notificationService = notificationService;
         _logger = logger;
 
-        LoadAdaptersCommand.ExecuteAsync(null);
+        // Read the warmed-up cache synchronously. App.OnLaunched calls
+        // EnsureLoadedAsync before this VM is constructed.
+        PopulateAdaptersFromCache();
+        PopulateRecentHistory();
+
+        // Repopulate when the cache is refreshed (user clicks Refresh, or
+        // SettingsViewModel triggers a rescan).
+        _cache.AdaptersRefreshed += OnAdaptersRefreshed;
+    }
+
+    private void OnAdaptersRefreshed(object? sender, EventArgs e)
+    {
+        PopulateAdaptersFromCache();
+    }
+
+    private void PopulateAdaptersFromCache()
+    {
+        var current = SelectedAdapter?.PnpDeviceId;
+        Adapters.Clear();
+        foreach (var a in _cache.Adapters)
+            Adapters.Add(a);
+
+        if (current is not null)
+            SelectedAdapter = Adapters.FirstOrDefault(a => a.PnpDeviceId == current);
+
+        StatusMessage = $"Found {Adapters.Count} adapter(s).";
+    }
+
+    private void PopulateRecentHistory()
+    {
+        RecentHistory.Clear();
+        foreach (var entry in _historyService.GetHistory())
+            RecentHistory.Add(entry);
     }
 
     partial void OnSelectedAdapterChanged(NetworkAdapterInfo? value)
@@ -116,13 +151,9 @@ public partial class DashboardViewModel : ViewModelBase
 
         try
         {
-            var adapters = await _adapterService.GetPhysicalAdaptersAsync();
-            Adapters.Clear();
-            foreach (var a in adapters)
-                Adapters.Add(a);
-
-            StatusMessage = $"Found {adapters.Count} adapter(s).";
-            _logger.LogInformation("Loaded {Count} physical adapters", adapters.Count);
+            await _cache.RefreshAsync();
+            // PopulateAdaptersFromCache runs via the AdaptersRefreshed event.
+            _logger.LogInformation("Loaded {Count} physical adapters", _cache.Adapters.Count);
         }
         catch (Exception ex)
         {
@@ -134,10 +165,7 @@ public partial class DashboardViewModel : ViewModelBase
             IsLoading = false;
         }
 
-        // Load recent history
-        RecentHistory.Clear();
-        foreach (var entry in _historyService.GetHistory())
-            RecentHistory.Add(entry);
+        PopulateRecentHistory();
     }
 
     [RelayCommand]

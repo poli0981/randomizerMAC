@@ -16,7 +16,7 @@ public partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsService _settingsService;
     private readonly IBlacklistService _blacklistService;
-    private readonly INetworkAdapterService _adapterService;
+    private readonly IAdapterCacheService _cache;
     private readonly ThemeService _themeService;
     private readonly ILogger<SettingsViewModel> _logger;
 
@@ -62,20 +62,40 @@ public partial class SettingsViewModel : ViewModelBase
     public SettingsViewModel(
         ISettingsService settingsService,
         IBlacklistService blacklistService,
-        INetworkAdapterService adapterService,
+        IAdapterCacheService cache,
         ThemeService themeService,
         ILogger<SettingsViewModel> logger)
     {
         _settingsService = settingsService;
         _blacklistService = blacklistService;
-        _adapterService = adapterService;
+        _cache = cache;
         _themeService = themeService;
         _logger = logger;
 
         _isLoading = true;
         LoadFromSettings();
         _isLoading = false;
-        LoadAutoChangeAdaptersCommand.ExecuteAsync(null);
+
+        // Read warmed-up cache synchronously (App.OnLaunched calls
+        // EnsureLoadedAsync before this VM is constructed).
+        PopulateAutoChangeAdaptersFromCache();
+        _cache.AdaptersRefreshed += (_, _) => PopulateAutoChangeAdaptersFromCache();
+    }
+
+    private void PopulateAutoChangeAdaptersFromCache()
+    {
+        var configuredIds = _settingsService.Settings.AutoChangeAdapterIds;
+        AutoChangeAdapters.Clear();
+        foreach (var adapter in _cache.Adapters)
+        {
+            AutoChangeAdapters.Add(new AutoChangeAdapterItem
+            {
+                PnpDeviceId = adapter.PnpDeviceId,
+                Name = adapter.Name,
+                Type = adapter.Type.ToString(),
+                IsSelected = configuredIds.Contains(adapter.PnpDeviceId)
+            });
+        }
     }
 
     /// <summary>
@@ -107,20 +127,8 @@ public partial class SettingsViewModel : ViewModelBase
     {
         try
         {
-            var adapters = await _adapterService.GetPhysicalAdaptersAsync();
-            var configuredIds = _settingsService.Settings.AutoChangeAdapterIds;
-
-            AutoChangeAdapters.Clear();
-            foreach (var adapter in adapters)
-            {
-                AutoChangeAdapters.Add(new AutoChangeAdapterItem
-                {
-                    PnpDeviceId = adapter.PnpDeviceId,
-                    Name = adapter.Name,
-                    Type = adapter.Type.ToString(),
-                    IsSelected = configuredIds.Contains(adapter.PnpDeviceId)
-                });
-            }
+            await _cache.RefreshAsync();
+            // PopulateAutoChangeAdaptersFromCache runs via AdaptersRefreshed event.
         }
         catch (Exception ex)
         {
