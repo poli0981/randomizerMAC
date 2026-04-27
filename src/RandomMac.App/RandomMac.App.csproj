@@ -26,6 +26,9 @@
     <EnableMsixTooling>false</EnableMsixTooling>
     <Platforms>x64</Platforms>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <!-- Default RID so plain `dotnet build` (and Rider) succeed without -r;
+         WindowsAppSDKSelfContained refuses to build on AnyCPU/unspecified. -->
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Release'">true</PublishReadyToRun>
 
     <!-- Velopack must run before XAML init, so we provide our own Main in Program.cs. -->
