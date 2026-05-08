@@ -4,6 +4,10 @@ on:
   workflow_run:
     workflows: ["*"]
     types: [completed]
+    
+permissions:
+  contents: read
+  actions: read
 
 jobs:
   notify:
