@@ -123,4 +123,9 @@
   <!-- Update view -->
   <data name="Update_VersionFormat"><value>Current Version: v{0}</value></data>
   <data name="Update_PublishedFormat"><value>Published: {0}</value></data>
+
+  <!-- Tray menu -->
+  <data name="Tray_Show"><value>Show</value></data>
+  <data name="Tray_RandomizeActive"><value>Randomize Active Adapter</value></data>
+  <data name="Tray_Exit"><value>Exit</value></data>
 </root>
