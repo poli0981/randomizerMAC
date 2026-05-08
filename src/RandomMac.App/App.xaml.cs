@@ -75,8 +75,27 @@ public partial class App : Application
 
         if (isOsStartup)
         {
-            Log.Information("Starting minimized to system tray (window not activated)");
-            // Don't Activate() — tray icon is the visible affordance.
+            Log.Information("Starting minimized to system tray (priming XamlRoot off-screen)");
+
+            // The tray ContextFlyout needs a XamlRoot to display — and XamlRoot
+            // is only populated after the window activates at least once. Move
+            // the window off-screen, activate (so XamlRoot wires up), then hide
+            // and restore the centered position so a later ShowMainWindow lands
+            // where ConfigurePresenter intended.
+            if (_mainWindow.AppWindow is not null)
+            {
+                var centeredPos = _mainWindow.AppWindow.Position;
+                _mainWindow.AppWindow.Move(new Windows.Graphics.PointInt32(-32000, -32000));
+
+                void HideOnFirstActivate(object sender, WindowActivatedEventArgs args)
+                {
+                    _mainWindow.Activated -= HideOnFirstActivate;
+                    _mainWindow.AppWindow?.Hide();
+                    _mainWindow.AppWindow?.Move(centeredPos);
+                }
+                _mainWindow.Activated += HideOnFirstActivate;
+                _mainWindow.Activate();
+            }
         }
         else
         {

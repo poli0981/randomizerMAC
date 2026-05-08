@@ -123,4 +123,9 @@
   <!-- Update view -->
   <data name="Update_VersionFormat"><value>Phiên bản hiện tại: v{0}</value></data>
   <data name="Update_PublishedFormat"><value>Ngày phát hành: {0}</value></data>
+
+  <!-- Tray menu -->
+  <data name="Tray_Show"><value>Hiện cửa sổ</value></data>
+  <data name="Tray_RandomizeActive"><value>Đổi MAC adapter đang hoạt động</value></data>
+  <data name="Tray_Exit"><value>Thoát</value></data>
 </root>

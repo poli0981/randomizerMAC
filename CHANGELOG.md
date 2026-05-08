@@ -5,6 +5,20 @@ All notable changes to RANDOM MAC will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-05-08
+
+Two correctness fixes around app instancing and the system-tray menu, plus tray-menu polish (Vietnamese localization + restored Fluent icons).
+
+### Fixed
+
+- **Process duplication on every launch.** Each time the user opened `RandomMac.App.exe` while the previous instance was still resident in the tray (default `MinimizeToTray=true` keeps it alive on close), a new process started. Over time, Task Manager filled up with parallel `RandomMac.App.exe` entries — none of them visibly active. Added a single-instance gate in `Program.cs` using `Microsoft.Windows.AppLifecycle.AppInstance.FindOrRegisterForKey("RandomMac.SingleInstance")`. Secondary launches call `RedirectActivationToAsync` and exit; the primary's `Activated` handler marshals to the UI dispatcher and calls `TrayIconService.ShowMainWindow()` to bring the existing window back from the tray. `VelopackApp.Build().Run()` still runs first so installer/update CLI args (`--veloapp-*`) bypass the gate as before.
+- **Tray right-click menu items did nothing when clicked.** Initially diagnosed as a `XamlRoot` issue (the `--minimized` startup path never activates the window, and `MenuFlyout.ContextFlyout` needs a XamlRoot). The real cause was the H.NotifyIcon dispatch model: in default `ContextMenuMode = PopupMenu`, the library builds a Win32 popup menu from `MenuFlyout.Items` and dispatches selections via the items' **`ICommand`** — `MenuFlyoutItem.Click` events do not fire in this mode (documented in the H.NotifyIcon README, easy to miss). All three menu items now use `Command = new RelayCommand(...)` instead of `item.Click += ...`. `XamlRoot` priming was kept as defense-in-depth: `App.OnLaunched` for `--minimized` startups now performs an off-screen activate (`AppWindow.Move(-32000,-32000)` → `Activate()` → first-Activated handler hides + restores centered position) so a future switch to `ContextMenuMode.SecondWindow` would also work.
+
+### Changed
+
+- **Tray menu localized.** The three items previously rendered hardcoded English ("Show" / "Randomize Active Adapter" / "Exit") regardless of the chosen UI language. New keys `Tray_Show`, `Tray_RandomizeActive`, `Tray_Exit` in `Lang.resx` (en) and `Lang.vi.resx` (vi: "Hiện cửa sổ" / "Đổi MAC adapter đang hoạt động" / "Thoát"), pulled via `Loc.Get(...)` at menu-build time.
+- **Tray FontIcon glyphs** rewritten as `\uXXXX` C# escape sequences (`&#xE737;` Window, `&#xE8B1;` Shuffle, `&#xE8BB;` ChromeClose) instead of raw Private-Use-Area chars. Survives any future tooling write that strips PUA codepoints.
+
 ## [1.1.1] - 2026-04-27
 
 UX polish + correctness fixes on top of the WinUI 3 migration.
@@ -216,6 +230,7 @@ First public release of RANDOM MAC, a lightweight Windows utility for randomizin
 - **Start Minimized** toggle may not function correctly in all scenarios
 - **App Icon** is placeholder only (no custom icon designed yet)
 
+[1.1.2]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.2
 [1.1.1]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.1
 [1.1.0]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.0
 [1.0.0]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.0.0

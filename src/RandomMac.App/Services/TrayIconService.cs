@@ -100,33 +100,34 @@ public sealed class TrayIconService : IDisposable
 
     private MenuFlyout BuildMenu()
     {
+        // H.NotifyIcon's default ContextMenuMode = PopupMenu builds a Win32
+        // popup from MenuFlyout and dispatches selections via the items'
+        // ICommand. Click events do NOT fire in this mode -- Command must be
+        // set, otherwise the menu items appear but do nothing when selected.
         var menu = new MenuFlyout();
 
-        var showItem = new MenuFlyoutItem
+        menu.Items.Add(new MenuFlyoutItem
         {
-            Text = "Show",
-            Icon = new FontIcon { FontFamily = SegoeFluent, Glyph = "" }, // Window
-        };
-        showItem.Click += (_, _) => ShowMainWindow();
-        menu.Items.Add(showItem);
+            Text = Loc.Get("Tray_Show"),
+            Icon = new FontIcon { FontFamily = SegoeFluent, Glyph = "\uE737" }, // Window
+            Command = new RelayCommand(ShowMainWindow),
+        });
 
-        var randomizeItem = new MenuFlyoutItem
+        menu.Items.Add(new MenuFlyoutItem
         {
-            Text = "Randomize Active Adapter",
-            Icon = new FontIcon { FontFamily = SegoeFluent, Glyph = "" }, // Shuffle
-        };
-        randomizeItem.Click += (_, _) => _ = RandomizeActiveAdapterAsync();
-        menu.Items.Add(randomizeItem);
+            Text = Loc.Get("Tray_RandomizeActive"),
+            Icon = new FontIcon { FontFamily = SegoeFluent, Glyph = "\uE8B1" }, // Shuffle
+            Command = new RelayCommand(() => _ = RandomizeActiveAdapterAsync()),
+        });
 
         menu.Items.Add(new MenuFlyoutSeparator());
 
-        var exitItem = new MenuFlyoutItem
+        menu.Items.Add(new MenuFlyoutItem
         {
-            Text = "Exit",
-            Icon = new FontIcon { FontFamily = SegoeFluent, Glyph = "" }, // ChromeClose
-        };
-        exitItem.Click += (_, _) => ExitApp();
-        menu.Items.Add(exitItem);
+            Text = Loc.Get("Tray_Exit"),
+            Icon = new FontIcon { FontFamily = SegoeFluent, Glyph = "\uE8BB" }, // ChromeClose
+            Command = new RelayCommand(ExitApp),
+        });
 
         return menu;
     }
@@ -200,7 +201,12 @@ public sealed class TrayIconService : IDisposable
         }
     }
 
-    private void ShowMainWindow()
+    /// <summary>
+    /// Bring the main window back from the tray to the foreground. Public so
+    /// that <see cref="Program.OnActivated"/> can call it when a secondary
+    /// instance redirects activation to us.
+    /// </summary>
+    public void ShowMainWindow()
     {
         if (_window?.AppWindow is null) return;
 
