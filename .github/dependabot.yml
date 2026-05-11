@@ -6,7 +6,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
-      day: monday
+      # Tuesday avoids the Monday-morning queue across GitHub.
+      day: tuesday
       time: '04:00'
       timezone: Asia/Ho_Chi_Minh
     open-pull-requests-limit: 5
@@ -24,16 +25,30 @@ updates:
     labels:
       - dependencies
       - nuget
+    assignees:
+      - poli0981
+    reviewers:
+      - poli0981
+    commit-message:
+      prefix: 'chore(deps)'
+      include: scope
 
   # GitHub Actions used in workflows.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-      day: monday
+      day: tuesday
       time: '04:00'
       timezone: Asia/Ho_Chi_Minh
     open-pull-requests-limit: 3
     labels:
       - dependencies
       - github-actions
+    assignees:
+      - poli0981
+    reviewers:
+      - poli0981
+    commit-message:
+      prefix: 'chore(ci)'
+      include: scope

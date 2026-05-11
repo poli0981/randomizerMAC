@@ -27,6 +27,7 @@
   <data name="Nav_Log"><value>Nhật ký</value></data>
   <data name="Nav_Update"><value>Cập nhật</value></data>
   <data name="Nav_About"><value>Giới thiệu</value></data>
+  <data name="Nav_Social"><value>Mạng xã hội</value></data>
 
   <!-- Dashboard -->
   <data name="Dashboard_SelectAdapter"><value>Chọn một adapter mạng...</value></data>
@@ -128,4 +129,12 @@
   <data name="Tray_Show"><value>Hiện cửa sổ</value></data>
   <data name="Tray_RandomizeActive"><value>Đổi MAC adapter đang hoạt động</value></data>
   <data name="Tray_Exit"><value>Thoát</value></data>
+
+  <!-- Social Dev page -->
+  <data name="Social_Title"><value>Mạng xã hội nhà phát triển</value></data>
+  <data name="Social_Subtitle"><value>Theo dõi nhà phát triển, ủng hộ dự án hoặc báo lỗi.</value></data>
+  <data name="Social_Donate"><value>Ủng hộ</value></data>
+  <data name="Social_ReportBug"><value>Báo lỗi</value></data>
+  <data name="Social_Networks"><value>Mạng xã hội</value></data>
+  <data name="Social_Contact"><value>Liên hệ</value></data>
 </root>

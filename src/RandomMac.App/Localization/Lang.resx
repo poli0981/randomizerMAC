@@ -27,6 +27,7 @@
   <data name="Nav_Log"><value>Log</value></data>
   <data name="Nav_Update"><value>Update</value></data>
   <data name="Nav_About"><value>About</value></data>
+  <data name="Nav_Social"><value>Social</value></data>
 
   <!-- Dashboard -->
   <data name="Dashboard_SelectAdapter"><value>Select a network adapter...</value></data>
@@ -128,4 +129,12 @@
   <data name="Tray_Show"><value>Show</value></data>
   <data name="Tray_RandomizeActive"><value>Randomize Active Adapter</value></data>
   <data name="Tray_Exit"><value>Exit</value></data>
+
+  <!-- Social Dev page -->
+  <data name="Social_Title"><value>Social Dev</value></data>
+  <data name="Social_Subtitle"><value>Follow the developer, support the project, or report an issue.</value></data>
+  <data name="Social_Donate"><value>Donate</value></data>
+  <data name="Social_ReportBug"><value>Report a Bug</value></data>
+  <data name="Social_Networks"><value>Networks</value></data>
+  <data name="Social_Contact"><value>Contact</value></data>
 </root>

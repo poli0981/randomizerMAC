@@ -1,0 +1,124 @@
+name: Create Discussion on Release
+
+# Opens a GitHub Discussion thread in the "Announcements" category
+# whenever a Release is published. Runs in parallel to announce-release.yml
+# (which posts to Discord).
+#
+# Prerequisites (one-time, repo Settings):
+#   1. Settings → Features → enable Discussions
+#   2. Discussions tab → ensure an "Announcements" category exists
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to create a Discussion for (e.g. v1.1.2)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  discussions: write
+
+jobs:
+  create-discussion:
+    name: Open Announcements Discussion
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create Discussion via GraphQL
+        uses: actions/github-script@v7
+        env:
+          # Category slug/name to post into. Match is case-insensitive.
+          DISCUSSION_CATEGORY: Announcements
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        with:
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            if (!tag) {
+              core.setFailed('No release tag available');
+              return;
+            }
+
+            // Resolve release (payload on release event; REST call on dispatch).
+            let release = context.payload.release;
+            if (!release) {
+              const { data } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                tag,
+              });
+              release = data;
+            }
+
+            // 1) Fetch repositoryId + discussion categories.
+            const repoQuery = `
+              query($owner: String!, $name: String!) {
+                repository(owner: $owner, name: $name) {
+                  id
+                  hasDiscussionsEnabled
+                  discussionCategories(first: 25) {
+                    nodes { id name slug }
+                  }
+                }
+              }`;
+            const repoData = await github.graphql(repoQuery, {
+              owner: context.repo.owner,
+              name:  context.repo.repo,
+            });
+
+            if (!repoData.repository.hasDiscussionsEnabled) {
+              core.setFailed('Discussions are not enabled for this repository. Enable them under Settings → Features.');
+              return;
+            }
+
+            const cats = repoData.repository.discussionCategories.nodes;
+            const wanted = process.env.DISCUSSION_CATEGORY.toLowerCase();
+            const cat = cats.find(c =>
+              c.name.toLowerCase() === wanted ||
+              c.slug.toLowerCase() === wanted
+            );
+            if (!cat) {
+              core.setFailed(
+                `Discussion category "${process.env.DISCUSSION_CATEGORY}" not found. ` +
+                `Available: ${cats.map(c => c.name).join(', ')}`
+              );
+              return;
+            }
+
+            // 2) Compose title + body.
+            const title = `Release ${tag} discussion`;
+            const releaseName = release.name || tag;
+            const releaseUrl  = release.html_url;
+            const releaseBody = (release.body || '').trim();
+            const lines = [
+              `**Release:** [${releaseName}](${releaseUrl})`,
+              ``,
+              `Discussion thread for the **${tag}** release. Share feedback, bug reports, or upgrade notes here.`,
+            ];
+            if (releaseBody) {
+              lines.push('', '<details><summary>Release notes</summary>', '', releaseBody, '', '</details>');
+            }
+            const body = lines.join('\n');
+
+            // 3) Create the discussion.
+            const mutation = `
+              mutation($repo: ID!, $cat: ID!, $title: String!, $body: String!) {
+                createDiscussion(input: {repositoryId: $repo, categoryId: $cat, title: $title, body: $body}) {
+                  discussion { url }
+                }
+              }`;
+            const created = await github.graphql(mutation, {
+              repo:  repoData.repository.id,
+              cat:   cat.id,
+              title,
+              body,
+            });
+
+            const url = created.createDiscussion.discussion.url;
+            core.info(`Created discussion: ${url}`);
+            await core.summary
+              .addHeading(`Discussion created for ${tag}`)
+              .addLink(url, url)
+              .write();

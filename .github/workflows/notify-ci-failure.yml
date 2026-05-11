@@ -2,7 +2,13 @@ name: Notify CI Failures
 
 on:
   workflow_run:
-    workflows: ["*"]
+    # Explicit allowlist avoids spam from every workflow_run completion
+    # (Dependabot, attestation re-runs, the notifier workflows themselves).
+    # Names below MUST match the `name:` field of each watched workflow.
+    workflows:
+      - "CI"
+      - "Release"
+      - "Announce Release to Discord"
     types: [completed]
 
 # REQUIRED: declare permissions matching the reusable workflow's needs.
@@ -13,5 +19,9 @@ permissions:
 
 jobs:
   notify:
+    # Belt-and-braces: only fire when the watched workflow actually failed.
+    # The shared reusable workflow may already filter, but gating at the
+    # caller avoids spinning up a job slot for every successful CI run.
+    if: github.event.workflow_run.conclusion == 'failure'
     uses: poli0981/.github/.github/workflows/notify-ci-failure.yml@main
     secrets: inherit

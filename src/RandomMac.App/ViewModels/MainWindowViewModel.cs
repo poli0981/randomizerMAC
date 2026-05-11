@@ -28,7 +28,8 @@ public partial class MainWindowViewModel : ObservableObject
         SettingsViewModel settings,
         AboutViewModel about,
         UpdateViewModel update,
-        LogViewModel log)
+        LogViewModel log,
+        SocialViewModel social)
     {
         // Glyphs are Segoe Fluent Icons codepoints (https://aka.ms/SegoeFluentIcons).
         NavItems =
@@ -38,6 +39,7 @@ public partial class MainWindowViewModel : ObservableObject
             new NavItem("Nav_Log",       "", log),        // Document
             new NavItem("Nav_Update",    "", update),     // Refresh / Sync
             new NavItem("Nav_About",     "", about),      // Info
+            new NavItem("Nav_Social",    "", social),    // People
         ];
 
         // Back-reference so item templates can bind to Owner.IsPaneOpen.

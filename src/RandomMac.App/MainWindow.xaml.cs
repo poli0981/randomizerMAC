@@ -94,7 +94,7 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Ctrl+1..5 jumps to the corresponding nav item in
+    /// Ctrl+1..6 jumps to the corresponding nav item in
     /// <see cref="MainWindowViewModel.NavItems"/>.
     /// </summary>
     private void OnNavShortcut(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
@@ -106,6 +106,7 @@ public sealed partial class MainWindow : Window
             VirtualKey.Number3 => 2,
             VirtualKey.Number4 => 3,
             VirtualKey.Number5 => 4,
+            VirtualKey.Number6 => 5,
             _ => -1,
         };
 
