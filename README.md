@@ -30,7 +30,7 @@ Built with C# 13, .NET 11, and WinUI 3 (Microsoft.WindowsAppSDK 1.8) — Fluent 
 - **Auto-Apply Settings** — Each toggle applies immediately; persist is debounced (500ms) to keep disk I/O minimal — no Save button.
 - **Bundle Export** — Single ZIP with `settings.json` + `blacklist.json` + `history.json` for backup or migration.
 - **Real-time Log Viewer** — Live application logs with filter and export to `.txt` / `.log`.
-- **Keyboard Shortcuts** — `Ctrl+1..5` jump between pages, `Ctrl+R` Randomize, `Ctrl+Enter` Apply.
+- **Keyboard Shortcuts** — `Ctrl+1..6` jump between pages, `Ctrl+R` Randomize, `Ctrl+Enter` Apply.
 - **Hamburger Toggle** — Collapse the navigation pane to icon-only (48px).
 
 ## Screenshots

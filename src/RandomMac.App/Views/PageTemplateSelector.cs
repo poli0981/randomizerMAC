@@ -15,6 +15,7 @@ public sealed class PageTemplateSelector : DataTemplateSelector
     public DataTemplate? AboutTemplate { get; set; }
     public DataTemplate? LogTemplate { get; set; }
     public DataTemplate? UpdateTemplate { get; set; }
+    public DataTemplate? SocialTemplate { get; set; }
 
     protected override DataTemplate? SelectTemplateCore(object item) => item switch
     {
@@ -23,6 +24,7 @@ public sealed class PageTemplateSelector : DataTemplateSelector
         AboutViewModel => AboutTemplate,
         LogViewModel => LogTemplate,
         UpdateViewModel => UpdateTemplate,
+        SocialViewModel => SocialTemplate,
         _ => null
     };
 

@@ -2,9 +2,12 @@ name: Notify Release Pipeline
 
 on:
   workflow_run:
-    # Release-related workflows only. Renaming any of these → update list.
+    # Release-related workflows only. Names below MUST match the `name:`
+    # field of each watched workflow. Renaming any of those → update list.
+    #   release.yml          → name: "Release"
+    #   announce-release.yml → name: "Announce Release to Discord"
     workflows:
-      - "Release Desktop App"
+      - "Release"
       - "Announce Release to Discord"
     types: [completed]
 

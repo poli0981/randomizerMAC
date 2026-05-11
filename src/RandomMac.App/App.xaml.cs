@@ -280,6 +280,7 @@ public partial class App : Application
         services.AddTransient<AboutViewModel>();
         services.AddTransient<UpdateViewModel>();
         services.AddTransient<LogViewModel>();
+        services.AddTransient<SocialViewModel>();
 
         // App services
         services.AddSingleton<ThemeService>();

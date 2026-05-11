@@ -5,6 +5,28 @@ All notable changes to RANDOM MAC will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2026-05-11
+
+Developer-ergonomics hotfix. No changes to MAC randomization, registry, WMI, or any `RandomMac.Core` logic. Existing `settings.json` / `blacklist.json` / `history.json` files load unchanged.
+
+### Added
+
+- **Social Dev nav page (Ctrl+6).** New 6th navigation entry hosting a **Donate** button (MenuFlyout with Ko-fi / Buy Me a Coffee / Patreon / PayPal), a **Report a Bug** button (deep-links to `issues/new?template=bug_report.yml`), a **Networks** grid (`ItemsRepeater` + `UniformGridLayout`) listing 11 social profiles, and a **Contact** `mailto:` link. URL launching dispatched from code-behind to sidestep WinUI 3 flyout `DataContext` fragility. 7 new localization keys (EN + VI).
+- **`.github/FUNDING.yml`.** Activates the repository's "Sponsor" button with five channels: GitHub Sponsors (poli0981), Ko-fi, Buy Me a Coffee, Patreon, PayPal (custom URL).
+- **Auto-create GitHub Discussion on each release.** New `.github/workflows/discussion-on-release.yml` runs on `release: published` (parallel to the Discord announcer) and opens a thread in the **Announcements** category via the GraphQL `createDiscussion` mutation. `workflow_dispatch` with a `tag` input supports back-filling discussions for prior releases. Fails with a clear message if Discussions are not enabled or the category is missing.
+- **Developer docs.** `docs/pc_spec.md` (developer workstation hardware reference) and `docs/dev_env.md` (personal toolchain — .NET, Python, Node, Rust, Git/GPG). Vietnamese mirrors at `docs/i18n/vi/`. The existing `docs/DEV_ENVIRONMENT.md` (project build instructions) is intentionally unchanged.
+
+### Changed
+
+- **CI no longer runs on documentation-only commits.** `.github/workflows/ci.yml` now declares `paths-ignore` for `docs/**`, `**/*.md`, `.github/FUNDING.yml`, `.github/ISSUE_TEMPLATE/**`, and the root metadata files (`CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `DISCLAIMER.md`, `EULA.md`, `SECURITY.md`, `LICENSE`). Edits under `.github/workflows/**` still trigger CI.
+- **`notify-ci-failure.yml` no longer spams on every workflow_run.** Previously watched `workflows: ["*"]` (every completion of any workflow). Now restricted to `["CI", "Release", "Announce Release to Discord"]` with an explicit `if: github.event.workflow_run.conclusion == 'failure'` gate at the job level.
+- **Dependabot.** Schedule day shifted `monday` → `tuesday` to avoid the Monday-morning queue. Added `assignees`/`reviewers: [poli0981]` and `commit-message` prefixes (`chore(deps)` for NuGet, `chore(ci)` for github-actions).
+- **README** keyboard-shortcut hint `Ctrl+1..5` → `Ctrl+1..6` to reflect the new Social Dev page.
+
+### Fixed
+
+- **`notify-release-pipeline.yml` never fired.** The caller watched `workflows: ["Release Desktop App", "Announce Release to Discord"]` but the actual `name:` field in `release.yml` is just `"Release"` — `workflow_run` is a strict string match. Names corrected to `["Release", "Announce Release to Discord"]`. The reusable downstream notification (Discord) will now actually run after each release pipeline completes.
+
 ## [1.1.2] - 2026-05-08
 
 Two correctness fixes around app instancing and the system-tray menu, plus tray-menu polish (Vietnamese localization + restored Fluent icons).
