@@ -1,5 +1,4 @@
 name: Notify CI Failures
-name: Notify CI Failures
 
 on:
   workflow_run:
