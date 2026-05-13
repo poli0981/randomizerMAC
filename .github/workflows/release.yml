@@ -185,7 +185,7 @@ jobs:
       - name: Attest build provenance
         # Cryptographic attestation that ties these binaries to this exact
         # commit + workflow run. Verifiable with `gh attestation verify`.
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             releases/RandomMac-win-Setup.exe
