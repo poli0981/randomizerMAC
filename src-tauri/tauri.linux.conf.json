@@ -3,7 +3,7 @@
   "bundle": {
     "linux": {
       "deb": {
-        "depends": ["iproute2", "pkexec | policykit-1", "libayatana-appindicator3-1"],
+        "depends": ["iproute2", "pkexec | policykit-1"],
         "recommends": ["network-manager", "xdg-utils"],
         "section": "net"
       },
