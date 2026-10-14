@@ -14,6 +14,10 @@ ra thiết bị qua địa chỉ phần cứng. Đây là ứng dụng desktop n
 
 > Bản dịch tiếng Việt do AI tạo và có thể chưa chính xác tuyệt đối — bản tiếng Anh là bản gốc.
 
+![Bảng điều khiển RandomMac (giao diện tối, tiếng Việt)](../../images/dashboard-vi.png)
+
+<sub>Ảnh chụp dùng dữ liệu demo có sẵn trong app; không hiển thị adapter thật.</sub>
+
 ## Tính năng
 
 - **Đổi địa chỉ trong hai bước.** Tạo địa chỉ xem trước, kiểm tra hãng và cảnh báo, rồi áp dụng.

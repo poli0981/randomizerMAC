@@ -13,6 +13,19 @@ and Linux (Ubuntu, Fedora and other distributions)**, with a command-line tool f
 > installers that are ~20× smaller, signed automatic updates and many fixes. Coming from 1.x? See
 > [Upgrading from 1.x](#upgrading-from-1x). Vietnamese: [README tiếng Việt](docs/i18n/vi/README.md).
 
+![RandomMac dashboard (dark theme)](docs/images/dashboard-dark.png)
+
+<details>
+<summary>More screenshots (light theme, history, settings)</summary>
+
+![Dashboard in the light theme](docs/images/dashboard-light.png)
+![History page](docs/images/history-dark.png)
+![Settings page](docs/images/settings-dark.png)
+
+</details>
+
+<sub>Screenshots use the built-in demo data; no real adapter is shown.</sub>
+
 ## Features
 
 - **New address in two clicks.** Generate a preview, check its vendor and warnings, then apply.
