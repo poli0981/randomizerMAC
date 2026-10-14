@@ -44,6 +44,8 @@ class AppStore {
   fatal = $state<string | null>(null);
 
   #toastId = 0;
+  #saveQueue: Promise<unknown> = Promise.resolve();
+  #pendingSaves = 0;
 
   get format(): MacFormat {
     return this.settings?.macFormat ?? DEFAULT_FORMAT;
@@ -94,6 +96,9 @@ class AppStore {
     void events.onHistoryChanged(() => void this.refreshHistory());
     void events.onBlacklistChanged(() => void this.refreshBlacklist());
     void events.onSettingsChanged((s) => {
+      // While our own saves are queued, their echo would undo edits that are shown but not yet
+      // saved; the last save brings the authoritative copy anyway.
+      if (this.#pendingSaves > 0) return;
       this.settings = s;
       i18n.setLanguage(s.language);
     });
@@ -139,21 +144,39 @@ class AppStore {
     }
   }
 
-  /** Applies a modification to a copy of the settings and saves it. */
-  async saveSettings(mutate: (s: Settings) => void): Promise<boolean> {
-    if (!this.settings) return false;
-    const next: Settings = $state.snapshot(this.settings) as Settings;
-    mutate(next);
-    try {
-      this.settings = await api.settingsUpdate(next);
-      i18n.setLanguage(this.settings.language);
-      return true;
-    } catch (e) {
-      this.toastError(e);
-      // Reload the authoritative copy so the UI does not show unsaved values.
-      this.settings = await api.settingsGet().catch(() => this.settings);
-      return false;
-    }
+  /**
+   * Applies a modification to the settings and saves it. The change shows immediately; saves
+   * run one after another and each re-applies its change to the latest copy, so quick
+   * successive edits (two checkboxes, a toggle while autostart is being written) never
+   * overwrite each other.
+   */
+  saveSettings(mutate: (s: Settings) => void): Promise<boolean> {
+    if (!this.settings) return Promise.resolve(false);
+    const shown = $state.snapshot(this.settings) as Settings;
+    mutate(shown);
+    this.settings = shown;
+    this.#pendingSaves++;
+    const job = this.#saveQueue.then(async () => {
+      try {
+        const base = this.settings ?? shown;
+        const next = $state.snapshot(base) as Settings;
+        mutate(next);
+        const saved = await api.settingsUpdate(next);
+        // Later queued edits are already visible; the last save brings the authoritative copy.
+        if (this.#pendingSaves === 1) this.settings = saved;
+        i18n.setLanguage(saved.language);
+        return true;
+      } catch (e) {
+        this.toastError(e);
+        // Reload the authoritative copy so the UI does not show unsaved values.
+        this.settings = await api.settingsGet().catch(() => this.settings);
+        return false;
+      } finally {
+        this.#pendingSaves--;
+      }
+    });
+    this.#saveQueue = job.catch(() => false);
+    return job;
   }
 
   select(id: string) {

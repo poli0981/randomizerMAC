@@ -31,6 +31,8 @@
   let restoring = $state(false);
   let lastMessage = $state<{ kind: string; message: string } | null>(null);
   let inspectTimer: ReturnType<typeof setTimeout> | undefined;
+  // Bumped whenever the input or the adapter changes; late answers for older values are dropped.
+  let inspectSeq = 0;
 
   const adapter = $derived(app.selected);
   const busyHere = $derived(!!app.busy && app.busy.adapterId === adapter?.id);
@@ -56,6 +58,8 @@
     const id = adapter?.id ?? null;
     if (id !== lastAdapterId) {
       lastAdapterId = id;
+      clearTimeout(inspectTimer);
+      inspectSeq++;
       input = "";
       info = null;
       lastMessage = null;
@@ -66,24 +70,29 @@
     input = value;
     lastMessage = null;
     clearTimeout(inspectTimer);
-    if (!parseMac(value)) {
-      info = null;
-      return;
-    }
+    const seq = ++inspectSeq;
+    info = null;
+    if (!parseMac(value)) return;
+    const adapterId = adapter?.id ?? null;
     inspectTimer = setTimeout(async () => {
       try {
-        info = await api.inspectMac(value, adapter?.id ?? null);
+        const result = await api.inspectMac(value, adapterId);
+        if (seq === inspectSeq) info = result;
       } catch (e) {
-        app.toastError(e);
+        if (seq === inspectSeq) app.toastError(e);
       }
     }, 200);
   }
 
   async function randomize() {
     if (!adapter || anyBusy) return;
+    clearTimeout(inspectTimer);
+    const seq = ++inspectSeq;
     try {
-      info = await api.generateMac(adapter.id, mode);
-      input = formatMac(info.mac, app.format);
+      const result = await api.generateMac(adapter.id, mode);
+      if (seq !== inspectSeq) return;
+      info = result;
+      input = formatMac(result.mac, app.format);
       lastMessage = null;
     } catch (e) {
       app.toastError(e);
@@ -101,15 +110,19 @@
 
   async function apply() {
     confirmOpen = false;
-    if (!adapter || !parsed) return;
+    // The selection may change while the adapter restarts: report on the adapter we changed.
+    const target = adapter;
+    if (!target || !parsed) return;
     const mac = canonical(input);
     if (!mac) return;
     try {
-      const result = await api.applyMac(adapter.id, mac);
-      const out = describeOutcome(result, false, adapter, app.format, app.info?.os);
-      lastMessage = out;
+      const result = await api.applyMac(target.id, mac);
+      const out = describeOutcome(result, false, target, app.format, app.info?.os);
       app.toast(out.kind, out.message);
+      if (adapter?.id !== target.id) return;
+      lastMessage = out;
       if (result.success) {
+        inspectSeq++;
         input = "";
         info = null;
       }
@@ -119,13 +132,14 @@
   }
 
   async function restore() {
-    if (!adapter || anyBusy) return;
+    const target = adapter;
+    if (!target || anyBusy) return;
     restoring = true;
     try {
-      const result = await api.restoreMac(adapter.id);
-      const out = describeOutcome(result, true, adapter, app.format, app.info?.os);
-      lastMessage = out;
+      const result = await api.restoreMac(target.id);
+      const out = describeOutcome(result, true, target, app.format, app.info?.os);
       app.toast(out.kind, out.message);
+      if (adapter?.id === target.id) lastMessage = out;
     } catch (e) {
       app.toastError(e);
     } finally {
