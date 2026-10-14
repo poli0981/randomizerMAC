@@ -1,54 +1,67 @@
 version: 2
 
 updates:
-  # NuGet packages — the bulk of the dependency tree.
-  - package-ecosystem: nuget
+  # Rust crates (Cargo workspace at the repository root).
+  - package-ecosystem: cargo
     directory: /
     schedule:
       interval: weekly
-      # Tuesday avoids the Monday-morning queue across GitHub.
       day: tuesday
-      time: '04:00'
+      time: "04:00"
       timezone: Asia/Ho_Chi_Minh
     open-pull-requests-limit: 5
-    groups:
-      microsoft:
-        patterns:
-          - 'Microsoft.*'
-          - 'System.*'
-      mvvm-toolkit:
-        patterns:
-          - 'CommunityToolkit.*'
-      serilog:
-        patterns:
-          - 'Serilog*'
-    labels:
-      - dependencies
-      - nuget
-    assignees:
-      - poli0981
-    reviewers:
-      - poli0981
+    labels: [dependencies, rust]
     commit-message:
-      prefix: 'chore(deps)'
-      include: scope
+      prefix: "chore(deps)"
+    groups:
+      # Tauri crates must move together with @tauri-apps/* (see the npm groups below).
+      tauri:
+        patterns: ["tauri", "tauri-*"]
+      windows-rs:
+        patterns: ["windows", "windows-*"]
+      rust-minor-patch:
+        update-types: [minor, patch]
+        exclude-patterns: ["tauri", "tauri-*", "windows", "windows-*"]
 
-  # GitHub Actions used in workflows.
+  # Frontend packages.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "04:00"
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 5
+    labels: [dependencies, javascript]
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      # svelte-check and typescript-eslint support TypeScript 5–6 only; TypeScript 7 (Go) needs
+      # their native support first.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+    groups:
+      tauri-js:
+        patterns: ["@tauri-apps/*"]
+      svelte-vite:
+        patterns: ["svelte", "svelte-check", "@sveltejs/*", "vite", "vitest", "@testing-library/*", "jsdom"]
+      lint:
+        patterns: ["eslint", "@eslint/*", "eslint-*", "typescript-eslint", "prettier", "prettier-*", "globals"]
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  # GitHub Actions used by the workflows.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
       day: tuesday
-      time: '04:00'
+      time: "04:00"
       timezone: Asia/Ho_Chi_Minh
     open-pull-requests-limit: 3
-    labels:
-      - dependencies
-      - github-actions
-    assignees:
-      - poli0981
-    reviewers:
-      - poli0981
+    labels: [dependencies, github-actions]
     commit-message:
-      prefix: 'chore(ci)'
-      include: scope
+      prefix: "ci(deps)"
+    groups:
+      actions:
+        patterns: ["*"]
