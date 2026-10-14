@@ -69,6 +69,7 @@ impl Args {
     }
 
     /// Flags forwarded when the app relaunches itself (elevation, restart).
+    #[cfg_attr(not(windows), allow(dead_code))]
     pub fn forwarded(&self) -> Vec<String> {
         let mut out = Vec::new();
         if self.autostart {
