@@ -1,45 +1,46 @@
-## .NET
-bin/
-obj/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
+# Rust
+/target/
 
-## Velopack publish + pack output
-publish/
-releases/
-history.json
+# Frontend
+node_modules/
+/dist/
+/coverage/
+*.tsbuildinfo
+.vite/
 
-## IDE
+# Tauri
+/src-tauri/gen/
+/src-tauri/binaries/
+/src-tauri/target/
+
+# Release / packaging output produced locally
+/release-assets/
+/artifacts/
+
+# Signing material must never be committed
+*.key
+*.key.pub
+*.pfx
+*.p12
+
+# Logs and test output
+*.log
+/test-results/
+
+# IDE / editor
 .vs/
 .idea/
+.vscode/*
+!.vscode/extensions.json
 *.swp
 *~
+*.user
 
-## OS
+# OS
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 .DS_Store
 
-## Build
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-[Bb]uild/
-bld/
-
-## NuGet
-*.nupkg
-**/packages/*
-project.lock.json
-project.fragment.lock.json
-artifacts/
-
-## Logs
-logs/
-*.log
-
-.claude/
+# Claude Code local state (worktrees, settings)
+/.claude/
