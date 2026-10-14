@@ -49,3 +49,14 @@ export function formatTime(iso: string): string {
   const p = (x: number, n = 2) => String(x).padStart(n, "0");
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
 }
+
+/** Human-readable name of a change method reported by the backend. */
+export function methodLabel(method: string): string {
+  const labels: Record<string, string> = {
+    windowsRegistry: "Windows (NetworkAddress)",
+    networkManager: "NetworkManager",
+    iproute2: "iproute2",
+    mock: "Demo",
+  };
+  return labels[method] ?? method;
+}

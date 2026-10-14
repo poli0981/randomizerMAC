@@ -25,12 +25,11 @@
 </script>
 
 <div class="mac" class:emphasis>
-  <span class="label">{label}</span>
-  <div class="value-row">
-    <span class="value mono" aria-label="{label}: {shown}">{shown}</span>
+  <div class="head">
+    <span class="label">{label}</span>
     {#if mac}
       <button
-        class="btn ghost icon small"
+        class="btn ghost icon small copy"
         onclick={copy}
         aria-label="{t('common.copy')} {label}"
         title={t("common.copy")}
@@ -39,6 +38,7 @@
       </button>
     {/if}
   </div>
+  <span class="value mono" aria-label="{label}: {shown}">{shown}</span>
   <span class="vendor subtle">{vendor ?? " "}</span>
 </div>
 
@@ -64,17 +64,21 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
-  .value-row {
+  .head {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 4px;
+    min-height: 20px;
   }
+  .copy {
+    margin: -6px -8px -6px 0;
+  }
+  /* The whole address must stay readable: wrap rather than truncate in very narrow cards. */
   .value {
     font-size: 15px;
     font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
   .emphasis .value {
     color: var(--accent);

@@ -5,7 +5,7 @@
   import { app } from "../stores/app.svelte";
   import { api } from "../api";
   import { i18n, t, type MessageKey } from "../i18n/index.svelte";
-  import { formatDateTime } from "../format";
+  import { formatDateTime, methodLabel } from "../format";
   import { formatMac } from "../mac";
 
   let query = $state("");
@@ -147,7 +147,7 @@
               </td>
               <td class="subtle"
                 >{t(`history.source.${h.source}` as MessageKey)}{h.method
-                  ? ` · ${h.method}`
+                  ? ` · ${methodLabel(h.method)}`
                   : ""}</td
               >
             </tr>

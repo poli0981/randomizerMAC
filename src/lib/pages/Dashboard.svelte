@@ -18,7 +18,7 @@
   import { api } from "../api";
   import { i18n, t, type MessageKey } from "../i18n/index.svelte";
   import { canonical, formatMac, parseMac } from "../mac";
-  import { formatRelative } from "../format";
+  import { formatRelative, methodLabel } from "../format";
   import { describeOutcome } from "../outcome";
   import type { Adapter, GenerationMode, MacInfo, Stage } from "../types";
 
@@ -193,17 +193,6 @@
     return "dashboard.state.down";
   }
 
-  function methodLabel(m: string): string {
-    return (
-      {
-        windowsRegistry: "Windows (NetworkAddress)",
-        networkManager: "NetworkManager",
-        iproute2: "iproute2",
-        mock: "Demo",
-      }[m] ?? m
-    );
-  }
-
   const warningKeys: Record<string, MessageKey> = {
     multicast: "warning.multicast",
     zero: "warning.zero",
@@ -289,7 +278,7 @@
               <span class="desc subtle">{a.description}</span>
               <span class="meta">
                 <span class="dot" class:on={a.connected} aria-hidden="true"></span>
-                <span class="subtle">{t(stateKey(a))}</span>
+                <span class="state subtle">{t(stateKey(a))}</span>
                 <span class="mono subtle">{formatMac(a.currentMac, app.format)}</span>
               </span>
             </span>
@@ -474,23 +463,24 @@
               >{t("dashboard.shortcutApply")}</kbd
             >
           </button>
-          <span class="grow"></span>
-          {#if adapter.originalMac && adapter.changed}
+          <span class="end-group">
+            {#if adapter.originalMac && adapter.changed}
+              <button
+                class="btn ghost"
+                onclick={() => onInput(formatMac(adapter.originalMac, app.format))}
+                disabled={anyBusy}
+              >
+                {t("dashboard.useOriginal")}
+              </button>
+            {/if}
             <button
-              class="btn ghost"
-              onclick={() => onInput(formatMac(adapter.originalMac, app.format))}
-              disabled={anyBusy}
+              class="btn"
+              onclick={restore}
+              disabled={anyBusy || app.readOnly || (!adapter.restorable && !adapter.changed)}
             >
-              {t("dashboard.useOriginal")}
+              <Undo2 size={16} aria-hidden="true" />{t("dashboard.restore")}
             </button>
-          {/if}
-          <button
-            class="btn"
-            onclick={restore}
-            disabled={anyBusy || app.readOnly || (!adapter.restorable && !adapter.changed)}
-          >
-            <Undo2 size={16} aria-hidden="true" />{t("dashboard.restore")}
-          </button>
+          </span>
         </div>
 
         {#if busyHere}
@@ -571,7 +561,7 @@
 <style>
   .layout {
     display: grid;
-    grid-template-columns: minmax(270px, 310px) minmax(0, 1fr);
+    grid-template-columns: minmax(280px, 330px) minmax(0, 1fr);
     gap: 16px;
     align-items: start;
   }
@@ -656,9 +646,14 @@
   }
   .meta {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: 2px 6px;
     margin-top: 2px;
+  }
+  .meta .state,
+  .meta .mono {
+    white-space: nowrap;
   }
   .meta .mono {
     margin-left: auto;
@@ -701,7 +696,7 @@
   }
   .macs {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(186px, 1fr));
     gap: 10px;
     margin: 12px 0;
   }
@@ -754,6 +749,14 @@
     gap: 8px;
     align-items: center;
     flex-wrap: wrap;
+  }
+  /* Restore-related actions stay together and right-aligned, also when they wrap. */
+  .end-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-left: auto;
   }
   .steps {
     list-style: none;
