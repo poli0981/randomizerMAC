@@ -8,17 +8,28 @@ use tauri::{AppHandle, Manager};
 use crate::ops_runner;
 use crate::state::AppState;
 
-/// (Re)starts the periodic task according to the current settings.
-pub fn restart(app: &AppHandle) {
+/// Stops the periodic task. A change it already started still runs to completion (see
+/// `ops_runner::run`).
+pub fn stop(app: &AppHandle) {
     let state = app.state::<AppState>();
     if let Ok(mut slot) = state.scheduler.lock()
         && let Some(handle) = slot.take()
     {
         handle.abort();
     }
+}
+
+/// (Re)starts the periodic task according to the current settings.
+pub fn restart(app: &AppHandle) {
+    stop(app);
+    let state = app.state::<AppState>();
     let settings = state.settings();
     let auto = &settings.automation;
-    if !auto.interval_enabled || auto.interval_adapter_ids.is_empty() || state.read_only {
+    if !auto.interval_enabled
+        || auto.interval_adapter_ids.is_empty()
+        || state.read_only
+        || state.exiting.load(std::sync::atomic::Ordering::SeqCst)
+    {
         return;
     }
     let period = Duration::from_secs(u64::from(auto.interval_minutes) * 60);

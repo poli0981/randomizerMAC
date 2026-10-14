@@ -2,6 +2,7 @@
 //! time, off the main thread, with progress events, history refresh and OS notifications.
 
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use randommac_core::{ChangeSource, ChangeStatus, GenerateRequest, MacAddress, OsRandom, generate};
 use randommac_net::ops::{self, Outcome};
@@ -92,7 +93,25 @@ fn notify_outcome(app: &AppHandle, outcome: &Outcome, restore: bool, source: Cha
     notify(app, body, source != ChangeSource::Ui);
 }
 
+/// Runs an operation in its own task, so cancelling the caller (the scheduler being restarted,
+/// a closed IPC request) can never stop it half-way: the busy flag, history refresh,
+/// restore-on-exit tracking and the operation lock always see the end of the change.
 async fn run(
+    app: &AppHandle,
+    adapter_id: String,
+    action: Action,
+    source: ChangeSource,
+    wait: bool,
+) -> ApiResult<OpResult> {
+    let app = app.clone();
+    tauri::async_runtime::spawn(
+        async move { run_inner(&app, adapter_id, action, source, wait).await },
+    )
+    .await
+    .map_err(|e| ApiError::new("INTERNAL", e.to_string()))?
+}
+
+async fn run_inner(
     app: &AppHandle,
     adapter_id: String,
     action: Action,
@@ -102,6 +121,10 @@ async fn run(
     let state = app.state::<AppState>();
     if state.read_only {
         return Err(ApiError::read_only());
+    }
+    // While quitting, only the restore-on-exit changes may run.
+    if state.exiting.load(Ordering::SeqCst) && source != ChangeSource::Exit {
+        return Err(ApiError::busy());
     }
     let _guard = if wait {
         state.op_lock.lock().await

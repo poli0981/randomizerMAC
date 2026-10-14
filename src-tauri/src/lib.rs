@@ -448,25 +448,32 @@ pub(crate) fn request_quit(app: &AppHandle) {
     if state.exiting.swap(true, Ordering::SeqCst) {
         return;
     }
-    let restore = state.settings().automation.restore_on_exit
-        && !state.read_only
-        && !state.changed_adapters().is_empty();
-    if !restore {
-        app.exit(0);
-        return;
-    }
+    // From here on no new change starts (see ops_runner::run_inner) and the schedule stops.
+    scheduler::stop(app);
     let app = app.clone();
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.hide();
     }
     tauri::async_runtime::spawn(async move {
-        let result = tokio::time::timeout(
-            Duration::from_secs(120),
-            ops_runner::restore_all(&app, ChangeSource::Exit, true),
-        )
-        .await;
-        if !matches!(result, Ok(Ok(_))) {
-            tracing::warn!("restore on exit did not complete");
+        let state = app.state::<AppState>();
+        // A change that is still running must finish verifying (or roll back) before exit, and
+        // it must be counted for "restore on exit".
+        match tokio::time::timeout(Duration::from_secs(150), state.op_lock.lock()).await {
+            Ok(guard) => drop(guard),
+            Err(_) => tracing::warn!("a running change did not finish before exit"),
+        }
+        let restore = state.settings().automation.restore_on_exit
+            && !state.read_only
+            && !state.changed_adapters().is_empty();
+        if restore {
+            let result = tokio::time::timeout(
+                Duration::from_secs(120),
+                ops_runner::restore_all(&app, ChangeSource::Exit, true),
+            )
+            .await;
+            if !matches!(result, Ok(Ok(_))) {
+                tracing::warn!("restore on exit did not complete");
+            }
         }
         app.exit(0);
     });
