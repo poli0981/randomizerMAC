@@ -21,10 +21,21 @@ pub fn import_v1(store: &DataStore, settings: &mut Settings) -> Option<V1ImportR
     }
     settings.legacy.imported_from_v1_at = Some(now);
 
-    let history_count = data.history.len();
+    // Importing again (Settings → Data) must not duplicate entries imported earlier: v1 entries
+    // get fresh ids, so compare their content instead.
+    let (mut history, _) = store.load_history();
+    let key = |e: &randommac_core::HistoryEntry| {
+        (e.timestamp, e.adapter_id.clone(), e.previous_mac, e.new_mac)
+    };
+    let known: std::collections::HashSet<_> = history.entries.iter().map(key).collect();
+    let new_entries: Vec<_> = data
+        .history
+        .into_iter()
+        .filter(|e| !known.contains(&key(e)))
+        .collect();
+    let history_count = new_entries.len();
     if history_count > 0 {
-        let (mut history, _) = store.load_history();
-        history.entries.extend(data.history);
+        history.entries.extend(new_entries);
         history.prune(settings.history.policy(), now);
         if let Err(e) = store.save_history(&history) {
             tracing::warn!("could not save imported history: {e}");

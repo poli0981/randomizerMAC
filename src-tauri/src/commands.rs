@@ -116,30 +116,40 @@ pub fn ui_ready(app: AppHandle, state: State<'_, AppState>) {
 }
 
 #[tauri::command]
-pub fn relaunch_elevated(app: AppHandle) -> ApiResult<()> {
+pub async fn relaunch_elevated(app: AppHandle) -> ApiResult<()> {
     #[cfg(windows)]
     {
+        use platform::windows::ElevationError;
+
         let state = app.state::<AppState>();
         let mut args = state.args.forwarded();
         args.push(format!("--after-pid={}", std::process::id()));
         platform::windows::release_instance();
-        match platform::windows::relaunch_elevated(&args) {
-            Ok(()) => {
-                state.exiting.store(true, Ordering::SeqCst);
-                app.exit(0);
-                Ok(())
-            }
-            Err(platform::windows::ElevationError::Cancelled) => {
-                let _ = platform::windows::register_instance({
-                    let app = app.clone();
-                    move || tray::show_main_window(&app)
-                });
+        // The UAC prompt can stay open for a long time: keep it off the main thread.
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            platform::windows::relaunch_elevated(&args)
+        })
+        .await
+        .unwrap_or(Err(ElevationError::Failed(0)));
+        if result.is_ok() {
+            state.exiting.store(true, Ordering::SeqCst);
+            app.exit(0);
+            return Ok(());
+        }
+        // Whatever went wrong, this instance keeps running: take the single-instance role back.
+        let _ = platform::windows::register_instance({
+            let app = app.clone();
+            move || tray::show_main_window(&app)
+        });
+        match result {
+            Err(ElevationError::Cancelled) => {
                 Err(ApiError::new("AUTH_CANCELLED", "elevation was cancelled"))
             }
-            Err(platform::windows::ElevationError::Failed(code)) => Err(ApiError::new(
+            Err(ElevationError::Failed(code)) => Err(ApiError::new(
                 "OS_ERROR",
                 format!("could not restart as administrator (error {code})"),
             )),
+            Ok(()) => Ok(()),
         }
     }
     #[cfg(not(windows))]
@@ -156,9 +166,7 @@ pub fn quit_app(app: AppHandle) {
 
 #[tauri::command]
 pub fn open_url(url: String) -> ApiResult<()> {
-    if !links::is_allowed(&url) {
-        return Err(ApiError::invalid("this link is not allowed"));
-    }
+    let url = links::allowed(&url).ok_or_else(|| ApiError::invalid("this link is not allowed"))?;
     platform::open_external(&url)?;
     Ok(())
 }
@@ -798,12 +806,27 @@ pub async fn v1_import(
     state: State<'_, AppState>,
 ) -> ApiResult<Option<crate::state::V1ImportReport>> {
     let store = state.store.clone();
-    let mut settings = state.settings();
+    let current = state.settings();
+    let mut settings = current.clone();
     let app2 = app.clone();
     let report = blocking(move || {
         let report = crate::legacy::import_v1(&store, &mut settings);
         if report.is_some() {
+            // Like settings_import: never change autostart as a side effect (it needs
+            // elevation and would fail in read-only mode after the data was already imported).
+            settings.start_with_system = current.start_with_system;
+            settings.start_minimized = current.start_minimized;
+            let imported_at = settings.legacy.imported_from_v1_at;
             apply_settings(&app2, settings)?;
+            // apply_settings keeps the stored `legacy` block; record this import explicitly.
+            let state = app2.state::<AppState>();
+            let updated = state.settings.lock().ok().map(|mut s| {
+                s.legacy.imported_from_v1_at = imported_at;
+                s.clone()
+            });
+            if let Some(updated) = updated {
+                state.store.save_settings(&updated)?;
+            }
         }
         Ok(report)
     })

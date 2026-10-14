@@ -31,11 +31,32 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
+/// The Windows directory as reported by the OS. Never taken from `%SystemRoot%`: the elevated
+/// process inherits the user's environment, which a normal process could have changed to point
+/// RandomMac at its own `schtasks.exe`.
 fn system_root() -> PathBuf {
-    std::env::var_os("SystemRoot")
-        .map(PathBuf::from)
-        .filter(|p| p.is_absolute())
-        .unwrap_or_else(|| PathBuf::from(r"C:\Windows"))
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::System::SystemInformation::GetSystemWindowsDirectoryW;
+
+    let mut buf = vec![0u16; 260];
+    for _ in 0..2 {
+        let capacity = u32::try_from(buf.len()).unwrap_or(u32::MAX);
+        // SAFETY: the pointer and length describe `buf`.
+        let len = unsafe { GetSystemWindowsDirectoryW(buf.as_mut_ptr(), capacity) } as usize;
+        if len == 0 {
+            break;
+        }
+        if len < buf.len() {
+            let path = PathBuf::from(std::ffi::OsString::from_wide(&buf[..len]));
+            if path.is_absolute() {
+                return path;
+            }
+            break;
+        }
+        // Too small: `len` is the required size including the terminating NUL.
+        buf.resize(len, 0);
+    }
+    PathBuf::from(r"C:\Windows")
 }
 
 pub fn system32(exe: &str) -> PathBuf {
