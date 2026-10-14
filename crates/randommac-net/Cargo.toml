@@ -23,6 +23,7 @@ libc.workspace = true
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_Globalization",
     "Win32_NetworkManagement_IpHelper",
     "Win32_NetworkManagement_Ndis",
     "Win32_Networking_WinSock",

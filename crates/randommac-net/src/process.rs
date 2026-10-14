@@ -76,18 +76,18 @@ pub fn run(
     let mut stdout = child.stdout.take();
     let mut stderr = child.stderr.take();
     let out_reader = thread::spawn(move || {
-        let mut s = String::new();
+        let mut buf = Vec::new();
         if let Some(p) = stdout.as_mut() {
-            let _ = p.read_to_string(&mut s);
+            let _ = p.read_to_end(&mut buf);
         }
-        s
+        decode(buf)
     });
     let err_reader = thread::spawn(move || {
-        let mut s = String::new();
+        let mut buf = Vec::new();
         if let Some(p) = stderr.as_mut() {
-            let _ = p.read_to_string(&mut s);
+            let _ = p.read_to_end(&mut buf);
         }
-        s
+        decode(buf)
     });
     let deadline = Instant::now() + timeout;
     let status = loop {
@@ -108,9 +108,63 @@ pub fn run(
     })
 }
 
+/// Decodes captured output. Text is UTF-8 when valid; otherwise, on Windows, it is in the OEM
+/// code page that console programs such as `schtasks.exe` use for pipes (non-ASCII user names,
+/// localized task names). Lossy UTF-8 is the last resort, so ASCII parts always survive.
+fn decode(bytes: Vec<u8>) -> String {
+    match String::from_utf8(bytes) {
+        Ok(text) => text,
+        Err(e) => {
+            let bytes = e.into_bytes();
+            #[cfg(windows)]
+            if let Some(text) = decode_oem(&bytes) {
+                return text;
+            }
+            String::from_utf8_lossy(&bytes).into_owned()
+        }
+    }
+}
+
+#[cfg(windows)]
+fn decode_oem(bytes: &[u8]) -> Option<String> {
+    use windows_sys::Win32::Globalization::{CP_OEMCP, MultiByteToWideChar};
+
+    let len = i32::try_from(bytes.len()).ok()?;
+    if len == 0 {
+        return Some(String::new());
+    }
+    // SAFETY: the input pointer and length describe `bytes`; a null output buffer only asks for
+    // the required size.
+    let needed =
+        unsafe { MultiByteToWideChar(CP_OEMCP, 0, bytes.as_ptr(), len, std::ptr::null_mut(), 0) };
+    let capacity = usize::try_from(needed).ok().filter(|&n| n > 0)?;
+    let mut wide = vec![0u16; capacity];
+    // SAFETY: `wide` has room for exactly `needed` UTF-16 units.
+    let written =
+        unsafe { MultiByteToWideChar(CP_OEMCP, 0, bytes.as_ptr(), len, wide.as_mut_ptr(), needed) };
+    wide.truncate(usize::try_from(written).ok().filter(|&n| n > 0)?);
+    Some(String::from_utf16_lossy(&wide))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decodes_non_utf8_output_without_losing_ascii() {
+        assert_eq!(decode(b"plain".to_vec()), "plain");
+        let vietnamese = "Tiếng Việt";
+        assert_eq!(decode(vietnamese.as_bytes().to_vec()), vietnamese);
+        // A 1.x task path for a user named "José" as written by schtasks in a single-byte code
+        // page: invalid UTF-8, but the parts RandomMac looks for must survive.
+        let mut raw = br"C:\Users\Jos".to_vec();
+        raw.push(0xE9);
+        raw.extend_from_slice(br"\AppData\Local\RandomMac\current\RandomMac.App.exe");
+        let text = decode(raw);
+        assert!(text.starts_with(r"C:\Users\Jos"), "{text}");
+        assert!(text.contains(r"\AppData\Local\RandomMac\"), "{text}");
+        assert!(text.ends_with("RandomMac.App.exe"), "{text}");
+    }
 
     #[test]
     fn rejects_relative_programs() {
