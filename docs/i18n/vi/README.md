@@ -180,6 +180,8 @@ randommac-cli history --limit 10 --json
 
 Adapter có thể chỉ định bằng tên, id hoặc MAC hiện tại. Tuỳ chọn chung: `--json`, `--data-dir <DIR>`,
 `--method auto|networkmanager|iproute2` (Linux), `--mock` (adapter giả lập, không thay đổi gì).
+Trên Linux, `sudo randommac-cli` lưu lịch sử và địa chỉ gốc trong thư mục dữ liệu riêng của root,
+tách khỏi dữ liệu của app — nên chạy bằng user thường.
 
 | Mã thoát | Ý nghĩa |
 |---|---|

@@ -190,6 +190,8 @@ randommac-cli history --limit 10 --json
 
 Adapters can be given by name, id or current MAC. Global options: `--json`, `--data-dir <DIR>`,
 `--method auto|networkmanager|iproute2` (Linux), `--mock` (demo adapters, nothing is changed).
+On Linux, `sudo randommac-cli` keeps its history and original addresses in root's own data
+folder, separate from the app's — prefer running it as your user.
 
 | Exit code | Meaning |
 |---|---|
