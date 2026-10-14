@@ -758,11 +758,12 @@ impl NetworkBackend for WindowsBackend {
             }
         };
         if reboot {
+            // Nothing is observed yet: the new address takes effect after the reboot.
             return Ok(Self::report(
                 ChangeStatus::RebootRequired,
                 previous_mac,
                 Some(mac),
-                previous_mac,
+                None,
                 Some("REBOOT_REQUIRED"),
             ));
         }
@@ -848,7 +849,7 @@ impl NetworkBackend for WindowsBackend {
                 ChangeStatus::RebootRequired,
                 previous,
                 permanent,
-                previous,
+                None,
                 Some("REBOOT_REQUIRED"),
             ));
         }
