@@ -11,6 +11,8 @@ pub struct Args {
     /// Never ask for elevation (Windows).
     pub no_elevate: bool,
     pub version: bool,
+    /// Print the supported flags and exit.
+    pub help: bool,
     /// Installer hook: remove RandomMac 1.x leftovers (elevated logon task).
     pub cleanup_legacy: bool,
     /// Uninstaller hook: remove autostart entries.
@@ -20,6 +22,16 @@ pub struct Args {
     /// Use the in-memory demo backend (debug builds only).
     pub mock: bool,
 }
+
+pub const USAGE: &str = "\
+Usage: randommac [--minimized] [--no-elevate]
+
+  --minimized    Start hidden in the system tray
+  --no-elevate   Windows: do not ask for administrator rights (read-only mode)
+  -V, --version  Print the version and exit
+  -h, --help     Print this help and exit
+
+For scripting, use randommac-cli (run `randommac-cli --help`).";
 
 impl Args {
     pub fn parse() -> Self {
@@ -36,6 +48,7 @@ impl Args {
                 "--smoke-test" => args.smoke_test = true,
                 "--no-elevate" => args.no_elevate = true,
                 "--version" | "-V" => args.version = true,
+                "--help" | "-h" | "/?" => args.help = true,
                 "--cleanup-legacy" => args.cleanup_legacy = true,
                 "--cleanup-uninstall" => args.cleanup_uninstall = true,
                 "--mock" => args.mock = cfg!(debug_assertions),
@@ -92,6 +105,7 @@ mod tests {
         assert_eq!(a.after_pid, Some(42));
         assert_eq!(parse(&["--after-pid=7"]).after_pid, Some(7));
         assert!(parse(&["--version"]).version);
+        assert!(parse(&["--help"]).help && parse(&["-h"]).help);
         assert_eq!(a.forwarded(), vec!["--autostart", "--minimized"]);
         assert!(parse(&[]).forwarded().is_empty());
     }

@@ -30,6 +30,7 @@
     { name: "serde", license: "MIT / Apache-2.0", url: "https://github.com/serde-rs/serde" },
     { name: "tracing", license: "MIT", url: "https://github.com/tokio-rs/tracing" },
     { name: "clap", license: "MIT / Apache-2.0", url: "https://github.com/clap-rs/clap" },
+    { name: "zip", license: "MIT", url: "https://github.com/zip-rs/zip2" },
     { name: "marked", license: "MIT", url: "https://github.com/markedjs/marked" },
     {
       name: "DOMPurify",

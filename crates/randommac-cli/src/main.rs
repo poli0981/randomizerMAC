@@ -21,6 +21,7 @@ use serde::Serialize;
 #[derive(Parser)]
 #[command(
     name = "randommac-cli",
+    bin_name = "randommac-cli",
     version,
     about = "Randomize, set and restore network adapter MAC addresses (RandomMac CLI).",
     after_help = "Adapters can be referred to by name (\"Wi-Fi\", wlp2s0), id or current MAC.\n\
@@ -76,10 +77,15 @@ enum Command {
         all: bool,
     },
     /// Show details of one adapter.
-    Show { adapter: String },
+    Show {
+        /// Adapter name, id or current MAC.
+        adapter: String,
+    },
     /// Assign a random MAC address.
     Random {
+        /// Adapter name, id or current MAC.
         adapter: String,
+        /// How the new address is generated.
         #[arg(long, value_enum, default_value_t)]
         mode: ModeArg,
         /// Vendor id for --mode vendor (see `randommac-cli vendors`).
@@ -94,21 +100,32 @@ enum Command {
     },
     /// Assign a specific MAC address.
     Set {
+        /// Adapter name, id or current MAC.
         adapter: String,
+        /// New address (AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF, AABBCCDDEEFF or AABB.CCDD.EEFF).
         mac: String,
+        /// Only validate the address; change nothing.
         #[arg(long)]
         dry_run: bool,
+        /// Apply even if the address matches a blacklist rule.
         #[arg(long)]
         ignore_blacklist: bool,
     },
     /// Undo RandomMac's changes and return to the original address.
-    Restore { adapter: String },
+    Restore {
+        /// Adapter name, id or current MAC.
+        adapter: String,
+    },
     /// Show how a MAC address is interpreted.
-    Inspect { mac: String },
+    Inspect {
+        /// Address in any supported notation.
+        mac: String,
+    },
     /// List vendors known to the OUI table.
     Vendors,
     /// Show recent changes.
     History {
+        /// Maximum number of entries to show.
         #[arg(long, default_value_t = 20)]
         limit: usize,
         /// Only entries for this adapter (name or id).

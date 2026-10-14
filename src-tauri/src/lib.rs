@@ -39,16 +39,19 @@ use crate::state::{AppState, StartupReport};
 pub fn main_entry() -> ExitCode {
     #[cfg(windows)]
     platform::windows::harden();
-    #[cfg(target_os = "linux")]
-    if let Err(msg) = platform::linux::prepare() {
-        eprintln!("{msg}");
-        return ExitCode::from(1);
-    }
-
     let args = Args::parse();
     if args.version {
         println!("RandomMac {}", env!("CARGO_PKG_VERSION"));
         return ExitCode::SUCCESS;
+    }
+    if args.help {
+        println!("RandomMac {}\n\n{}", env!("CARGO_PKG_VERSION"), args::USAGE);
+        return ExitCode::SUCCESS;
+    }
+    #[cfg(target_os = "linux")]
+    if let Err(msg) = platform::linux::prepare() {
+        eprintln!("{msg}");
+        return ExitCode::from(1);
     }
     #[cfg(windows)]
     {

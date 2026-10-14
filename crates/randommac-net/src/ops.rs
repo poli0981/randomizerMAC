@@ -197,6 +197,13 @@ pub fn validate(
     if !mac.is_assignable() {
         return Err(OpError::NotAssignable(mac));
     }
+    // Reserved addresses stay blocked even when the user's rules are ignored.
+    if randommac_core::blacklist::RESERVED.contains(&mac) {
+        return Err(OpError::Blacklisted {
+            mac,
+            reason: describe_block(BlockReason::Reserved),
+        });
+    }
     if !ignore_blacklist {
         let (bl, _) = store.load_blacklist();
         if let Some(reason) = bl.check(mac, Some(adapter_id)) {
@@ -430,6 +437,18 @@ mod tests {
             &mut |_| {},
         )
         .expect("override with ignore_blacklist");
+        let reserved = apply_mac(
+            &backend,
+            &store,
+            &settings,
+            "mock-ethernet",
+            "AA:AA:AA:AA:AA:AA".parse().expect("mac"),
+            ChangeSource::Cli,
+            true,
+            &mut |_| {},
+        )
+        .expect_err("reserved addresses ignore the override");
+        assert_eq!(reserved.code(), "BLACKLISTED");
         assert!(matches!(
             apply_mac(
                 &backend,
