@@ -23,6 +23,50 @@ pub fn is_enabled() -> bool {
     false
 }
 
+/// Quotes one argument for the `Exec` key of a desktop entry. The quoting rule escapes `"`, `` ` ``,
+/// `$` and `\`; the string-value rule, which is applied before it when the file is read, then
+/// doubles every backslash; `%` starts field codes and must be doubled. Paths with line breaks
+/// cannot be represented.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn desktop_exec_arg(arg: &str) -> Option<String> {
+    if arg.contains(['\n', '\r']) {
+        return None;
+    }
+    let mut quoted = String::with_capacity(arg.len() + 2);
+    quoted.push('"');
+    for c in arg.chars() {
+        if matches!(c, '"' | '`' | '$' | '\\') {
+            quoted.push('\\');
+        }
+        quoted.push(c);
+    }
+    quoted.push('"');
+    Some(quoted.replace('\\', "\\\\").replace('%', "%%"))
+}
+
+#[cfg(test)]
+mod exec_tests {
+    use super::desktop_exec_arg;
+
+    #[test]
+    fn desktop_exec_quoting_follows_the_spec() {
+        assert_eq!(
+            desktop_exec_arg("/usr/bin/randommac").as_deref(),
+            Some("\"/usr/bin/randommac\"")
+        );
+        // Literal `$` is `\\$` and a literal backslash is four backslashes in the file.
+        assert_eq!(
+            desktop_exec_arg(r"/home/a$b/c\d.AppImage").as_deref(),
+            Some(r#""/home/a\\$b/c\\\\d.AppImage""#)
+        );
+        assert_eq!(
+            desktop_exec_arg("/opt/100% \"x\"").as_deref(),
+            Some(r#""/opt/100%% \\"x\\"""#)
+        );
+        assert_eq!(desktop_exec_arg("/tmp/a\nb"), None);
+    }
+}
+
 #[cfg(windows)]
 mod windows {
     use std::path::Path;
@@ -298,16 +342,6 @@ mod linux {
         Ok(std::env::current_exe()?.to_string_lossy().into_owned())
     }
 
-    fn quote(s: &str) -> String {
-        format!(
-            "\"{}\"",
-            s.replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('$', "\\$")
-                .replace('`', "\\`")
-        )
-    }
-
     pub fn set(enabled: bool, minimized: bool) -> ApiResult<()> {
         let path = entry_path().ok_or_else(|| ApiError::new("INTERNAL", "no config directory"))?;
         if !enabled {
@@ -317,9 +351,14 @@ mod linux {
                 Err(e) => return Err(e.into()),
             }
         }
+        let target = desktop_exec_arg(&exec_target()?).ok_or_else(|| {
+            ApiError::new(
+                "AUTOSTART_FAILED",
+                "the program path cannot be used in an autostart entry",
+            )
+        })?;
         let exec = format!(
-            "{} --autostart{}",
-            quote(&exec_target()?),
+            "{target} --autostart{}",
             if minimized { " --minimized" } else { "" }
         );
         let content = format!(

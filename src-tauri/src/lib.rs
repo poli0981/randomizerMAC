@@ -341,6 +341,34 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     if !tray_ok {
         tracing::info!("no system tray available; closing the window quits the app");
     }
+    // At sign-in the panel may register its tray host after RandomMac has started: keep looking
+    // for a while and add the tray icon as soon as a host appears.
+    #[cfg(target_os = "linux")]
+    if !tray_host {
+        let handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            for _ in 0..30 {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                let found =
+                    tauri::async_runtime::spawn_blocking(platform::linux::tray_host_available)
+                        .await
+                        .unwrap_or(false);
+                if found {
+                    let main = handle.clone();
+                    let _ = handle.run_on_main_thread(move || {
+                        let state = main.state::<AppState>();
+                        state.tray_available.store(true, Ordering::Relaxed);
+                        let ok = tray::create(&main);
+                        state.tray_available.store(ok, Ordering::Relaxed);
+                        if ok {
+                            tracing::info!("system tray became available");
+                        }
+                    });
+                    return;
+                }
+            }
+        });
+    }
 
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
