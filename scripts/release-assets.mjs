@@ -10,9 +10,12 @@
 //   node scripts/release-assets.mjs sums <dir>
 //       Writes <dir>/SHA256SUMS.txt covering every asset (and nothing else).
 
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey, verify as verifySignature } from "node:crypto";
 import { readdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const PATTERNS = {
   nsis: /_x64-setup\.exe$/,
@@ -51,6 +54,39 @@ function find(dir) {
   return { found, errors };
 }
 
+// minisign helpers: tauri-cli only warns when the signing key does not belong to the public key
+// built into the app, which would publish updates no installed copy can verify.
+const decodeMinisign = (text) => Buffer.from(text.trim(), "base64").toString("utf8").split("\n");
+
+function updaterPublicKey() {
+  const conf = JSON.parse(readFileSync(join(root, "src-tauri", "tauri.conf.json"), "utf8"));
+  const raw = Buffer.from(decodeMinisign(conf.plugins.updater.pubkey)[1].trim(), "base64");
+  const key = createPublicKey({
+    key: { kty: "OKP", crv: "Ed25519", x: raw.subarray(10, 42).toString("base64url") },
+    format: "jwk",
+  });
+  return { id: raw.subarray(2, 10), key };
+}
+
+/** Returns why `file` does not carry a valid signature by the app's updater key, or null. */
+function signatureProblem(file, sigFile, pub) {
+  const lines = decodeMinisign(readFileSync(sigFile, "utf8"));
+  const blob = Buffer.from(lines[1]?.trim() ?? "", "base64");
+  if (blob.length !== 74) return "malformed signature";
+  if (!blob.subarray(2, 10).equals(pub.id)) return "signed with a different key";
+  const sig = blob.subarray(10, 74);
+  const data = readFileSync(file);
+  const prehashed = blob.subarray(0, 2).toString("latin1") === "ED";
+  const message = prehashed ? createHash("blake2b512").update(data).digest() : data;
+  if (!verifySignature(null, message, pub.key, sig)) return "signature does not match the file";
+  const trusted = Buffer.from((lines[2] ?? "").replace(/^trusted comment: /, ""));
+  const global = Buffer.from(lines[3]?.trim() ?? "", "base64");
+  if (!verifySignature(null, Buffer.concat([sig, trusted]), pub.key, global)) {
+    return "invalid trusted comment signature";
+  }
+  return null;
+}
+
 const [cmd, dir, ...rest] = process.argv.slice(2);
 if (!dir) {
   console.error("usage: node scripts/release-assets.mjs <verify|latest-json|sums> <dir> ...");
@@ -59,6 +95,12 @@ if (!dir) {
 
 if (cmd === "verify") {
   const { found, errors } = find(dir);
+  const pub = updaterPublicKey();
+  for (const kind of SIGNED) {
+    if (!found[kind] || !files(dir).includes(`${found[kind]}.sig`)) continue;
+    const problem = signatureProblem(join(dir, found[kind]), join(dir, `${found[kind]}.sig`), pub);
+    if (problem) errors.push(`${kind}: ${found[kind]}.sig: ${problem}`);
+  }
   if (errors.length) {
     for (const e of errors) console.error(`✗ ${e}`);
     process.exit(1);

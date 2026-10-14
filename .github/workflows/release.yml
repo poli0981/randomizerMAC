@@ -195,6 +195,11 @@ jobs:
           set -euo pipefail
           notes="docs/RELEASE_v${VERSION}.md"
           if gh release view "$TAG" > /dev/null 2>&1; then
+            # Re-runs may finish a draft, but must never replace the assets of a published release.
+            if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "true" ]; then
+              echo "::error::$TAG is already published; release a new version instead of re-running."
+              exit 1
+            fi
             gh release edit "$TAG" --title "RandomMac $TAG" --notes-file "$notes"
           else
             flags=(--draft --verify-tag --title "RandomMac $TAG" --notes-file "$notes")
