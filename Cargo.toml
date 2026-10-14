@@ -4,6 +4,7 @@ members = [
     "crates/randommac-core",
     "crates/randommac-net",
     "crates/randommac-cli",
+    "src-tauri",
 ]
 
 [workspace.package]

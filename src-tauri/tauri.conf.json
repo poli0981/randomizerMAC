@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "RandomMac",
+  "mainBinaryName": "randommac",
+  "identifier": "io.github.poli0981.randommac",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist",
+    "removeUnusedCommands": true
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "freezePrototype": true,
+      "dangerousDisableAssetCspModification": ["style-src"],
+      "capabilities": ["main"],
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data:",
+        "font-src": "'self' data:",
+        "connect-src": "ipc: http://ipc.localhost",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'",
+        "frame-src": "'none'",
+        "worker-src": "'none'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data:",
+        "font-src": "'self' data:",
+        "connect-src": "ipc: http://ipc.localhost ws://localhost:1420",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'",
+        "frame-src": "'none'",
+        "worker-src": "'none'"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": false,
+    "publisher": "poli0981",
+    "copyright": "Copyright © 2026 poli0981",
+    "category": "Utility",
+    "shortDescription": "Randomize, set and restore network adapter MAC addresses",
+    "longDescription": "RandomMac changes the MAC address of Ethernet and Wi-Fi adapters on Windows and Linux: random or vendor-like addresses, one-click restore of the original address, history, blacklist, automation and a command-line tool.",
+    "homepage": "https://github.com/poli0981/randomizerMAC",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMxODFEQTRGMzkyOENFNjYKUldSbXppZzVUOXFCTVJ1WVRNUUZPOVk0SlI5SWxKbWtwdlkvbDF3YmtkcElCQ0hOV21GYzBSdGwK",
+      "endpoints": [
+        "https://github.com/poli0981/randomizerMAC/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

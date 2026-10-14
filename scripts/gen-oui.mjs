@@ -152,7 +152,8 @@ for (const r of rows) {
 }
 records.sort((a, b) => a[0] - b[0]);
 for (let i = 1; i < records.length; i++) {
-  if (records[i][0] === records[i - 1][0]) throw new Error(`duplicate OUI ${records[i][0].toString(16)}`);
+  if (records[i][0] === records[i - 1][0])
+    throw new Error(`duplicate OUI ${records[i][0].toString(16)}`);
 }
 VENDORS.forEach(([id], i) => {
   if (counts[i] === 0) throw new Error(`vendor ${id} matched no OUIs — check its patterns`);
