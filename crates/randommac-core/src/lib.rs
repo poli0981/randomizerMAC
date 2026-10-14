@@ -24,7 +24,7 @@ pub use mac::{MacAddress, MacFormat, ParseMacError, Separator};
 pub use paths::{APP_ID, AppPaths};
 pub use random::{OsRandom, RandomSource};
 pub use settings::Settings;
-pub use state::{AppState, OriginalRecord};
+pub use state::{AppState, OriginalRecord, Remembered};
 
 /// Version of the RandomMac workspace (all crates share it).
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

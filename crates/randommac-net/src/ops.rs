@@ -15,7 +15,7 @@ use randommac_core::lock::OperationLock;
 use randommac_core::storage::{self, LoadStatus};
 use randommac_core::{
     AppPaths, AppState, Blacklist, ChangeSource, ChangeStatus, History, HistoryAction,
-    HistoryEntry, MacAddress, OriginalRecord, Settings, random::new_id,
+    HistoryEntry, MacAddress, Settings, random::new_id,
 };
 
 use crate::{Adapter, ChangeOptions, ChangeReport, NetError, NetworkBackend, Stage};
@@ -235,16 +235,16 @@ pub fn apply_mac(
 
     // Remember what the adapter looked like before our first change (crash-safe: saved first).
     let (mut state, _) = store.load_state();
-    let recorded_now = state.record_original(
+    let remembered = state.remember(
         &adapter.id,
-        OriginalRecord {
-            mac: adapter.current_mac,
-            nm_connection_uuid: adapter.nm_connection.as_ref().map(|c| c.uuid.clone()),
-            nm_cloned_mac: adapter.nm_connection.as_ref().map(|c| c.cloned_mac.clone()),
-            recorded_at: Utc::now(),
-        },
+        adapter.current_mac,
+        adapter
+            .nm_connection
+            .as_ref()
+            .map(|c| (c.uuid.as_str(), c.cloned_mac.as_str())),
+        Utc::now(),
     );
-    if recorded_now {
+    if !remembered.is_empty() {
         store.save_state(&state)?;
     }
 
@@ -254,12 +254,17 @@ pub fn apply_mac(
     };
     let report = backend.apply(&adapter, mac, &opts, progress);
 
+    // Forget the new record only when we are sure the adapter is exactly as before; a failed
+    // rollback or an error after the configuration was written must stay restorable.
     let nothing_changed = match &report {
-        Err(_) => true,
         Ok(r) => r.status == ChangeStatus::RolledBack,
+        Err(NetError::RollbackFailed(_)) => false,
+        Err(_) => backend
+            .find_adapter(&adapter.id)
+            .is_ok_and(|now| same_configuration(&adapter, &now)),
     };
-    if recorded_now && nothing_changed {
-        state.clear_original(&adapter.id);
+    if !remembered.is_empty() && nothing_changed {
+        state.forget(&adapter.id, &remembered);
         store.save_state(&state)?;
     }
 
@@ -301,6 +306,19 @@ pub fn restore_mac(
         report,
         entry,
     })
+}
+
+/// Whether two snapshots of an adapter have the same address and the same override (Windows
+/// `NetworkAddress`, NetworkManager `cloned-mac-address`).
+fn same_configuration(before: &Adapter, after: &Adapter) -> bool {
+    let profile = |a: &Adapter| {
+        a.nm_connection
+            .as_ref()
+            .map(|c| (c.uuid.clone(), c.cloned_mac.clone()))
+    };
+    before.current_mac == after.current_mac
+        && before.override_value == after.override_value
+        && profile(before) == profile(after)
 }
 
 /// The address RandomMac considers "original" for an adapter: the hardware address when the OS
@@ -493,5 +511,78 @@ mod tests {
         let err = OperationLock::acquire(&other.paths.lock_file(), Duration::from_millis(50))
             .expect_err("busy");
         assert_eq!(OpError::from(err).code(), "BUSY");
+    }
+
+    /// Fails every change, optionally after the mock adapter was already modified.
+    struct FailingBackend {
+        inner: MockBackend,
+        change_first: bool,
+        error: fn() -> NetError,
+    }
+
+    impl NetworkBackend for FailingBackend {
+        fn capabilities(&self) -> crate::Capabilities {
+            self.inner.capabilities()
+        }
+        fn list_adapters(&self) -> Result<Vec<Adapter>, NetError> {
+            self.inner.list_adapters()
+        }
+        fn apply(
+            &self,
+            adapter: &Adapter,
+            mac: MacAddress,
+            opts: &ChangeOptions,
+            progress: &mut dyn FnMut(Stage),
+        ) -> Result<ChangeReport, NetError> {
+            if self.change_first {
+                self.inner.apply(adapter, mac, opts, progress)?;
+            }
+            Err((self.error)())
+        }
+        fn restore(
+            &self,
+            adapter: &Adapter,
+            original: Option<&randommac_core::OriginalRecord>,
+            opts: &ChangeOptions,
+            progress: &mut dyn FnMut(Stage),
+        ) -> Result<ChangeReport, NetError> {
+            self.inner.restore(adapter, original, opts, progress)
+        }
+    }
+
+    fn failed_apply_keeps_record(change_first: bool, error: fn() -> NetError) -> bool {
+        let (_dir, store) = store();
+        let backend = FailingBackend {
+            inner: MockBackend::new(MockScenario::Normal),
+            change_first,
+            error,
+        };
+        let out = apply_mac(
+            &backend,
+            &store,
+            &Settings::default(),
+            "mock-ethernet",
+            "02:00:00:00:00:09".parse().expect("mac"),
+            ChangeSource::Ui,
+            false,
+            &mut |_| {},
+        )
+        .expect("outcome");
+        assert!(out.report.is_err());
+        store.load_state().0.original("mock-ethernet").is_some()
+    }
+
+    #[test]
+    fn failed_changes_stay_restorable_unless_nothing_changed() {
+        let denied = || NetError::PermissionDenied("no".into());
+        let failed = || NetError::CommandFailed {
+            program: "test".into(),
+            code: Some(1),
+            stderr: "boom".into(),
+        };
+        let rollback = || NetError::RollbackFailed("could not undo".into());
+        assert!(!failed_apply_keeps_record(false, denied));
+        assert!(failed_apply_keeps_record(true, failed));
+        assert!(failed_apply_keeps_record(false, rollback));
     }
 }

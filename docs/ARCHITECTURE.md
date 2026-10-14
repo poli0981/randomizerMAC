@@ -30,8 +30,10 @@ All front ends (UI, tray, scheduler, CLI) go through `randommac_net::ops`:
 2. **Validate**: unicast and not all-zero, never one of the reserved addresses (`00…`, `FF…`,
    `AA:AA:AA:AA:AA:AA`), not matched by a blacklist rule (global or for this adapter) unless the
    caller explicitly ignores the user's rules.
-3. **Record the original** configuration in `state.json` the first time an adapter is changed (the
-   address before the change and, on Linux, the NetworkManager profile value).
+3. **Record the original** configuration in `state.json` before the change: the adapter's address
+   the first time it is changed and, on Linux, the `cloned-mac-address` of each NetworkManager
+   profile the first time that profile is involved (the adapter may roam between connections).
+   The record is dropped again only when the backend proves nothing changed.
 4. **Apply** with the backend, reporting stages (`Preparing → Writing → Restarting → Verifying`) to
    the UI as `op-progress` events.
 5. **Verify** by polling the live address (up to 20 s). If it does not match, the backend
@@ -68,7 +70,9 @@ Restore follows the same path and removes RandomMac's override instead of writin
 - **NetworkManager method** (persistent): find the active connection's UUID with `nmcli`, set
   `802-3-ethernet.cloned-mac-address` / `802-11-wireless.cloned-mac-address`, re-activate the
   connection. Runs as the user; polkit asks only if the user may not modify the profile. Restore
-  sets `permanent`, re-activates, then puts back the profile's original value.
+  puts back the recorded value of every profile RandomMac changed (inactive ones without
+  activating them); for the active one it sets `permanent`, re-activates, then restores the value.
+  NetworkManager's own `random`/`stable` policies are never treated as RandomMac changes.
 - **iproute2 method** (temporary): `pkexec <ip> -force -batch -` with `down / address / up`
   commands on stdin, an empty environment and a fixed `PATH`; interface names are validated so no
   second command can be smuggled in. `pkexec` exit 126 = dialog dismissed, 127 = not authorized

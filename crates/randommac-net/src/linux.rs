@@ -513,10 +513,12 @@ impl NetworkBackend for LinuxBackend {
             if ip_ok {
                 methods.push(ChangeMethod::Iproute2);
             }
+            // Only an explicit address counts as an override; "random"/"stable"/"preserve"/
+            // "permanent" are NetworkManager policies that "Restore" must not erase.
             let override_value = nm_connection
                 .as_ref()
                 .map(|c| c.cloned_mac.clone())
-                .filter(|v| !nm_value_keeps_current(v) && v != "permanent");
+                .filter(|v| v.parse::<MacAddress>().is_ok());
             let (ipv4, ipv6) = ips.get(&iface.name).cloned().unwrap_or_default();
             out.push(Adapter {
                 id: iface.name.clone(),
@@ -579,56 +581,113 @@ impl NetworkBackend for LinuxBackend {
     ) -> Result<ChangeReport, NetError> {
         progress(Stage::Preparing);
         let previous = adapter.current_mac;
-        // Undo a NetworkManager change on the same profile we modified.
-        let nm_conn = adapter.nm_connection.clone().filter(|c| {
-            original
-                .and_then(|o| o.nm_connection_uuid.as_deref())
-                .is_none_or(|uuid| uuid == c.uuid)
-        });
-        let use_nm = nm_conn.is_some()
-            && (original.is_some_and(|o| o.nm_connection_uuid.is_some())
-                || matches!(
-                    self.choose_method(adapter, opts.linux_method),
-                    Ok(ChangeMethod::NetworkManager)
+        let profiles = original.map(|o| &o.nm_profiles);
+        let active = adapter.nm_connection.clone();
+
+        // Profiles we changed earlier that are not active now (the adapter roamed): put their
+        // value back without activating them. Stop at the first failure so the record is kept.
+        let inactive: Vec<(&String, &String)> = profiles
+            .into_iter()
+            .flatten()
+            .filter(|(uuid, _)| active.as_ref().is_none_or(|c| &c.uuid != *uuid))
+            .collect();
+        if !inactive.is_empty() {
+            if Self::nmcli().is_none() || !Self::nm_running() {
+                return Err(NetError::NmUnavailable(
+                    "NetworkManager is needed to undo changes to saved connections".into(),
                 ));
-        if let (true, Some(conn)) = (use_nm, nm_conn) {
-            let original_value = original
-                .and_then(|o| o.nm_cloned_mac.clone())
-                .unwrap_or_default();
-            progress(Stage::Writing);
-            let expected = if nm_value_keeps_current(&original_value) {
-                // "" / "preserve" would keep our address: force the hardware address first,
-                // then put the profile back exactly as it was without re-activating.
-                Self::nm_set_cloned(&conn, "permanent")?;
-                progress(Stage::Restarting);
-                Self::nm_up(&conn)?;
-                Self::nm_set_cloned(&conn, &original_value)?;
-                adapter.permanent_mac
-            } else {
-                Self::nm_set_cloned(&conn, &original_value)?;
-                progress(Stage::Restarting);
-                Self::nm_up(&conn)?;
-                original_value.parse().ok()
-            };
-            progress(Stage::Verifying);
-            let observed = match expected {
-                Some(e) => self.wait_for(&adapter.interface_name, e, opts.verify_timeout),
-                None => self.current_address(&adapter.interface_name),
-            };
-            let status = match expected {
-                Some(e) if observed == Some(e) => ChangeStatus::Applied,
-                _ => ChangeStatus::Unverified,
-            };
-            let mut report = Self::report(
-                ChangeMethod::NetworkManager,
-                status,
-                previous,
-                expected,
-                observed,
-            );
-            report.nm_connection_uuid = Some(conn.uuid);
-            return Ok(report);
+            }
+            for (uuid, value) in inactive {
+                // A profile that no longer exists has nothing left to undo.
+                if let Some(conn) = Self::nm_connection(uuid)
+                    && conn.cloned_mac != *value
+                {
+                    progress(Stage::Writing);
+                    Self::nm_set_cloned(&conn, value)?;
+                }
+            }
         }
+
+        // The active profile: undo our change, or remove an explicit address someone set on it.
+        if let Some(conn) = active {
+            let recorded = profiles.and_then(|p| p.get(&conn.uuid)).cloned();
+            let explicit = conn.cloned_mac.parse::<MacAddress>().is_ok();
+            if recorded.is_some() || explicit {
+                let original_value = recorded.unwrap_or_default();
+                progress(Stage::Writing);
+                let expected = if nm_value_keeps_current(&original_value) {
+                    // "" / "preserve" would keep our address: force the hardware address first,
+                    // then put the profile back exactly as it was without re-activating.
+                    Self::nm_set_cloned(&conn, "permanent")?;
+                    progress(Stage::Restarting);
+                    Self::nm_up(&conn)?;
+                    Self::nm_set_cloned(&conn, &original_value)?;
+                    adapter.permanent_mac
+                } else {
+                    Self::nm_set_cloned(&conn, &original_value)?;
+                    progress(Stage::Restarting);
+                    Self::nm_up(&conn)?;
+                    match original_value.as_str() {
+                        "permanent" => adapter.permanent_mac,
+                        // "random"/"stable": NetworkManager picks the address itself.
+                        v => v.parse().ok(),
+                    }
+                };
+                progress(Stage::Verifying);
+                let (status, observed) = match expected {
+                    Some(e) => {
+                        let observed =
+                            self.wait_for(&adapter.interface_name, e, opts.verify_timeout);
+                        let status = if observed == Some(e) {
+                            ChangeStatus::Applied
+                        } else {
+                            ChangeStatus::Unverified
+                        };
+                        (status, observed)
+                    }
+                    None => (
+                        ChangeStatus::Applied,
+                        self.current_address(&adapter.interface_name),
+                    ),
+                };
+                let mut report = Self::report(
+                    ChangeMethod::NetworkManager,
+                    status,
+                    previous,
+                    expected,
+                    observed,
+                );
+                report.nm_connection_uuid = Some(conn.uuid);
+                return Ok(report);
+            }
+            // NetworkManager's own privacy setting chose this address: leave it alone.
+            if original.and_then(|o| o.mac).is_none()
+                && matches!(conn.cloned_mac.as_str(), "random" | "stable")
+            {
+                let at_hardware = previous.is_some() && previous == adapter.permanent_mac;
+                let mut report = Self::report(
+                    ChangeMethod::NetworkManager,
+                    if at_hardware {
+                        ChangeStatus::Applied
+                    } else {
+                        ChangeStatus::Unverified
+                    },
+                    previous,
+                    adapter.permanent_mac,
+                    previous,
+                );
+                report.detail_code = Some(
+                    if at_hardware {
+                        "NOTHING_TO_RESTORE"
+                    } else {
+                        "CHANGED_BY_OS"
+                    }
+                    .into(),
+                );
+                return Ok(report);
+            }
+        }
+
         let target = original
             .and_then(|o| o.mac)
             .or(adapter.permanent_mac)
