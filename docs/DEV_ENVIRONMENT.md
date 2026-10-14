@@ -1,188 +1,191 @@
-# Development Environment
+# Development environment
+
+How to build, run, test and release RandomMac 2.x. For the design, see
+[ARCHITECTURE.md](ARCHITECTURE.md). Vietnamese: [i18n/vi/DEV_ENVIRONMENT.md](i18n/vi/DEV_ENVIRONMENT.md).
 
 ## Prerequisites
 
-| Tool | Version | Required |
-|------|---------|----------|
-| [.NET 11 SDK preview](https://dotnet.microsoft.com/download/dotnet/11.0) | ≥ `11.0.100-preview.3` | Yes (App project) |
-| [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) | 9.0+ | Yes (Core project + tests) |
-| [Git](https://git-scm.com/) | 2.x+ | Yes |
-| Windows 10 SDK 26100 | Bundled | Auto-installed via `Microsoft.Windows.SDK.BuildTools` package |
-| IDE | See below | Yes |
+| Tool | Version | Notes |
+|---|---|---|
+| Git | 2.x | |
+| [rustup](https://rustup.rs/) | any | `rust-toolchain.toml` pins Rust **1.98.0** (+ rustfmt, clippy); rustup installs it on first use. MSRV is 1.89. |
+| [Node.js](https://nodejs.org/) | **24** (`.nvmrc`), ≥ 22 works | npm 10+. |
+| Tauri prerequisites | see below | WebView2/WebKitGTK and native build tools. |
 
-`global.json` at the repo root pins the SDK to `11.0.100-preview.3` with `rollForward: latestFeature`. If multiple SDKs are installed, this avoids accidental version mismatches.
+### Windows 10/11
 
-### Recommended IDE
+- **Microsoft C++ Build Tools** (or Visual Studio) with *Desktop development with C++* (MSVC v143+
+  and a Windows 10/11 SDK).
+- **WebView2 runtime** — built into Windows 11; on Windows 10 install the Evergreen runtime.
+- NSIS and WiX are downloaded automatically by the Tauri CLI when you build installers.
 
-| IDE | Version | Notes |
-|-----|---------|-------|
-| [JetBrains Rider](https://www.jetbrains.com/rider/) | 2026.1+ | Recommended. Native WinUI 3 / WindowsAppSDK support. |
-| [Visual Studio](https://visualstudio.microsoft.com/) | 2022 17.10+ | Install the "Windows App SDK C# Templates" workload. |
-| [VS Code](https://code.visualstudio.com/) | Latest | C# Dev Kit; XAML IntelliSense limited. |
-
-## Build & Run
+### Ubuntu 24.04+ / Debian 13+
 
 ```bash
-# Clone
+sudo apt update
+sudo apt install build-essential curl wget file patchelf libssl-dev libxdo-dev \
+  libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+```
+
+To exercise real changes you also need `network-manager` and/or `iproute2`, plus `pkexec`
+(`polkitd` + `pkexec` on Ubuntu 24.04, `policykit-1` on older releases).
+
+### Fedora 41+
+
+```bash
+sudo dnf install webkit2gtk4.1-devel openssl-devel curl wget file \
+  libappindicator-gtk3-devel librsvg2-devel libxdo-devel
+sudo dnf group install c-development
+```
+
+## Getting started
+
+```bash
 git clone https://github.com/poli0981/randomizerMAC.git
 cd randomizerMAC
-
-# Restore dependencies
-dotnet restore
-
-# Build (csproj sets RuntimeIdentifier=win-x64 by default)
-dotnet build
-
-# Run (requires Administrator for full functionality — MAC change needs elevation)
-dotnet run --project src/RandomMac.App
-
-# Run unit tests
-dotnet test
+npm ci
+npm run tauri dev          # desktop app with hot reload (Vite on http://localhost:1420)
 ```
 
-> **Note**: `RandomMac.App.csproj` declares `<RuntimeIdentifier>win-x64</RuntimeIdentifier>` as a default fallback so plain `dotnet build` and IDE "Build Solution" work without flags. Override with `-r <rid>` when needed.
+Useful variations:
 
-## Publish (Self-Contained)
+| Goal | Command / variable |
+|---|---|
+| UI only, in a normal browser, with demo data | `npm run dev`, open http://localhost:1420 (`src/lib/devmock.ts` fakes the backend) |
+| Desktop app with demo adapters (debug builds) | `RANDOMMAC_BACKEND=mock npm run tauri dev` |
+| Demo scenarios | `RANDOMMAC_MOCK_SCENARIO=driver_ignores` (rollback path) or `slow` |
+| Real changes on Windows (debug builds don't self-elevate) | run the terminal as administrator, or set `RANDOMMAC_ELEVATE=1` |
+| Verbose logs | `RANDOMMAC_LOG=debug` (any `tracing` filter, e.g. `randommac_net=trace`) |
+| CLI against demo adapters | `cargo run -p randommac-cli -- --mock list --all` |
+| CLI with throwaway data | `cargo run -p randommac-cli -- --data-dir ./tmp-data list` |
+| Run the GUI as root on Linux (not recommended) | `RANDOMMAC_ALLOW_ROOT=1` |
+
+On Linux, real changes can be tested safely on a dummy interface (this is what CI does):
 
 ```bash
-# Windows x64 (only architecture supported in v1.1.x)
-dotnet publish src/RandomMac.App -c Release -r win-x64 --self-contained true -o publish/
+sudo ip link add dummy0 type dummy && sudo ip link set dummy0 up
+cargo build -p randommac-cli
+sudo ./target/debug/randommac-cli --data-dir /tmp/rm --method iproute2 set dummy0 02:11:22:33:44:55
+sudo ./target/debug/randommac-cli --data-dir /tmp/rm --method iproute2 restore dummy0
+sudo ip link del dummy0
 ```
 
-The published output is ~225 MB. The WinAppSDK runtime + .NET 11 are bundled (`<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>` + `<SelfContained>true</SelfContained>`); no runtime install needed on the target machine.
+## Checks (same as CI)
 
-ARM64 is not currently a supported target — the WinAppSDK packages we use are x64-tested only.
-
-## Project Structure
-
-```
-RandomMac.sln                          # Solution
-global.json                            # SDK pin (11.0.100-preview.3)
-src/
-  RandomMac.Core/                      # Business logic, no UI dependency (net9.0)
-    Models/                            # MacAddress, AppSettings, MacChangeResult, …
-    Services/
-      Interfaces/                      # Service contracts (IAdapterCacheService, …)
-      Implementations/                 # NetworkAdapter, MacAddress, Blacklist, History, Settings, Update, AdapterCache
-    Helpers/                           # MacAddressGenerator, RegistryHelper, OuiLookup, AdminHelper
-
-  RandomMac.App/                       # WinUI 3 desktop app (net11.0-windows10.0.26100.0)
-    App.xaml(.cs)                      # Application entry, DI bootstrap, OnLaunched flow
-    Program.cs                         # Custom Main (Velopack init before XAML start)
-    MainWindow.xaml(.cs)               # Window shell, NavigationView, custom titlebar, tray
-    Themes/Theme.xaml                  # ThemeDictionaries (Default/Light) + design tokens
-    Views/                             # Page UserControls + PageTemplateSelector
-    ViewModels/                        # MVVM ViewModels (CommunityToolkit.Mvvm source-generated)
-    Controls/NotificationPopup        # Toast container UserControl
-    Converters/                        # IValueConverter implementations
-    Services/                          # Theme, Tray, Notification, LogSink
-    Helpers/Win32FileDialog            # comdlg32 wrapper (replaces FileSavePicker/FileOpenPicker)
-    Localization/                      # Lang.resx + Lang.vi.resx + Loc.cs (singleton + indexer)
-    app.manifest                       # requireAdministrator + DPI awareness PerMonitorV2
-
-tests/
-  RandomMac.Tests/                     # xUnit (net9.0)
-
-docs/                                  # Documentation
-  DEV_ENVIRONMENT.md                   # This file
-  RELEASE_v1.0.0.md                    # v1.0.0 release notes
-  RELEASE_v1.1.0.md                    # v1.1.0 release notes
-.github/                               # Issue templates, PR template, CODEOWNERS
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+npm run lint            # eslint + prettier --check
+npm run check           # svelte-check (warnings fail)
+npm test                # vitest
+npm run build           # vite build into dist/ (needed by cargo builds of src-tauri)
+node scripts/version.mjs check
+cargo deny check        # advisories, licenses, bans (cargo install cargo-deny)
 ```
 
-## Architecture
+`cargo build -p randommac` needs `dist/` to exist — run `npm run build` once first.
 
-- **Pattern**: MVVM with [CommunityToolkit.Mvvm](https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/) (source generators for `[ObservableProperty]` / `[RelayCommand]`).
-- **DI**: `Microsoft.Extensions.DependencyInjection`. Configured in `App.xaml.cs::ConfigureServices`.
-- **UI**: WinUI 3 + Microsoft.WindowsAppSDK 1.8 (Fluent Design 2). Unpackaged + `WindowsAppSDKSelfContained=true`.
-- **Logging**: Serilog with two sinks — rolling daily file (`%LOCALAPPDATA%\RandomMac\logs\log-YYYY-MM-DD.txt`, 7-day retention) + custom `LogEntrySink` for the in-app log viewer.
-- **Updates**: Velopack (when packaged) with a GitHub Releases API fallback for dev builds. Auto-check on launch is throttled by `Settings.LastUpdateCheckedAt` (24h cooldown).
-- **MAC Change**: Windows Registry `NetworkAddress` write + WMI `Win32_NetworkAdapter.Disable/Enable` cycle, with post-change verification.
-- **Adapter Cache**: `IAdapterCacheService` (Singleton, `SemaphoreSlim` single-flight) — warmed once at `App.OnLaunched`, prevents duplicate WMI scans from concurrent VM constructors.
-- **Custom Main**: opt out of XAML-generated `Main` via `DISABLE_XAML_GENERATED_MAIN`; `Program.cs` runs `VelopackApp.Build().Run()` *before* `Application.Start`, then constructs `App`.
-- **File dialogs**: Win32 `comdlg32` `GetOpenFileName`/`GetSaveFileName` (in-process) instead of `Windows.Storage.Pickers` (broker-mediated, fails under `requireAdministrator`).
+From Windows you can type-check the Linux backend and CLI (they have no GTK dependency):
 
-## Key Dependencies
+```bash
+rustup target add x86_64-unknown-linux-gnu
+cargo clippy -p randommac-net -p randommac-cli --target x86_64-unknown-linux-gnu -- -D warnings
+```
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| Microsoft.WindowsAppSDK | 1.8.* | WinUI 3 + Fluent Design 2 platform |
-| CommunityToolkit.WinUI.UI.Controls.DataGrid | 7.1.2 | DataGrid for WinUI 3 (last published; v8 dropped DataGrid) |
-| H.NotifyIcon.WinUI | 2.2.* | System tray icon (replaces `Avalonia.TrayIcon`) |
-| CommunityToolkit.Mvvm | 8.4.* | MVVM source generators |
-| Microsoft.Extensions.DependencyInjection | 9.0.* | DI container |
-| Serilog | 4.2.* | Structured logging |
-| Velopack | 0.0.1298 | Auto-update + packaging |
-| System.Management | 9.0.* | WMI adapter control (`RandomMac.Core` only) |
+## Building installers locally
 
-## WinUI 3 Pitfalls (Hard-Won Lessons)
+```bash
+node scripts/build-sidecar.mjs      # builds randommac-cli into src-tauri/binaries/
+```
 
-These are properties of WinAppSDK 1.8 itself; documented here so future contributors don't rediscover them. See also `memory/feedback_patterns.md` (developer-local).
+Windows:
 
-| Issue | Symptom | Workaround |
-|-------|---------|------------|
-| Custom `MarkupExtension` returning `Binding` | `XamlCompiler.exe` exits with code 1, **silent**, 0-byte XBF for affected XAML page | Drop the markup extension; bind via `{Binding [Key], Source={StaticResource Loc}}` against an Application resource. |
-| `IsEnabled` bound on `Border` (or any non-`Control` `FrameworkElement`) | Same silent XamlCompiler crash; XBF stays at previous build's size | Move the binding to a `Control` descendant inside the `Border`. |
-| `<PathGeometry x:Key Figures="M..."/>` | Same silent XamlCompiler crash | Inline `<PathIcon Data="M..."/>` per usage, or use `<FontIcon Glyph="&#xXXXX;" FontFamily="Segoe Fluent Icons"/>`. |
-| Inline FontIcon `Glyph="..."` with Private-Use-Area chars | Glyph rendered as empty | Use XML entity references (`&#xE72C;`) in XAML attribute values. |
-| `DataGridColumn.Header` `{Binding ...}` | Header text reads `Microsoft.UI.Xaml.Data.Binding` literally | Set headers from code-behind on `Loaded` + subscribe to `Loc.PropertyChanged`. |
-| `Application.Resources["X"]` from App constructor | `COMException 0x8000FFFF` (E_UNEXPECTED) at `get_Resources()` | Defer to the start of `OnLaunched`. |
-| `Windows.Storage.Pickers.FileSavePicker` / `FileOpenPicker` in elevated unpackaged process | "The parameter is incorrect" / dialog never opens / returns null | Use Win32 `comdlg32` `GetOpenFileName`/`GetSaveFileName` (`Helpers/Win32FileDialog.cs`). |
-| Cache events fire on threadpool | UI-bound `ObservableCollection` mutated cross-thread → InvalidOperation | Subscribers marshal via `App.MainDispatcher.TryEnqueue` when `!HasThreadAccess`. |
+```bash
+npx tauri build --bundles nsis,msi --config '{"bundle":{"externalBin":["binaries/randommac-cli"]}}'
+```
 
-## Developer Machine (Primary)
+Linux:
 
-| Component | Details |
-|-----------|---------|
-| **OS** | Windows 11 Pro 25H2 Insider Preview (Dev Channel) |
-| **Build** | 26300.8155 |
-| **CPU** | Intel Core i7-14700KF |
-| **GPU** | NVIDIA GeForce RTX 5080 (16 GB VRAM) |
-| **RAM** | 32 GB DDR5 |
-| **Storage** | 1 TB SSD |
-| **IDE** | JetBrains Rider 2026.1 |
+```bash
+npx tauri build --bundles deb,rpm,appimage --config '{"bundle":{"externalBin":["binaries/randommac-cli"]}}'
+```
 
-## Tested Configurations
+Output: `target/release/bundle/`. Release builds use `src-tauri/tauri.release.conf.json`, which also
+creates signed updater artifacts and therefore needs `TAURI_SIGNING_PRIVATE_KEY` and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 
-### Physical Machine
-- Developer machine (specs above) — **Passed**
+## Repository layout
 
-### Virtual Machines
+```
+Cargo.toml                 workspace (version, shared dependencies, release profile)
+rust-toolchain.toml        pinned Rust toolchain
+deny.toml                  cargo-deny policy
+crates/
+  randommac-core/          OS-independent logic: MAC type, generator, OUI table, blacklist,
+                           history, settings (+ v1 migration), atomic storage, paths, lock
+  randommac-net/           NetworkBackend trait; windows.rs, linux.rs (+ *_parse.rs, testable
+                           on any OS), mock.rs; ops.rs = validate → apply → verify → record
+  randommac-cli/           randommac-cli (+ tests/cli.rs)
+src-tauri/
+  src/                     app entry, commands, tray, autostart, elevation, updater, logging,
+                           scheduler, legacy (v1) cleanup, platform/{windows,linux}.rs
+  capabilities/, permissions/   what the UI may call
+  tauri*.conf.json         base, per-OS and release configuration
+  windows/hooks.nsh        NSIS install/uninstall hooks
+src/                       Svelte 5 UI: App.svelte, lib/{api,stores,i18n,components,pages}
+scripts/                   version.mjs, gen-oui.mjs, build-sidecar.mjs, release-assets.mjs
+tests/vectors/             test vectors shared by Rust and TypeScript
+.github/workflows/         ci.yml, release.yml, Discord/Discussions notifications
+```
 
-| Environment | OS | Specs | Result |
-|-------------|-----|-------|--------|
-| Oracle VirtualBox 7.2.6 | Windows 10 22H2 (Build 19045.3803) | 4 GB RAM, 2 CPUs, 128 MB VRAM | **Passed** (v1.0.0); v1.1.x falls back to Acrylic backdrop |
-| Windows Sandbox | Windows 11 (host version) | Default | **Passed** |
+## Conventions
 
-## Data Storage Locations
+- **Commits**: [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`,
+  `docs:`, `chore(deps):`, `ci(deps):`, `feat!:` for breaking changes).
+- **Rust**: `rustfmt` defaults (`rustfmt.toml`), clippy clean with `-D warnings`, no `unwrap()` on
+  user or OS input, errors carry a stable `code` that the UI translates.
+- **UI strings**: add every key to `src/lib/i18n/en.ts` (source of truth) and
+  `src/lib/i18n/vi.ts`; the test suite fails when a key is missing. Rust-side strings (tray,
+  notifications, dialogs) live in `src-tauri/src/i18n.rs`.
+- **New Tauri command**: implement it in `commands.rs`, register it in `lib.rs`, add it to the
+  `AppManifest` list in `build.rs` and to `permissions/app-commands.toml`.
+- **Versions**: never edit version numbers by hand — use `npm run version:set`.
 
-All data is stored locally under `%LOCALAPPDATA%\RandomMac\`:
+## Releasing
 
-| File | Purpose |
-|------|---------|
-| `settings.json` | Application settings |
-| `blacklist.json` | MAC address blacklist (global + per-adapter) |
-| `history.json` | MAC change history (atomic save via `.tmp`+`File.Move`; 30-day retention; max 100 entries) |
-| `history.json.bak.<timestamp>` | Auto-backup if `history.json` fails to parse on load |
-| `logs/log-YYYY-MM-DD.txt` | Rolling daily log files (7-day retention) |
+1. `npm run version:set 2.1.0` — updates `Cargo.toml`, `Cargo.lock`, `package.json`,
+   `package-lock.json` (`tauri.conf.json` has no version; it uses `Cargo.toml`).
+2. Add `## [2.1.0] - YYYY-MM-DD` to `CHANGELOG.md` and write `docs/RELEASE_v2.1.0.md` (release
+   page body and in-app update notes — **use absolute links only**).
+3. Open a PR, wait for CI, merge into `master`.
+4. Tag the merge commit and push the tag:
+   ```bash
+   git tag -a v2.1.0 -m "RandomMac 2.1.0"
+   git push origin v2.1.0
+   ```
+5. The **Release** workflow checks the version files against the tag, builds and signs all bundles
+   plus the CLI archives, verifies the asset set, writes `latest.json` and `SHA256SUMS.txt`,
+   attests build provenance, publishes the release and dispatches the Discord and Discussions
+   announcements.
 
-## AI Tooling
+If a run fails after the tag exists, fix the problem on `master`, move nothing, and re-run
+*Actions → Release → Run workflow* with the tag (`dry_run` builds and verifies without publishing).
+Tags with a suffix (`v2.1.0-beta.1`) become pre-releases and are not offered to the updater.
 
-This project uses AI-assisted development:
+Repository secrets: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (updater
+signing — **back up the key**, without it no update can ever be delivered), `DISCORD_*` webhooks.
 
-| Phase | Model | Usage |
-|-------|-------|-------|
-| v1.0.0 | Claude Opus 4.6 (Anthropic) via [Claude Code](https://claude.ai/claude-code) | Code generation, debugging, testing, docs, translations |
-| v1.1.0+ | Claude Opus 4.7 (Anthropic) via [Claude Code](https://claude.ai/claude-code) | Migration to WinUI 3, UX polish, bug fixes, docs updates |
+## Tested configurations
 
-All AI output is reviewed and approved by the developer before merge.
+| Environment | Coverage |
+|---|---|
+| Windows 11 Pro Insider (developer machine, see [pc_spec.md](pc_spec.md)) | App, tray, read-only mode, CLI, real change attempt on a Wi-Fi adapter with rollback |
+| GitHub `windows-latest` | Build, tests, NSIS + MSI install/uninstall, legacy task cleanup, GUI smoke test |
+| GitHub `ubuntu-24.04` | Build, tests, real change on a dummy interface, `.deb` install + GUI smoke test (Xvfb) |
+| `fedora:43` container | `.rpm` installation and dependency resolution |
 
-## Coding Conventions
+## Data locations
 
-- Follow standard [.NET naming conventions](https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/coding-conventions).
-- All user-facing strings must be localized via `Loc.Get("Key")` (C#) or `{Binding [Key], Source={StaticResource Loc}}` (XAML).
-- New localization keys must be added to both `Lang.resx` (English) and `Lang.vi.resx` (Vietnamese).
-- Use `[ObservableProperty]` and `[RelayCommand]` attributes (CommunityToolkit.Mvvm source generators).
-- Services are registered in `App.xaml.cs::ConfigureServices`.
-- File dialogs go through `Helpers/Win32FileDialog` — never `Windows.Storage.Pickers` directly (see WinUI 3 pitfalls table).
-- FontIcon glyphs in XAML use entity references (`&#xE72C;`); glyphs in C# strings use `\uXXXX` escapes.
+See [README → Where your data lives](../README.md#where-your-data-lives). Debug and release builds
+share the same folders; use `--data-dir` (CLI) or the mock backend when experimenting.

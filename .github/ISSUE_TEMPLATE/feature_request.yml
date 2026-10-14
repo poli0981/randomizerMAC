@@ -6,45 +6,52 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for your suggestion. Please describe the feature clearly and concisely.
+        Thank you for your suggestion. Please search existing issues first.
 
   - type: textarea
     id: description
     attributes:
-      label: Feature Description
-      description: What feature would you like to see?
-      placeholder: Describe the feature...
+      label: Feature description
+      description: What would you like RandomMac to do?
     validations:
       required: true
 
   - type: textarea
     id: usecase
     attributes:
-      label: Use Case
-      description: Why is this feature needed? What problem does it solve?
-      placeholder: Explain the use case...
+      label: Use case
+      description: Why is it needed? What problem does it solve for you?
     validations:
       required: true
 
   - type: checkboxes
     id: area
     attributes:
-      label: Related Area
-      description: Which part of the application does this relate to?
+      label: Related area
       options:
-        - label: Dashboard / MAC Change
-        - label: Settings
-        - label: System Tray
-        - label: Startup / Auto-change
-        - label: Update
+        - label: Dashboard / changing addresses
+        - label: History
+        - label: Settings / blacklist
+        - label: Automation
+        - label: System tray / notifications
+        - label: Command-line tool (randommac-cli)
+        - label: Installation / update
         - label: Localization
         - label: UI / UX
         - label: Other
 
+  - type: checkboxes
+    id: platform
+    attributes:
+      label: Platforms
+      options:
+        - label: Windows
+        - label: Linux
+
   - type: dropdown
     id: priority
     attributes:
-      label: Priority
+      label: Priority for you
       options:
         - Nice to have
         - Should have
@@ -55,16 +62,12 @@ body:
   - type: textarea
     id: mockup
     attributes:
-      label: Mockup / Pseudocode
-      description: Optional - include a mockup, pseudocode, or reference.
-      render: shell
+      label: Mockup, example or reference
+      description: Optional — a sketch, an example command line, or a link to a similar tool.
 
   - type: checkboxes
-    id: ide
+    id: contribute
     attributes:
-      label: IDE (if you plan to contribute)
+      label: Contribution
       options:
-        - label: JetBrains Rider
-        - label: Visual Studio
-        - label: VS Code
-        - label: Other
+        - label: I would like to implement this myself (see CONTRIBUTING.md)

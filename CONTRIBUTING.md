@@ -1,87 +1,102 @@
-# Contributing to RANDOM MAC
+# Contributing to RandomMac
 
-Thank you for your interest in contributing. Please read this guide before submitting issues or pull requests.
+Thank you for your interest in contributing. Please read this guide before opening an issue or a
+pull request.
 
-## Getting Started
+## Getting started
 
-1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/randomizerMAC.git`
-3. Create a feature branch: `git checkout -b feature/your-feature`
-4. Make your changes
-5. Test thoroughly (see [Dev Environment](docs/DEV_ENVIRONMENT.md))
-6. Push and create a Pull Request
+1. Fork the repository and clone your fork:
+   `git clone https://github.com/YOUR_USERNAME/randomizerMAC.git`
+2. Create a branch from `master`: `git checkout -b fix/short-description`
+3. Make your change and run the checks below.
+4. Push and open a pull request.
 
-## Development Setup
+## Development setup
 
-See [docs/DEV_ENVIRONMENT.md](docs/DEV_ENVIRONMENT.md) for detailed environment setup, prerequisites, and build instructions.
+See [docs/DEV_ENVIRONMENT.md](docs/DEV_ENVIRONMENT.md) for prerequisites on Windows, Ubuntu and
+Fedora, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together.
 
-**Quick start:**
 ```bash
-# Prerequisites: .NET 9 SDK, Git
-dotnet restore
-dotnet build
-dotnet run --project src/RandomMac.App
+npm ci
+npm run tauri dev                                   # desktop app
+RANDOMMAC_BACKEND=mock npm run tauri dev            # with demo adapters (nothing is changed)
+cargo run -p randommac-cli -- --mock list --all     # CLI against demo adapters
 ```
 
-## Coding Standards
+## Before you open a pull request
 
-- **Language:** C# 13 on .NET 9
-- **Architecture:** MVVM with CommunityToolkit.Mvvm
-- **UI Framework:** Avalonia 11.2.x with FluentAvalonia
-- **Naming:** Follow standard .NET naming conventions
-- **Localization:** All user-facing strings must use `Loc.Get()` or `{loc:L Key}` bindings. Add keys to both `Lang.resx` (English) and `Lang.vi.resx` (Vietnamese).
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+npm run lint
+npm run check
+npm test
+```
 
-## Pull Request Guidelines
+CI runs the same checks on Windows and Ubuntu, plus package installation tests.
 
-- Use the [PR template](.github/PULL_REQUEST_TEMPLATE.md).
-- Keep PRs focused: one feature or fix per PR.
-- Write a clear title (under 70 characters) and description.
-- Include test evidence (screenshots for UI changes, test output for logic changes).
-- Ensure the project builds with zero errors: `dotnet build`
-- Run tests: `dotnet test`
-- Do not include unrelated changes, IDE config files, or personal settings.
+## Coding standards
 
-## Issue Guidelines
+- **Rust** (edition 2024): `rustfmt` formatting, no clippy warnings, no `unwrap()`/`expect()` on
+  data that comes from the user or the operating system, errors with a stable `code`. Keep
+  OS-independent logic in `randommac-core` with unit tests; parsing of OS tool output belongs in
+  `*_parse.rs` so it can be tested on every platform.
+- **UI** (Svelte 5 runes + TypeScript strict): call the backend only through `src/lib/api.ts`;
+  keep components accessible (labels, keyboard support, visible focus).
+- **Security**: never build shell command lines; start programs by absolute path with validated
+  arguments (see `crates/randommac-net/src/process.rs`).
+- **Commits**: [Conventional Commits](https://www.conventionalcommits.org/) — `feat:`, `fix:`,
+  `docs:`, `refactor:`, `test:`, `chore:`; add `!` for breaking changes.
 
-Use the provided templates:
+## Localization
 
-- **Bug Report**: [bug_report.yml](.github/ISSUE_TEMPLATE/bug_report.yml)
-- **Feature Request**: [feature_request.yml](.github/ISSUE_TEMPLATE/feature_request.yml)
-- **Language Fix**: [fix_lang.yml](.github/ISSUE_TEMPLATE/fix_lang.yml)
+User-facing strings live in `src/lib/i18n/en.ts` (English, the source) and `src/lib/i18n/vi.ts`
+(Vietnamese); the few strings produced by Rust (tray, notifications, file dialogs) are in
+`src-tauri/src/i18n.rs`. Add every new key to all languages — the tests fail otherwise.
 
-Be specific. Include steps to reproduce, OS version, and app version. Vague or overly generic reports will be ignored.
+Translations other than English are AI-generated. To report a mistake, use the **Language Fix**
+issue template with the key, the current text, your suggestion and why.
 
-## Language Contributions
+To add a language: create `src/lib/i18n/<code>.ts` typed as `Dictionary`, register it in
+`src/lib/i18n/index.svelte.ts`, add the variant to `Language` in
+`crates/randommac-core/src/settings.rs` and the strings in `src-tauri/src/i18n.rs`, then open a PR.
 
-All translations beyond English are AI-generated. If you find errors:
+## Pull request guidelines
 
-1. Use the **Language Fix** issue template.
-2. Specify the exact key, current translation, and suggested correction.
-3. Explain why the current translation is incorrect (wrong terminology, unnatural phrasing, etc.).
+- Use the [PR template](.github/PULL_REQUEST_TEMPLATE.md); keep one topic per PR.
+- Title under 70 characters, in Conventional Commits form.
+- Include evidence: screenshots for UI changes, test output or new tests for logic changes.
+- Do not include unrelated changes, IDE settings or generated files (`dist/`, `target/`,
+  `src-tauri/gen/`, `src-tauri/permissions/autogenerated/`).
 
-To add a new language:
-1. Create `Lang.{culture-code}.resx` in `src/RandomMac.App/Localization/`
-2. Translate all keys from `Lang.resx`
-3. Submit a PR with the new file
+## Issue guidelines
 
-## Auto-Ignore Policy
+Use the templates: [Bug report](.github/ISSUE_TEMPLATE/bug_report.yml),
+[Feature request](.github/ISSUE_TEMPLATE/feature_request.yml),
+[Language fix](.github/ISSUE_TEMPLATE/fix_lang.yml). For bugs, include your OS and version, the
+RandomMac version, the adapter, and the diagnostics from **About → Copy diagnostics**. Search
+existing issues first. Security problems: see [SECURITY.md](SECURITY.md) — do not open a public
+issue.
 
-The following submissions will be **automatically ignored** without response:
+## Auto-ignore policy
 
-- Offensive, hateful, or abusive language toward maintainers
-- PRs containing malicious code or suspected backdoors
-- Issues or PRs unrelated to this project
-- Excessively long, vague, or unfocused reports
-- Duplicate issues (search before opening)
+The following submissions are closed without response:
 
-Repeated violations may result in a permanent ban. See [Code of Conduct](CODE_OF_CONDUCT.md).
+- Offensive, hateful or abusive language toward maintainers or other contributors
+- Pull requests containing malicious code or suspected backdoors
+- Issues or pull requests unrelated to this project
+- Excessively long, vague or unfocused reports
+- Duplicates (search before opening)
+
+Repeated violations may result in a permanent ban. See the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## AI disclosure
+
+This project is developed with assistance from **Anthropic Claude** via Claude Code (Claude Opus
+4.6 for 1.0, Opus 4.7 for 1.1.x, Opus 5.5 for the 2.0 rewrite). AI helps with code, debugging,
+tests, documentation and translations. Every change — human or AI — is reviewed by the maintainer.
 
 ## License
 
-## AI Disclosure
-
-This project was developed with assistance from **Anthropic Claude** (Claude Opus 4.6) via Claude Code. AI was used for code generation, debugging, test creation, documentation, and translations. All contributions (human and AI) are reviewed by the maintainer.
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).
+By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).

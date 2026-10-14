@@ -6,13 +6,13 @@ body:
   - type: markdown
     attributes:
       value: |
-        All translations beyond English are AI-generated. Please help us improve them.
+        All translations other than English are AI-generated. Thank you for helping to improve them.
 
   - type: input
     id: language
     attributes:
       label: Language
-      description: "Which language is affected? (e.g., Vietnamese, Spanish, etc.)"
+      description: Which language is affected (or which one should be added)?
       placeholder: Vietnamese
     validations:
       required: true
@@ -21,13 +21,12 @@ body:
     id: reason
     attributes:
       label: Reason
-      description: What type of language issue is this?
       options:
         - Translation error (wrong meaning)
         - Unnatural phrasing
         - Wrong terminology (technical terms)
-        - Missing translation (untranslated key)
-        - Add new language
+        - Missing translation (English text shown)
+        - Add a new language
     validations:
       required: true
 
@@ -36,16 +35,18 @@ body:
     attributes:
       label: Description
       description: |
-        Describe the issue. For errors, include:
-        - The resource key (if known)
-        - Current translation
-        - Suggested correction
-        - Why the current translation is wrong
+        For errors, include:
+        - where the text appears (page, dialog, tray menu, notification) and, if known, the key
+          from `src/lib/i18n/<language>.ts` or `src-tauri/src/i18n.rs`
+        - the current text
+        - your suggested correction
+        - why the current text is wrong
       placeholder: |
-        Key: Settings_Language
+        Where: Settings → General
+        Key: settings.language
         Current: "Ngôn ngử"
         Suggested: "Ngôn ngữ"
-        Reason: Typo - wrong character
+        Reason: typo
     validations:
       required: true
 
@@ -53,4 +54,4 @@ body:
     id: screenshots
     attributes:
       label: Screenshots
-      description: Attach a screenshot showing the incorrect translation in the app.
+      description: A screenshot showing the text in the app.

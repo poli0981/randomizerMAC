@@ -1,36 +1,41 @@
 ## Description
 
-<!-- Briefly describe what this PR does. -->
+<!-- What does this PR change, and why? -->
 
-## Type of Change
+## Type of change
 
 - [ ] Bug fix
 - [ ] New feature
-- [ ] Language/translation update
+- [ ] Breaking change
+- [ ] Language / translation
 - [ ] Documentation
 - [ ] Refactoring (no functional change)
-- [ ] Other: <!-- specify -->
+- [ ] CI / build / dependencies
 
-## Related Issue
+## Related issue
 
-<!-- Link to the issue this PR addresses, e.g. Fixes #123 -->
+<!-- e.g. Fixes #123 -->
 
-## Changes Made
+## Platforms affected
 
-<!-- List the key changes. -->
+- [ ] Windows
+- [ ] Linux
+- [ ] Both / platform-independent
 
--
+## Changes made
+
 -
 
 ## Screenshots
 
-<!-- If this is a UI change, include before/after screenshots. -->
+<!-- For UI changes: before / after. -->
 
 ## Checklist
 
-- [ ] I have tested this change locally
-- [ ] The project builds with zero errors (`dotnet build`)
-- [ ] Tests pass (`dotnet test`)
-- [ ] No unrelated files are included (IDE configs, personal settings)
-- [ ] New user-facing strings are added to both `Lang.resx` and `Lang.vi.resx`
-- [ ] I have read and agree to the [Contributing Guidelines](CONTRIBUTING.md)
+- [ ] `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` pass
+- [ ] `cargo test --workspace` passes
+- [ ] `npm run lint`, `npm run check` and `npm test` pass
+- [ ] New user-facing strings are in both `src/lib/i18n/en.ts` and `src/lib/i18n/vi.ts`
+- [ ] Tested manually (describe how — e.g. mock backend, dummy interface, real adapter)
+- [ ] No unrelated files (IDE settings, generated files, personal data)
+- [ ] I have read the [Contributing Guidelines](https://github.com/poli0981/randomizerMAC/blob/master/CONTRIBUTING.md)
