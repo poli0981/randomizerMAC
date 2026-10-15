@@ -1,0 +1,11 @@
+node_modules/
+dist/
+target/
+coverage/
+src-tauri/
+crates/
+package-lock.json
+Cargo.lock
+*.md
+.github/
+docs/

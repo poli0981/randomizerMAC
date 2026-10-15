@@ -1,8 +1,14 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Documentation
-    url: https://github.com/poli0981/randomizerMAC/blob/master/README.md
-    about: Read the README before opening an issue
+  - name: Report a security vulnerability
+    url: https://github.com/poli0981/randomizerMAC/security/advisories/new
+    about: Please report vulnerabilities privately, not as a public issue.
+  - name: Questions and ideas (Discussions)
+    url: https://github.com/poli0981/randomizerMAC/discussions
+    about: Ask questions or share ideas with the community.
+  - name: Documentation and FAQ
+    url: https://github.com/poli0981/randomizerMAC/blob/master/README.md#faq
+    about: Many common problems (Wi-Fi on Windows, Linux tray, NVIDIA) are answered here.
   - name: Code of Conduct
     url: https://github.com/poli0981/randomizerMAC/blob/master/CODE_OF_CONDUCT.md
-    about: Please read our Code of Conduct
+    about: Please read our Code of Conduct.

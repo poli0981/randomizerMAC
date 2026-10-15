@@ -1,0 +1,42 @@
+# Every backend command the main window may call (generated from the list in build.rs).
+
+[[set]]
+identifier = "app-commands"
+description = "All RandomMac backend commands used by the UI."
+permissions = [
+  "allow-app-info",
+  "allow-ui-ready",
+  "allow-relaunch-elevated",
+  "allow-quit-app",
+  "allow-open-url",
+  "allow-open-location",
+  "allow-diagnostics",
+  "allow-list-adapters",
+  "allow-set-adapter-enabled",
+  "allow-generate-mac",
+  "allow-inspect-mac",
+  "allow-list-vendors",
+  "allow-apply-mac",
+  "allow-restore-mac",
+  "allow-restore-all",
+  "allow-history-list",
+  "allow-history-clear",
+  "allow-history-export",
+  "allow-blacklist-get",
+  "allow-blacklist-add",
+  "allow-blacklist-remove",
+  "allow-blacklist-import",
+  "allow-blacklist-export",
+  "allow-settings-get",
+  "allow-settings-update",
+  "allow-settings-reset",
+  "allow-settings-export",
+  "allow-settings-import",
+  "allow-bundle-export",
+  "allow-v1-import",
+  "allow-logs-get",
+  "allow-logs-clear",
+  "allow-logs-export",
+  "allow-update-check",
+  "allow-update-install",
+]

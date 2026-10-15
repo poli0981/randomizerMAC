@@ -2,13 +2,9 @@ name: Notify Release Pipeline
 
 on:
   workflow_run:
-    # Release-related workflows only. Names below MUST match the `name:`
-    # field of each watched workflow. Renaming any of those → update list.
-    #   release.yml          → name: "Release"
-    #   announce-release.yml → name: "Announce Release to Discord"
+    # MUST match `name: Release` in release.yml.
     workflows:
       - "Release"
-      - "Announce Release to Discord"
     types: [completed]
 
 permissions:
@@ -19,4 +15,5 @@ jobs:
   notify:
     if: contains(fromJSON('["success","failure","cancelled"]'), github.event.workflow_run.conclusion)
     uses: poli0981/.github/.github/workflows/notify-release-pipeline.yml@main
-    secrets: inherit
+    secrets:
+      DISCORD_RELEASE_PIPELINE_WEBHOOK: ${{ secrets.DISCORD_RELEASE_PIPELINE_WEBHOOK }}

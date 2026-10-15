@@ -1,8 +1,8 @@
 name: Create Discussion on Release
 
-# Opens a GitHub Discussion thread in the "Announcements" category
-# whenever a Release is published. Runs in parallel to announce-release.yml
-# (which posts to Discord).
+# Opens a GitHub Discussion thread in the "Announcements" category for a release.
+# release.yml starts it with `gh workflow run` after publishing (releases published with
+# GITHUB_TOKEN do not trigger `release: published`). Re-running never creates duplicates.
 #
 # Prerequisites (one-time, repo Settings):
 #   1. Settings → Features → enable Discussions
@@ -24,7 +24,7 @@ permissions:
 jobs:
   create-discussion:
     name: Open Announcements Discussion
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Create Discussion via GraphQL
@@ -87,8 +87,25 @@ jobs:
               return;
             }
 
-            // 2) Compose title + body.
+            // 2) Skip if a discussion for this release already exists (idempotent re-runs).
             const title = `Release ${tag} discussion`;
+            const existing = await github.graphql(
+              `query($owner: String!, $name: String!, $cat: ID!) {
+                repository(owner: $owner, name: $name) {
+                  discussions(first: 50, categoryId: $cat, orderBy: {field: CREATED_AT, direction: DESC}) {
+                    nodes { title url }
+                  }
+                }
+              }`,
+              { owner: context.repo.owner, name: context.repo.repo, cat: cat.id },
+            );
+            const dup = existing.repository.discussions.nodes.find(d => d.title === title);
+            if (dup) {
+              core.info(`Discussion already exists: ${dup.url}`);
+              return;
+            }
+
+            // 3) Compose the body.
             const releaseName = release.name || tag;
             const releaseUrl  = release.html_url;
             const releaseBody = (release.body || '').trim();
@@ -102,7 +119,7 @@ jobs:
             }
             const body = lines.join('\n');
 
-            // 3) Create the discussion.
+            // 4) Create the discussion.
             const mutation = `
               mutation($repo: ID!, $cat: ID!, $title: String!, $body: String!) {
                 createDiscussion(input: {repositoryId: $repo, categoryId: $cat, title: $title, body: $body}) {

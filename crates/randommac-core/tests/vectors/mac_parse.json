@@ -1,0 +1,36 @@
+{
+  "$comment": "Shared MAC parsing vectors: used by crates/randommac-core (Rust) and src/lib/mac.test.ts (frontend). Keep both parsers in sync with this file.",
+  "valid": [
+    { "input": "AA:BB:CC:DD:EE:FF", "canonical": "AA:BB:CC:DD:EE:FF" },
+    { "input": "aa:bb:cc:dd:ee:ff", "canonical": "AA:BB:CC:DD:EE:FF" },
+    { "input": "aA:Bb:cC:Dd:eE:Ff", "canonical": "AA:BB:CC:DD:EE:FF" },
+    { "input": "02-1A-2B-3C-4D-5E", "canonical": "02:1A:2B:3C:4D:5E" },
+    { "input": "021a2b3c4d5e", "canonical": "02:1A:2B:3C:4D:5E" },
+    { "input": "021A.2B3C.4D5E", "canonical": "02:1A:2B:3C:4D:5E" },
+    { "input": "  02:00:00:00:00:01  ", "canonical": "02:00:00:00:00:01" },
+    { "input": "\t30-56-0F-09-8F-E4\n", "canonical": "30:56:0F:09:8F:E4" },
+    { "input": "00:00:00:00:00:00", "canonical": "00:00:00:00:00:00" },
+    { "input": "FF:FF:FF:FF:FF:FF", "canonical": "FF:FF:FF:FF:FF:FF" }
+  ],
+  "invalid": [
+    "",
+    "   ",
+    "AA:BB:CC:DD:EE",
+    "AA:BB:CC:DD:EE:FF:00",
+    "AA:BB-CC:DD:EE:FF",
+    "AA-BB:CC-DD:EE-FF",
+    "GG:BB:CC:DD:EE:FF",
+    "AA:BB:CC:DD:EE:FG",
+    "GG-AA-BB-CC-DD-EE-FF",
+    "MAC-AABBCCDDEE",
+    "AA BB CC DD EE FF",
+    "AA.BB.CC.DD.EE.FF",
+    "AABB:CCDD:EEFF",
+    "AABBCCDDEEF",
+    "AABBCCDDEEFF0",
+    "0x0A0B0C0D0E0F",
+    "AA::BB:CC:DD:EE:F",
+    "ÀA:BB:CC:DD:EE:FF",
+    "A:B:C:D:E:F"
+  ]
+}

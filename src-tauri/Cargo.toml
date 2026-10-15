@@ -1,0 +1,73 @@
+[package]
+name = "randommac"
+description = "RandomMac — randomize, set and restore network adapter MAC addresses."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+default-run = "randommac"
+
+[lib]
+name = "randommac_lib"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "randommac"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+dirs.workspace = true
+randommac-core.workspace = true
+randommac-net.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sys-locale = "0.3"
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt", "registry", "env-filter", "ansi", "tracing-log"] }
+tauri = { version = "2.12", features = ["tray-icon", "image-png"] }
+tauri-plugin-dialog = "2.8"
+tauri-plugin-notification = "2.6"
+tauri-plugin-process = "2.4"
+tauri-plugin-updater = "2.13"
+tauri-plugin-window-state = "2.5"
+tokio = { version = "1", features = ["sync", "time", "macros"] }
+url = "2"
+zip = { version = "9", default-features = false, features = ["deflate"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc.workspace = true
+tauri-plugin-single-instance = "2.5"
+zbus = { version = "5", default-features = false, features = ["blocking-api", "async-io"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[features]
+# Tauri builds with this feature in release (`tauri build`); do not remove.
+custom-protocol = ["tauri/custom-protocol"]
+
+[lints]
+workspace = true

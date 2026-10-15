@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "linux": {
+      "deb": {
+        "depends": ["iproute2", "pkexec | policykit-1"],
+        "recommends": ["network-manager", "xdg-utils"],
+        "section": "net"
+      },
+      "rpm": {
+        "depends": ["iproute", "polkit", "libayatana-appindicator-gtk3"],
+        "recommends": ["NetworkManager", "xdg-utils"]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  }
+}

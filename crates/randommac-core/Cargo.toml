@@ -1,0 +1,23 @@
+[package]
+name = "randommac-core"
+description = "Platform-independent core of RandomMac: MAC parsing/generation, OUI table, blacklist, history, settings and storage."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+chrono.workspace = true
+dirs.workspace = true
+getrandom.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

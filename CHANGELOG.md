@@ -1,9 +1,136 @@
 # Changelog
 
-All notable changes to RANDOM MAC will be documented in this file.
+All notable changes to RandomMac (named "RANDOM MAC" in 1.x) are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.0.0] - 2026-10-15
+
+A complete rewrite. RandomMac now runs on **Windows 10/11 and Linux (Ubuntu, Fedora and other
+glibc 2.39+ distributions)**, is built with Rust + Tauri 2 + Svelte 5 instead of .NET/WinUI 3, and
+ships a command-line tool. Installers shrink from ~112 MB to ~5 MB.
+
+### Breaking
+
+- **New installers and update channel.** NSIS (`*-setup.exe`) and MSI on Windows; `.deb`, `.rpm` and
+  AppImage on Linux. The 1.x Velopack updater cannot install 2.0 — install 2.0 manually, then
+  uninstall 1.x (see the README). 1.x data (`settings.json`, `history.json`, `blacklist.json` in
+  `%LOCALAPPDATA%\RandomMac`) is imported automatically on first start.
+- **Installed per machine in `C:\Program Files\RandomMac`** (1.x installed into the user-writable
+  `%LOCALAPPDATA%` while running with administrator rights).
+- **New data location and format**: `%LOCALAPPDATA%\io.github.poli0981.randommac\` on Windows,
+  `~/.config/…` and `~/.local/share/io.github.poli0981.randommac/` on Linux; camelCase JSON with a
+  `schemaVersion`.
+- The application id is `io.github.poli0981.randommac`; the executable is `randommac(.exe)`.
+
+### Added
+
+- **Linux support**: adapters from sysfs/udev, hardware address via the `ETHTOOL_GPERMADDR` ioctl
+  (no root needed), changes through **NetworkManager** (`cloned-mac-address` on the active
+  connection — persistent) or **iproute2** via `pkexec` (temporary), selectable as Auto /
+  NetworkManager / iproute2. The GUI never runs as root; polkit asks only for the change itself.
+  Tray support is detected over D-Bus (StatusNotifierWatcher); without a tray, closing quits.
+  XDG autostart entry; NVIDIA blank-window workaround (`WEBKIT_DISABLE_DMABUF_RENDERER`).
+- **`randommac-cli`** (installed next to the app and published as standalone archives): `list`,
+  `show`, `random`, `set`, `restore`, `inspect`, `vendors`, `history`; `--json`, `--dry-run`,
+  `--data-dir`, `--method`, `--mock`; documented exit codes 0–6.
+- **Generation modes**: Random (locally administered, default), Keep current vendor, Imitate vendor
+  (59 vendors, 11,247 prefixes generated from the IEEE registry). Warnings for addresses that are
+  multicast, blacklisted, identical to the current one or not locally administered (Wi-Fi on
+  Windows needs `x2/x6/xA/xE`).
+- **Automation**: change selected adapters at sign-in, periodically every 5 minutes – 7 days while
+  running, and optionally restore every change on exit. **Restore all** in the app and the tray.
+- **Disabled adapters** are listed and can be re-enabled; a *Changed* badge marks spoofed adapters;
+  vendor lookup for every address.
+- **History page** with search, CSV (formula-safe) and JSON export; configurable size (default 500
+  entries) and retention (default 90 days).
+- **Blacklist** of exact addresses or 1–5 byte prefixes, global or per adapter, with import/export.
+- **Settings import/export**, **Export all (zip)**, **re-import from 1.x**, reset to defaults.
+- **Diagnostics** (version, OS, privileges, available methods, package type) copied in one click.
+- **Signed updates** with `tauri-plugin-updater`: release notes, download progress, install and
+  restart; `.deb`/`.rpm` are installed with `pkexec apt-get/dnf`. A real *Check for updates
+  automatically* switch (1.x always checked).
+- **System theme** option, resizable window that remembers its size and position, **History** as its
+  own page (`Ctrl+2`), `F5` refreshes adapters, OS notifications when the window is hidden.
+- **App and tray icon** (1.x had none).
+- **Security hardening**: strict CSP, frozen prototypes, only the app's own commands are exposed to
+  the UI, navigation limited to the app origin, links opened only from an allowlist (on Windows
+  through the non-elevated shell), DLL search-path and WebView2 environment hardening, data folder
+  refused when it is a junction/symlink.
+- **CI/CD**: Windows + Ubuntu builds, clippy/rustfmt/eslint/prettier/svelte-check, Rust and Vitest
+  tests, a real address change on a Linux dummy interface, install/uninstall tests of every package
+  (NSIS, MSI, deb, rpm in a Fedora container) with a GUI smoke test, `cargo-deny` + `npm audit`.
+  Releases are built from the tag, verified, checksummed (`SHA256SUMS.txt`), attested
+  (build provenance) and published with a signed `latest.json`.
+- Documentation: rewritten README (+ Vietnamese), `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`
+  (+ Vietnamese), `CLAUDE.md`.
+
+### Changed
+
+- **Windows MAC changes** use SetupAPI instead of WMI: the adapter is matched by its device instance
+  id (not by description), the driver's `NetworkAddress` value is written through the device's own
+  driver key, and the device is restarted with `DIF_PROPERTYCHANGE` under a watchdog. Disabled
+  adapters are enumerated too.
+- **Every change is verified** by polling the live address for up to 20 seconds; if the driver
+  ignores it, the previous registry value is restored automatically (1.x slept 2 s and left
+  garbage behind).
+- **"Original MAC" is the real hardware address** from `GetIfEntry2` (Windows) / ethtool (Linux);
+  1.x used the address seen when the app started, so after a change and a restart "original" was
+  the spoofed one. **Restore** is available whenever the current address differs.
+- **Elevation**: the app asks for administrator rights itself (manifest `asInvoker` + UAC relaunch),
+  so a second launch only shows the existing window without a UAC prompt; declining opens a
+  read-only mode with *Restart as administrator*.
+- **Autostart** uses a per-user Task Scheduler task with highest privileges, no battery
+  restrictions and no 72-hour limit, created through `%SystemRoot%\System32\schtasks.exe` from XML.
+  Auto-change runs only when started by the system (`--autostart`), as documented.
+- **Storage**: atomic writes with fsync; a damaged file is renamed `*.corrupt-<timestamp>` (3 kept)
+  and the app continues with defaults instead of disabling saves or crashing.
+- **One change at a time** across the UI, tray, automation and CLI (operation lock).
+- **Logs**: rotating files (5 × 2 MB) plus a live in-app viewer with level filter, search,
+  auto-scroll, copy and export.
+- **MAC parser** is strict: six hex pairs with one consistent separator (`:`/`-`/none) or Cisco
+  `xxxx.xxxx.xxxx` (1.x accepted input like `GG-AA-…`).
+- **Vendor table** generated from the IEEE registry (fixes wrong entries such as `52:54:00` being
+  listed as Realtek); adapter type comes from the interface type, not from its name.
+- Dependabot covers `cargo`, `npm` and `github-actions` with grouped updates and correct commit
+  prefixes; workflows pin `ubuntu-24.04`; reusable Discord workflows receive only the secrets they
+  need.
+
+### Fixed
+
+- Elevated logon task pointed to an executable in a user-writable folder — any process could replace
+  it and gain administrator rights at the next sign-in (**security**). 2.0 removes that task.
+- The wrong adapter could be modified when two adapters shared a description or stale registry keys
+  existed.
+- An adapter could stay disabled (and vanish from the list) if the WMI disable/enable cycle failed.
+- `AutoChangeAdapterIds: null` in `settings.json` crashed the app at every start.
+- History, settings and blacklist could be lost or truncated on write errors; corrupt history
+  disabled saving permanently and created unbounded `.bak` files.
+- Concurrent changes (startup + tray + dashboard) interfered with each other's verification.
+- The update page reported "downloaded" before anything was downloaded; the last-check time was
+  stored in local time.
+- "Show notifications" had no effect; ~45 strings were not translated; the tray did not follow the
+  language; the fixed 1024×680 window did not fit 1366×768 screens at 125 %.
+- Failed addresses were added to the blacklist automatically (removed: the blacklist is user-owned).
+- `Announce Release to Discord` and `Create Discussion on Release` never ran for releases published
+  by the workflow (`GITHUB_TOKEN` events do not trigger workflows) — they are now dispatched
+  explicitly. `SHA256SUMS.txt` could include files from older builds.
+
+### Removed
+
+- The .NET/WinUI 3 solution (`RandomMac.sln`, `src/RandomMac.*`, `tests/RandomMac.Tests`) and
+  `global.json` (which pinned an unavailable .NET 11 preview SDK). The 1.x code remains available
+  at the `v1.1.3` tag.
+- Velopack packaging and the NuGet Dependabot ecosystem.
+
+### Dependencies (merged after 1.1.3, for the 1.x code base)
+
+- `actions/checkout` 4 → 7, `actions/setup-dotnet` 4 → 6, `actions/upload-artifact` 4 → 7,
+  `actions/attest-build-provenance` 2 → 4, `actions/github-script` 7 → 9,
+  `softprops/action-gh-release` 2 → 3, Microsoft packages, `Microsoft.NET.Test.Sdk` 18.5.1,
+  `xunit.runner.visualstudio` 3.1.5 (#3, #5, #6, #7, #9, #12–#17). Dependabot PR #19 (xunit) was
+  closed because the C# test project no longer exists.
 
 ## [1.1.3] - 2026-05-11
 
@@ -72,7 +199,7 @@ UX polish + correctness fixes on top of the WinUI 3 migration.
 - **Update view** — state-driven hero card (✓ green up-to-date, ⬆ accent update-available, ⚠ red error, ⓘ idle), "Last checked: 5 min ago" line, scrollable release notes, indeterminate ProgressBar during download.
 - **About view** — centered hero (icon + name + version), compact 4-column third-party rows, dependency list updated for v1.1.x (drops Avalonia / FluentAvalonia, adds Microsoft.WindowsAppSDK / CommunityToolkit.WinUI.UI.Controls.DataGrid / H.NotifyIcon.WinUI).
 - **Scrollbars** set to Hidden everywhere — scroll input still works (wheel / touch / keyboard) but the visible track is suppressed.
-- **JSON encoding** — `SettingsService` / `HistoryService` / `BlacklistService` now use `JavaScriptEncoder.UnsafeRelaxedJsonEscaping`, so `&` in PnpDeviceId no longer escapes to `&`.
+- **JSON encoding** — `SettingsService` / `HistoryService` / `BlacklistService` now use `JavaScriptEncoder.UnsafeRelaxedJsonEscaping`, so `&` in PnpDeviceId is written as-is instead of being escaped to `\u0026`.
 
 ### Fixed
 
@@ -252,7 +379,9 @@ First public release of RANDOM MAC, a lightweight Windows utility for randomizin
 - **Start Minimized** toggle may not function correctly in all scenarios
 - **App Icon** is placeholder only (no custom icon designed yet)
 
+[2.0.0]: https://github.com/poli0981/randomizerMAC/releases/tag/v2.0.0
+[1.1.3]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.3
 [1.1.2]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.2
 [1.1.1]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.1
-[1.1.0]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.0
+[1.1.0]: https://github.com/poli0981/randomizerMAC/blob/v1.1.1/docs/RELEASE_v1.1.0.md
 [1.0.0]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.0.0

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installMode": "perMachine",
+        "languages": ["English", "Vietnamese"],
+        "displayLanguageSelector": false,
+        "startMenuFolder": "RandomMac",
+        "installerHooks": "windows/hooks.nsh"
+      },
+      "wix": {
+        "upgradeCode": "76951B22-044E-49DA-B258-0F496CBD67E5",
+        "language": ["en-US"]
+      }
+    }
+  }
+}

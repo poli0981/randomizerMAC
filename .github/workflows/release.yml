@@ -1,217 +1,241 @@
+# Keep `name: Release` — notify-ci-failure.yml / notify-release-pipeline.yml watch it by name.
 name: Release
 
-# Triggered by pushing a version tag like `v1.1.1` or `v1.2.0-rc1`.
-# Pre-release tags (containing a hyphen) are marked as GitHub pre-releases.
 on:
   push:
     tags:
-      - 'v*'
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to release (without leading v), e.g. 1.1.1'
+      tag:
+        description: "Existing tag to build and publish, e.g. v2.0.0"
         required: true
         type: string
+      dry_run:
+        description: "Build and verify only; do not create or change the GitHub release"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
-  contents: write   # Create GitHub Releases + upload assets
-  attestations: write
-  id-token: write
+  contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false   # Don't kill an in-flight release.
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  release:
-    name: Build, pack with Velopack, publish GitHub Release
-    runs-on: windows-latest
-    timeout-minutes: 30
-    env:
-      DOTNET_NOLOGO: 'true'
-      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  prepare:
+    name: Validate version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0   # Velopack delta needs prior tag history.
-
-      - name: Setup .NET (from global.json)
-        uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: global.json
-          dotnet-quality: preview
-
-      - name: Resolve version + pre-release flag
+      - name: Resolve tag
         id: meta
-        shell: pwsh
-        run: |
-          $tag = if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
-                   "v${{ inputs.version }}"
-                 } else {
-                   "${{ github.ref_name }}"
-                 }
-          $version = $tag -replace '^v', ''
-          $isPrerelease = if ($version -match '-') { 'true' } else { 'false' }
-          "tag=$tag"                  | Out-File $env:GITHUB_OUTPUT -Append
-          "version=$version"          | Out-File $env:GITHUB_OUTPUT -Append
-          "is_prerelease=$isPrerelease" | Out-File $env:GITHUB_OUTPUT -Append
-          Write-Host "Tag=$tag  Version=$version  Prerelease=$isPrerelease"
-
-      - name: Restore
-        run: dotnet restore
-
-      - name: Test
-        # Tests gate the release — a regression should never be packaged.
-        run: dotnet test -c Release --verbosity normal
-
-      - name: Publish self-contained
-        # The csproj's CopyWinUIArtifactsToPublishDirectory target ensures
-        # the 9 *.xbf and RandomMac.App.pri ride along — without that,
-        # the installer succeeds but the app crashes at first XAML load.
-        run: |
-          dotnet publish src/RandomMac.App/RandomMac.App.csproj `
-            --configuration Release `
-            --runtime win-x64 `
-            --self-contained true `
-            --output publish/RandomMac
-
-      - name: Verify publish output (XBF + app PRI present)
-        shell: pwsh
-        run: |
-          $xbfs = (Get-ChildItem -Path publish/RandomMac -Recurse -Filter '*.xbf').Count
-          $hasAppPri = Test-Path 'publish/RandomMac/RandomMac.App.pri'
-          if ($xbfs -lt 9) { throw "Expected at least 9 XBF files in publish, got $xbfs" }
-          if (-not $hasAppPri) { throw "RandomMac.App.pri missing from publish output" }
-          Write-Host "publish/ has $xbfs XBF files + RandomMac.App.pri ✓"
-
-      - name: Install Velopack CLI
-        run: dotnet tool install -g vpk --version 0.0.1298
-
-      - name: Download previous releases (for delta)
-        # Velopack auto-generates a delta nupkg if the previous full nupkg
-        # is present in the output folder. continue-on-error so the very
-        # first release (no prior) doesn't fail the whole job.
-        continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          New-Item -ItemType Directory -Force -Path releases | Out-Null
-          vpk download github `
-            --repoUrl https://github.com/${{ github.repository }} `
-            --outputDir releases `
-            --token $env:GH_TOKEN
-
-      - name: Resolve release notes path
-        id: notes
-        shell: pwsh
-        run: |
-          $candidate = "docs/RELEASE_v${{ steps.meta.outputs.version }}.md"
-          if (Test-Path $candidate) {
-            "path=$candidate" | Out-File $env:GITHUB_OUTPUT -Append
-          } else {
-            # Fallback: write a minimal placeholder so vpk has something.
-            $placeholder = "$env:RUNNER_TEMP\release-notes.md"
-            "Release ${{ steps.meta.outputs.version }}." | Set-Content $placeholder
-            "path=$placeholder" | Out-File $env:GITHUB_OUTPUT -Append
-          }
-
-      - name: Pack with Velopack
-        # --delta BestSize maximizes the saving for users updating from a
-        # prior release; the full nupkg / Setup.exe / Portable.zip are
-        # always produced regardless.
-        shell: pwsh
-        run: |
-          vpk pack `
-            -u RandomMac `
-            -v ${{ steps.meta.outputs.version }} `
-            -p publish/RandomMac `
-            -e RandomMac.App.exe `
-            -o releases/ `
-            --packTitle "RANDOM MAC" `
-            --packAuthors "poli0981" `
-            --releaseNotes "${{ steps.notes.outputs.path }}" `
-            --delta BestSize
-
-      - name: Compute SHA256 checksums
-        shell: pwsh
-        run: |
-          $lines = Get-ChildItem releases -File |
-            Where-Object { $_.Extension -in '.exe', '.zip', '.nupkg', '.json' -or $_.Name -eq 'RELEASES' } |
-            Sort-Object Name |
-            ForEach-Object {
-              $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-              "$hash  $($_.Name)"
-            }
-          $lines | Out-File -Encoding ascii -NoNewline:$false releases/SHA256SUMS.txt
-          Write-Host "--- SHA256SUMS.txt ---"
-          $lines | ForEach-Object { Write-Host $_ }
-
-      - name: List release artifacts
-        shell: pwsh
-        run: |
-          Get-ChildItem releases | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
-
-      - name: Sign artifacts (manual setup required)
-        # Code signing is opt-in. To enable:
-        #   1. Add `CODE_SIGN_PFX_BASE64`  (base64-encoded .pfx)
-        #   2. Add `CODE_SIGN_PASSWORD`    (the cert's password)
-        #   3. Uncomment the body below.
-        if: env.CODE_SIGN_PFX_BASE64 != ''
-        env:
-          CODE_SIGN_PFX_BASE64: ${{ secrets.CODE_SIGN_PFX_BASE64 }}
-          CODE_SIGN_PASSWORD: ${{ secrets.CODE_SIGN_PASSWORD }}
-        shell: pwsh
-        run: |
-          $pfxPath = "$env:RUNNER_TEMP\sign.pfx"
-          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:CODE_SIGN_PFX_BASE64))
-          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Filter signtool.exe -Recurse |
-                      Where-Object { $_.FullName -match 'x64\\signtool.exe$' } |
-                      Select-Object -First 1 -ExpandProperty FullName
-          Get-ChildItem releases -Filter '*.exe' | ForEach-Object {
-            & $signtool sign /f $pfxPath /p $env:CODE_SIGN_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
-            if ($LASTEXITCODE -ne 0) { throw "signtool failed for $($_.Name)" }
-          }
-          Remove-Item $pfxPath -Force
-
-      - name: Upload artifacts to workflow run
-        uses: actions/upload-artifact@v7
+          set -euo pipefail
+          tag="${INPUT_TAG:-$REF_NAME}"
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$tag' is not a release tag (vX.Y.Z[-pre])"; exit 1
+          fi
+          version="${tag#v}"
+          prerelease=false
+          [[ "$version" == *-* ]] && prerelease=true
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
         with:
-          name: velopack-release-${{ steps.meta.outputs.version }}
-          path: releases/
-          retention-days: 30
+          ref: refs/tags/${{ steps.meta.outputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Version files match the tag
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: node scripts/version.mjs check --tag "$TAG"
 
+  build:
+    name: Build (${{ matrix.os }})
+    needs: prepare
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            bundles: nsis,msi
+            triple: x86_64-pc-windows-msvc
+          - os: ubuntu-24.04
+            bundles: deb,rpm,appimage
+            triple: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ needs.prepare.outputs.tag }}
+          persist-credentials: false
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev \
+            patchelf file
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install --profile minimal
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Build the CLI sidecar
+        run: node scripts/build-sidecar.mjs ${{ matrix.triple }}
+      - name: Build and sign bundles
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx tauri build --ci --bundles "${{ matrix.bundles }}" --config src-tauri/tauri.release.conf.json
+      - name: Collect release assets
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TRIPLE: ${{ matrix.triple }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          shopt -s nullglob
+          for f in target/release/bundle/{nsis/*-setup.exe,msi/*.msi,deb/*.deb,rpm/*.rpm,appimage/*.AppImage}; do
+            cp "$f" out/
+            if [ -f "$f.sig" ]; then cp "$f.sig" out/; fi
+          done
+          cli="randommac-cli-${VERSION}-${TRIPLE}"
+          if [[ "$TRIPLE" == *windows* ]]; then
+            mkdir -p "$cli" && cp "target/$TRIPLE/release/randommac-cli.exe" LICENSE "$cli/"
+            7z a -tzip "out/${cli}.zip" "$cli" > /dev/null
+          else
+            mkdir -p "$cli" && cp "target/$TRIPLE/release/randommac-cli" LICENSE "$cli/"
+            tar -czf "out/${cli}.tar.gz" "$cli"
+          fi
+          ls -la out
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.triple }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      actions: write
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+      DRY_RUN: ${{ inputs.dry_run || false }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ needs.prepare.outputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify assets
+        run: node scripts/release-assets.mjs verify release-assets
+      - name: Generate latest.json (updater manifest)
+        run: node scripts/release-assets.mjs latest-json release-assets "$TAG" "$GITHUB_REPOSITORY" "docs/RELEASE_v${VERSION}.md"
+      - name: Generate SHA256SUMS.txt
+        run: node scripts/release-assets.mjs sums release-assets
       - name: Attest build provenance
-        # Cryptographic attestation that ties these binaries to this exact
-        # commit + workflow run. Verifiable with `gh attestation verify`.
+        if: env.DRY_RUN != 'true'
         uses: actions/attest-build-provenance@v4
         with:
-          subject-path: |
-            releases/RandomMac-win-Setup.exe
-            releases/RandomMac-win-Portable.zip
-            releases/RandomMac-${{ steps.meta.outputs.version }}-full.nupkg
-
-      - name: Create / update GitHub Release
-        uses: softprops/action-gh-release@v3
+          subject-path: release-assets/*
+      - name: Keep the verified set (dry run)
+        if: env.DRY_RUN == 'true'
+        uses: actions/upload-artifact@v7
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: RANDOM MAC ${{ steps.meta.outputs.tag }}
-          body_path: ${{ steps.notes.outputs.path }}
-          draft: false
-          prerelease: ${{ steps.meta.outputs.is_prerelease == 'true' }}
-          fail_on_unmatched_files: false
-          # Explicit version in nupkg paths so we don't accidentally upload
-          # the previous release's full nupkg (which `vpk download github`
-          # places in releases/ for delta calculation).
-          files: |
-            releases/RandomMac-win-Setup.exe
-            releases/RandomMac-win-Portable.zip
-            releases/RandomMac-${{ steps.meta.outputs.version }}-full.nupkg
-            releases/RandomMac-${{ steps.meta.outputs.version }}-delta.nupkg
-            releases/releases.win.json
-            releases/RELEASES
-            releases/assets.win.json
-            releases/SHA256SUMS.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: dry-run-release-assets
+          path: release-assets/*
+          retention-days: 7
+      - name: Create or update the draft release
+        if: env.DRY_RUN != 'true'
+        run: |
+          set -euo pipefail
+          notes="docs/RELEASE_v${VERSION}.md"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            # Re-runs may finish a draft, but must never replace the assets of a published release.
+            if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "true" ]; then
+              echo "::error::$TAG is already published; release a new version instead of re-running."
+              exit 1
+            fi
+            gh release edit "$TAG" --title "RandomMac $TAG" --notes-file "$notes"
+          else
+            flags=(--draft --verify-tag --title "RandomMac $TAG" --notes-file "$notes")
+            [ "$PRERELEASE" = "true" ] && flags+=(--prerelease)
+            gh release create "$TAG" "${flags[@]}"
+          fi
+          gh release upload "$TAG" release-assets/* --clobber
+      - name: Publish
+        if: env.DRY_RUN != 'true'
+        run: |
+          set -euo pipefail
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release edit "$TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$TAG" --draft=false --latest
+          fi
+      # Releases published with GITHUB_TOKEN do not emit `release: published` to other workflows,
+      # so the announcement workflows are started explicitly (workflow_dispatch is allowed).
+      - name: Announce (Discord + Discussions)
+        if: env.DRY_RUN != 'true'
+        run: |
+          gh workflow run announce-release.yml -f tag="$TAG"
+          gh workflow run discussion-on-release.yml -f tag="$TAG"
+      - name: Check the published updater manifest
+        if: env.DRY_RUN != 'true' && env.PRERELEASE != 'true'
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5 6; do
+            if curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/latest.json" -o latest.json \
+              && [ "$(jq -r .version latest.json)" = "$VERSION" ]; then
+              jq -r '.platforms | keys[]' latest.json
+              for u in $(jq -r '.platforms[].url' latest.json | sort -u); do
+                curl -fsIL -o /dev/null "$u"
+              done
+              echo "latest.json OK"; exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::latest.json is not serving version $VERSION"; exit 1

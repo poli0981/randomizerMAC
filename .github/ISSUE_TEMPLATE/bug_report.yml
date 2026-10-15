@@ -6,12 +6,13 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for reporting a bug. Please fill out the fields below. Be specific and concise.
+        Thank you for reporting a bug. Please be specific and concise.
+        **Security vulnerabilities:** do not report them here — use a [private advisory](https://github.com/poli0981/randomizerMAC/security/advisories/new).
 
   - type: textarea
     id: description
     attributes:
-      label: Bug Description
+      label: Bug description
       description: What happened? What did you expect to happen?
       placeholder: Describe the bug clearly...
     validations:
@@ -20,11 +21,10 @@ body:
   - type: textarea
     id: steps
     attributes:
-      label: Steps to Reproduce
-      description: How can we reproduce this bug?
+      label: Steps to reproduce
       placeholder: |
-        1. Go to '...'
-        2. Click on '...'
+        1. Select the adapter '...'
+        2. Click '...'
         3. See error
     validations:
       required: true
@@ -32,47 +32,78 @@ body:
   - type: textarea
     id: expected
     attributes:
-      label: Expected Behavior
-      description: What should have happened instead?
+      label: Expected behavior
     validations:
       required: true
 
   - type: checkboxes
     id: area
     attributes:
-      label: Affected Area
-      description: Which part of the application is affected?
+      label: Affected area
       options:
-        - label: Dashboard / MAC Change
-        - label: Settings
-        - label: System Tray
-        - label: Startup / Auto-change
-        - label: Update
+        - label: Dashboard / changing or restoring an address
+        - label: History
+        - label: Settings / blacklist / import-export
+        - label: Automation (startup, periodic change, restore on exit)
+        - label: System tray / notifications
+        - label: Command-line tool (randommac-cli)
+        - label: Installation / update
         - label: Localization
-        - label: Logging
         - label: Other
 
-  - type: input
+  - type: dropdown
     id: os
     attributes:
-      label: OS Version
-      description: "e.g., Windows 11 23H2 Build 22631"
-      placeholder: Windows 11 23H2
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - Ubuntu
+        - Fedora
+        - Debian
+        - Other Linux distribution
+    validations:
+      required: true
+
+  - type: input
+    id: os_version
+    attributes:
+      label: OS version and desktop
+      description: "Windows: `winver` (e.g. 24H2, build 26100). Linux: release and desktop (e.g. Ubuntu 24.04, GNOME 46)."
+      placeholder: Windows 11 24H2 (26100.4061)
+    validations:
+      required: true
+
+  - type: input
+    id: app_version
+    attributes:
+      label: RandomMac version
+      description: Shown on the About page, or `randommac-cli --version`.
+      placeholder: "2.0.0"
     validations:
       required: true
 
   - type: dropdown
-    id: channel
+    id: package
     attributes:
-      label: App Channel
-      description: Which release channel are you using?
+      label: How did you install RandomMac?
       options:
-        - Stable
-        - Dev
-        - Beta
-        - Canary
+        - Windows installer (setup.exe)
+        - Windows MSI
+        - .deb package
+        - .rpm package
+        - AppImage
+        - Standalone CLI archive
+        - Built from source
     validations:
       required: true
+
+  - type: input
+    id: adapter
+    attributes:
+      label: Network adapter
+      description: Model and type of the adapter involved (Device Manager / `lspci` / `lsusb`), and on Linux whether NetworkManager manages it.
+      placeholder: Intel Wi-Fi 6E AX211 (Wi-Fi), NetworkManager
 
   - type: dropdown
     id: severity
@@ -82,30 +113,29 @@ body:
         - Low (cosmetic / minor)
         - Medium (feature partially broken)
         - High (feature completely broken)
-        - Critical (app crashes / data loss)
+        - Critical (crash, data loss, adapter left unusable)
     validations:
       required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: About page → **Copy diagnostics**, then paste here.
+      render: text
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Relevant lines from the Log page (Export) or the log files:
+        Windows `%LOCALAPPDATA%\io.github.poli0981.randommac\logs\` · Linux `~/.local/share/io.github.poli0981.randommac/logs/`.
+        Remove anything you consider private (IP addresses, network names).
+      render: text
 
   - type: textarea
     id: screenshots
     attributes:
       label: Screenshots
-      description: Attach screenshots if applicable.
-
-  - type: textarea
-    id: logs
-    attributes:
-      label: Debug Logs
-      description: Paste relevant log output (from Log tab or %LOCALAPPDATA%\RandomMac\logs\).
-      render: shell
-
-  - type: checkboxes
-    id: ide
-    attributes:
-      label: IDE (if debugging)
-      description: Select if you built from source.
-      options:
-        - label: JetBrains Rider
-        - label: Visual Studio
-        - label: VS Code
-        - label: Other
+      description: Attach screenshots if they help.
