@@ -34,7 +34,9 @@ and Linux (Ubuntu, Fedora and other distributions)**, with a command-line tool f
   *keep the current vendor*, or *imitate a vendor* (Apple, Samsung, Intel… 59 vendors, 11k prefixes
   from the IEEE registry). Type your own address in any common notation if you prefer.
 - **Real original address.** The hardware (permanent) address is read from the driver, so
-  **Restore** works at any time — even for changes made by another tool or by RandomMac 1.x.
+  **Restore** works at any time — also for addresses set by another tool or by RandomMac 1.x.
+  Privacy features of the operating system (Windows *random hardware addresses*, NetworkManager's
+  `random`/`stable` modes) are left alone.
 - **Automation.** Change selected adapters when you sign in, every *N* minutes while the app runs,
   and optionally restore everything when RandomMac exits. **Restore all** is one click away in the
   tray.
@@ -107,9 +109,10 @@ PowerShell, then compare with the line in `SHA256SUMS.txt`.
 ### Updates
 
 RandomMac checks for updates at most once a day (Settings → Updates → *Check for updates
-automatically*; turned off, it never contacts the network on its own). Updates are signed and verified before they are
-installed: the Windows installers and the AppImage update in place; for `.deb`/`.rpm` RandomMac
-downloads the package and installs it with `apt`/`dnf` after asking for your password.
+automatically*; turned off, it never contacts the network on its own). Updates are signed and
+verified before they are installed: the Windows installers and the AppImage update in place; for
+`.deb`/`.rpm` RandomMac downloads the package and installs it with `apt`/`dnf` after asking for
+your password.
 
 ### System requirements
 
@@ -225,6 +228,11 @@ when it is on, Windows replaces the address itself. Some drivers ignore the sett
 RandomMac detects that, restores the previous state and reports *"The driver ignored the new
 address"*.
 
+**Restore says the address was set by the operating system.**
+Nothing from RandomMac is active on that adapter: the address comes from Windows *random hardware
+addresses* or from a NetworkManager connection set to `random`/`stable`. RandomMac does not
+override those privacy features — turn them off for that network if you want the hardware address.
+
 **My connection drops for a moment.**
 Expected — the adapter has to restart (Windows) or the connection has to be re-activated (Linux)
 for a new address to take effect.
@@ -311,10 +319,10 @@ This application was built and tested with AI assistance using **Anthropic Claud
 | **AI Assistant (v1.1.x)** | Claude Opus 4.7 by [Anthropic](https://www.anthropic.com/) via [Claude Code](https://claude.com/claude-code) |
 | **AI Assistant (v2.0.0)** | Claude Opus 5.5 by [Anthropic](https://www.anthropic.com/) via [Claude Code](https://claude.com/claude-code) — cross-platform rewrite |
 
-**AI was used for:** architecture and code (Rust, Svelte, workflows), debugging, tests,
-documentation, Vietnamese translations and GitHub configuration.
-**AI was not used for:** final review and approval, testing on physical and virtual machines, and
-product decisions — those are done by the developer.
+**AI was used for:** architecture and code (Rust, Svelte, workflows), debugging, writing and
+running tests (CI, and real-adapter tests on the developer's machine with the developer's
+permission), code reviews, documentation, Vietnamese translations and GitHub configuration.
+**The developer** decides what is built and approves every change and release.
 
 > AI-generated translations are **not guaranteed** to be accurate. See [DISCLAIMER.md](DISCLAIMER.md).
 

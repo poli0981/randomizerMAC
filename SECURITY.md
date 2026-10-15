@@ -52,14 +52,17 @@ Please include:
   the elevated executable cannot be replaced by a normal process. On Linux the interface never runs
   as root — only the change itself is authorized through NetworkManager/polkit or `pkexec ip`.
 - **No shell.** External programs (`schtasks.exe`, `nmcli`, `ip`, `pkexec`, `apt-get`, `dnf`) are
-  started by absolute path with validated arguments and a fixed `PATH`.
+  started by absolute path with validated arguments and a fixed `PATH`. On Windows, system
+  programs are located through the Windows API, never through environment variables such as
+  `%SystemRoot%` that an unprivileged process could change.
 - **Locked-down UI.** Strict Content-Security-Policy, frozen prototypes, only the app's own commands
-  are callable, navigation restricted to the app, external links limited to an allowlist (opened
-  through the non-elevated shell on Windows).
+  are callable, navigation restricted to the app, external links limited to an exact host/path
+  allowlist (opened through the non-elevated shell on Windows).
 - **Cryptographic randomness.** Addresses are generated from the operating system's CSPRNG.
 - **Signed updates.** Update packages and `latest.json` are signed (minisign); the public key is
-  built into the app. Every release asset has a SHA-256 checksum and a GitHub build-provenance
-  attestation (`gh attestation verify <file> --repo poli0981/randomizerMAC`).
+  built into the app, and the release pipeline refuses to publish a package whose signature does
+  not verify against it. Every release asset has a SHA-256 checksum and a GitHub
+  build-provenance attestation (`gh attestation verify <file> --repo poli0981/randomizerMAC`).
 - **Supply chain.** Dependencies are checked with `cargo-deny` (RustSec advisories, licenses,
-  sources) and `npm audit` in CI; Dependabot keeps them current; CodeQL scans Rust, TypeScript and
-  workflows.
+  sources) and `npm audit` in CI; Dependabot keeps them current; CodeQL scans the TypeScript UI
+  and the workflows, and Rust code is linted with clippy (`-D warnings`) on every change.

@@ -15,7 +15,9 @@ Linux** (Ubuntu, Fedora and other modern distributions). The installers are ~5 M
   imitate one of 59 vendors from the IEEE registry.
 - **Automation** — change at sign-in, every *N* minutes, restore on exit, *Restore all* in the tray.
 - **Safer changes** — every change is verified and rolled back automatically if the driver ignores
-  it; *Restore* uses the real hardware address and works at any time; one change at a time.
+  it; *Restore* uses the real hardware address and works at any time (operating-system privacy
+  features such as Windows random hardware addresses are left alone); one change at a time, and
+  quitting waits for a running change.
 - **Security fixes** — installed per machine in `Program Files`; the 1.x logon task that ran an
   executable from a user-writable folder with administrator rights is removed.
 - **More** — History page with search and CSV/JSON export, blacklist by address or vendor prefix
@@ -57,6 +59,7 @@ Addresses applied by 1.x stay active and can be restored from 2.0.
   on for the network. RandomMac detects this and restores the previous state.
 - On GNOME without the AppIndicator extension there is no tray icon; closing the window quits.
 - Only x86_64 builds are provided.
+- Error details in tray notifications are shown in English.
 
 More help: [README](https://github.com/poli0981/randomizerMAC#readme) ·
 [FAQ](https://github.com/poli0981/randomizerMAC#faq) ·

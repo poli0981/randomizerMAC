@@ -28,10 +28,12 @@ ships a command-line tool. Installers shrink from ~112 MB to ~5 MB.
 
 - **Linux support**: adapters from sysfs/udev, hardware address via the `ETHTOOL_GPERMADDR` ioctl
   (no root needed), changes through **NetworkManager** (`cloned-mac-address` on the active
-  connection — persistent) or **iproute2** via `pkexec` (temporary), selectable as Auto /
-  NetworkManager / iproute2. The GUI never runs as root; polkit asks only for the change itself.
-  Tray support is detected over D-Bus (StatusNotifierWatcher); without a tray, closing quits.
-  XDG autostart entry; NVIDIA blank-window workaround (`WEBKIT_DISABLE_DMABUF_RENDERER`).
+  connection — persistent; the original value of every connection used is remembered, so Restore
+  also covers connections the adapter roamed away from) or **iproute2** via `pkexec` (temporary),
+  selectable as Auto / NetworkManager / iproute2. The GUI never runs as root; polkit asks only for
+  the change itself. Tray support is detected over D-Bus (StatusNotifierWatcher), also when the
+  panel starts after RandomMac; without a tray, closing quits. XDG autostart entry; NVIDIA
+  blank-window workaround (`WEBKIT_DISABLE_DMABUF_RENDERER`).
 - **`randommac-cli`** (installed next to the app and published as standalone archives): `list`,
   `show`, `random`, `set`, `restore`, `inspect`, `vendors`, `history`; `--json`, `--dry-run`,
   `--data-dir`, `--method`, `--mock`; documented exit codes 0–6.
@@ -55,14 +57,16 @@ ships a command-line tool. Installers shrink from ~112 MB to ~5 MB.
   own page (`Ctrl+2`), `F5` refreshes adapters, OS notifications when the window is hidden.
 - **App and tray icon** (1.x had none).
 - **Security hardening**: strict CSP, frozen prototypes, only the app's own commands are exposed to
-  the UI, navigation limited to the app origin, links opened only from an allowlist (on Windows
-  through the non-elevated shell), DLL search-path and WebView2 environment hardening, data folder
-  refused when it is a junction/symlink.
+  the UI, navigation limited to the app origin, links opened only from an exact host/path
+  allowlist (on Windows through the non-elevated shell), DLL search-path and WebView2 environment
+  hardening, system programs located through the Windows API instead of `%SystemRoot%`, data
+  folder refused when it is a junction/symlink.
 - **CI/CD**: Windows + Ubuntu builds, clippy/rustfmt/eslint/prettier/svelte-check, Rust and Vitest
   tests, a real address change on a Linux dummy interface, install/uninstall tests of every package
   (NSIS, MSI, deb, rpm in a Fedora container) with a GUI smoke test, `cargo-deny` + `npm audit`.
-  Releases are built from the tag, verified, checksummed (`SHA256SUMS.txt`), attested
-  (build provenance) and published with a signed `latest.json`.
+  Releases are built from the tag, every updater signature is checked against the app's public
+  key, assets are checksummed (`SHA256SUMS.txt`), attested (build provenance) and published with
+  a signed `latest.json`; a re-run can never overwrite a published release.
 - Documentation: rewritten README (+ Vietnamese), `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`
   (+ Vietnamese), `CLAUDE.md`.
 
@@ -77,16 +81,19 @@ ships a command-line tool. Installers shrink from ~112 MB to ~5 MB.
   garbage behind).
 - **"Original MAC" is the real hardware address** from `GetIfEntry2` (Windows) / ethtool (Linux);
   1.x used the address seen when the app started, so after a change and a restart "original" was
-  the spoofed one. **Restore** is available whenever the current address differs.
+  the spoofed one. **Restore** is available whenever the current address differs; privacy
+  features of the operating system (Windows *random hardware addresses*, NetworkManager
+  `random`/`stable`) are reported, not overridden.
 - **Elevation**: the app asks for administrator rights itself (manifest `asInvoker` + UAC relaunch),
   so a second launch only shows the existing window without a UAC prompt; declining opens a
   read-only mode with *Restart as administrator*.
 - **Autostart** uses a per-user Task Scheduler task with highest privileges, no battery
-  restrictions and no 72-hour limit, created through `%SystemRoot%\System32\schtasks.exe` from XML.
+  restrictions and no 72-hour limit, created from XML with the system's own `schtasks.exe`.
   Auto-change runs only when started by the system (`--autostart`), as documented.
 - **Storage**: atomic writes with fsync; a damaged file is renamed `*.corrupt-<timestamp>` (3 kept)
   and the app continues with defaults instead of disabling saves or crashing.
-- **One change at a time** across the UI, tray, automation and CLI (operation lock).
+- **One change at a time** across the UI, tray, automation and CLI (operation lock). Every change
+  runs to completion; quitting waits for a running change before restoring on exit.
 - **Logs**: rotating files (5 × 2 MB) plus a live in-app viewer with level filter, search,
   auto-scroll, copy and export.
 - **MAC parser** is strict: six hex pairs with one consistent separator (`:`/`-`/none) or Cisco

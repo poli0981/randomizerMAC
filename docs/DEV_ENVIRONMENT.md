@@ -165,13 +165,16 @@ tests/vectors/             test vectors shared by Rust and TypeScript
    git push origin v2.1.0
    ```
 5. The **Release** workflow checks the version files against the tag, builds and signs all bundles
-   plus the CLI archives, verifies the asset set, writes `latest.json` and `SHA256SUMS.txt`,
-   attests build provenance, publishes the release and dispatches the Discord and Discussions
-   announcements.
+   plus the CLI archives, verifies the asset set and every updater signature (against the public
+   key in `tauri.conf.json`), writes `latest.json` and `SHA256SUMS.txt`, attests build provenance,
+   publishes the release and dispatches the Discord and Discussions announcements.
 
-If a run fails after the tag exists, fix the problem on `master`, move nothing, and re-run
-*Actions → Release → Run workflow* with the tag (`dry_run` builds and verifies without publishing).
-Tags with a suffix (`v2.1.0-beta.1`) become pre-releases and are not offered to the updater.
+If a run fails before the release is published, re-run *Actions → Release → Run workflow* with the
+tag (`dry_run` builds and verifies without publishing). A re-run always builds the **tagged
+sources** with the workflow from the branch you dispatch it on — so workflow or infrastructure
+fixes can go to `master` first, but a mistake in the sources needs a new patch version: never move
+a tag. Once a release is published, re-runs refuse to touch it. Tags with a suffix
+(`v2.1.0-beta.1`) become pre-releases and are not offered to the updater.
 
 Repository secrets: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (updater
 signing — **back up the key**, without it no update can ever be delivered), `DISCORD_*` webhooks.
@@ -180,7 +183,7 @@ signing — **back up the key**, without it no update can ever be delivered), `D
 
 | Environment | Coverage |
 |---|---|
-| Windows 11 Pro Insider (developer machine, see [pc_spec.md](pc_spec.md)) | App, tray, read-only mode, CLI, real change attempt on a Wi-Fi adapter with rollback |
+| Windows 11 Pro Insider (developer machine, see [pc_spec.md](pc_spec.md)) | App, tray, read-only mode, CLI, real change attempt on a Wi-Fi adapter with rollback, signed NSIS/MSI release builds with signature verification |
 | GitHub `windows-latest` | Build, tests, NSIS + MSI install/uninstall, legacy task cleanup, GUI smoke test |
 | GitHub `ubuntu-24.04` | Build, tests, real change on a dummy interface, `.deb` install + GUI smoke test (Xvfb) |
 | `fedora:43` container | `.rpm` installation and dependency resolution |

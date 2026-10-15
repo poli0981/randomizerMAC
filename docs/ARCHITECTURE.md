@@ -26,7 +26,9 @@ flowchart LR
 All front ends (UI, tray, scheduler, CLI) go through `randommac_net::ops`:
 
 1. **Resolve** the adapter by id, name or MAC; take the cross-process **operation lock**
-   (`operation.lock`, `File::try_lock`, 15 s timeout) so only one change runs at a time.
+   (`operation.lock`, `File::try_lock`, 15 s timeout) so only one change runs at a time — also
+   between the app and the CLI. Inside the app, `ops_runner` additionally serializes the UI, tray,
+   scheduler and startup automation.
 2. **Validate**: unicast and not all-zero, never one of the reserved addresses (`00…`, `FF…`,
    `AA:AA:AA:AA:AA:AA`), not matched by a blacklist rule (global or for this adapter) unless the
    caller explicitly ignores the user's rules.
@@ -35,7 +37,7 @@ All front ends (UI, tray, scheduler, CLI) go through `randommac_net::ops`:
    profile the first time that profile is involved (the adapter may roam between connections).
    The record is dropped again only when the backend proves nothing changed.
 4. **Apply** with the backend, reporting stages (`Preparing → Writing → Restarting → Verifying`) to
-   the UI as `op-progress` events.
+   the UI as `op:progress` events.
 5. **Verify** by polling the live address (up to 20 s). If it does not match, the backend
    **rolls back** to the previous configuration and the result is `RolledBack` with a reason
    (e.g. `DRIVER_REJECTED`).
@@ -97,19 +99,23 @@ Startup (`lib.rs::main_entry`):
    so the WebView2 data folder can be separated for elevated and normal runs), tray, scheduler,
    update check (at most once per 24 h, only if enabled).
 
+Shutdown (`lib.rs::request_quit`): stop the scheduler and refuse new changes, wait (up to 150 s)
+for a running change to verify or roll back, run *restore on exit* for the adapters changed in this
+session if enabled, then exit.
+
 Other modules:
 
 | Module | Purpose |
 |---|---|
 | `commands.rs` | ~35 commands; DTOs are camelCase, errors are `ApiError { code, message }` |
-| `ops_runner.rs` | Runs changes off the UI thread, emits progress, sends OS notifications, restore-all, startup automation |
+| `ops_runner.rs` | Runs each change in its own task (cancelling the caller never stops it half-way), off the UI thread; emits progress and busy events, sends OS notifications, restore-all, startup automation |
 | `scheduler.rs` | Periodic change of the selected adapters |
-| `tray.rs` | Tray menu (localized by `i18n.rs`); on Linux only when a StatusNotifierWatcher exists |
+| `tray.rs` | Tray menu (localized by `i18n.rs`); on Linux only when a StatusNotifierWatcher exists (re-checked for 30 s after start) |
 | `autostart.rs` | Windows: Task Scheduler XML task `RandomMac-Autostart-<SID>` via `schtasks.exe`; Linux: XDG `.desktop` entry |
 | `legacy.rs` | Imports 1.x data, removes the 1.x `\RandomMac` logon task when it points to 1.x |
 | `updater.rs` | `tauri-plugin-updater`; `.deb`/`.rpm` installed with `pkexec apt-get/dnf install` |
 | `logging.rs` | `tracing` → rotating files (5 × 2 MB) + in-memory ring buffer for the Log page |
-| `links.rs` | URL allowlist; on Windows URLs are opened through the non-elevated shell |
+| `links.rs` | Exact host/path allowlist; the normalized URL is opened, on Windows through the non-elevated shell |
 
 ## User interface (`src/`)
 
@@ -140,9 +146,12 @@ On Windows the data folder is refused if it is a junction or symbolic link.
 - The UI can call only the app's own commands (generated permission set) plus the few plugin APIs
   it needs; strict CSP, `freezePrototype`, navigation restricted to the app origin.
 - External processes are started by absolute path with a fixed `PATH`; arguments are never passed
-  through a shell.
-- Windows: installed per machine (`Program Files`, not user-writable); the elevated process uses a
-  private temp folder (`%SystemRoot%\Temp\RandomMac-<id>`, SYSTEM + Administrators only).
+  through a shell. Their output is decoded as UTF-8, or on Windows in the console's OEM code page.
+- Windows: installed per machine (`Program Files`, not user-writable). System programs
+  (`schtasks.exe`, `reg.exe`, `explorer.exe`) and the elevated process's private temp folder
+  (`<Windows>\Temp\RandomMac-<id>`, SYSTEM + Administrators only) are located through
+  `GetSystemWindowsDirectoryW`, never through `%SystemRoot%`, which an unprivileged process could
+  change in the environment the elevated app inherits.
 - Updates: `latest.json` and every package are signed with the updater key (minisign); the public
   key is embedded in the app. Release assets have SHA-256 sums and build-provenance attestations.
 
@@ -153,6 +162,8 @@ a real change on a Linux dummy interface, package builds with install/uninstall 
 tests (NSIS, MSI, deb, rpm in Fedora), `cargo-deny` and `npm audit`.
 
 `release.yml` (tag `vX.Y.Z`): version check → build + sign on Windows and Ubuntu → verify the asset
-set → `latest.json` (platform keys `windows-x86_64[-nsis|-msi]`, `linux-x86_64[-appimage|-deb|-rpm]`)
-→ `SHA256SUMS.txt` → provenance attestation → publish → dispatch the Discord and Discussions
-workflows (a release published with `GITHUB_TOKEN` does not trigger them by itself).
+set and every updater signature against the public key in `tauri.conf.json` → `latest.json`
+(platform keys `windows-x86_64[-nsis|-msi]`, `linux-x86_64[-appimage|-deb|-rpm]`) →
+`SHA256SUMS.txt` → provenance attestation → publish → dispatch the Discord and Discussions
+workflows (a release published with `GITHUB_TOKEN` does not trigger them by itself). Re-runs can
+complete a draft release but never overwrite a published one.
