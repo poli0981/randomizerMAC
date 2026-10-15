@@ -146,12 +146,16 @@ Xem [bản tiếng Anh](../../DEV_ENVIRONMENT.md#repository-layout).
    git push origin v2.1.0
    ```
 5. Workflow **Release** kiểm tra version khớp tag, build và ký mọi gói cùng tệp nén CLI, kiểm tra đủ
-   bộ asset, tạo `latest.json` và `SHA256SUMS.txt`, chứng thực nguồn gốc bản build, publish release và
-   kích hoạt thông báo Discord + Discussions.
+   bộ asset và từng chữ ký updater (với khoá công khai trong `tauri.conf.json`), tạo `latest.json` và
+   `SHA256SUMS.txt`, chứng thực nguồn gốc bản build, publish release và kích hoạt thông báo Discord +
+   Discussions.
 
-Nếu lần chạy lỗi sau khi đã có tag: sửa trên `master`, không di chuyển tag, rồi chạy lại *Actions →
-Release → Run workflow* với tag đó (`dry_run` chỉ build và kiểm tra, không publish). Tag có hậu tố
-(`v2.1.0-beta.1`) thành bản pre-release và không được đưa vào updater.
+Nếu lần chạy lỗi trước khi release được publish: chạy lại *Actions → Release → Run workflow* với tag đó
+(`dry_run` chỉ build và kiểm tra, không publish). Lần chạy lại luôn build **mã nguồn của tag** bằng
+workflow của nhánh bạn chọn khi chạy — nên lỗi ở workflow/hạ tầng có thể sửa trên `master` trước, còn
+lỗi trong mã nguồn thì phải phát hành bản vá mới: không bao giờ di chuyển tag. Khi release đã publish,
+chạy lại sẽ từ chối động vào nó. Tag có hậu tố (`v2.1.0-beta.1`) thành bản pre-release và không được
+đưa vào updater.
 
 Secret của repo: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (ký bản cập nhật —
 **hãy sao lưu khoá**, mất khoá thì không thể phát hành bản cập nhật tự động nữa), các webhook
@@ -161,7 +165,7 @@ Secret của repo: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSW
 
 | Môi trường | Phạm vi |
 |---|---|
-| Windows 11 Pro Insider (máy phát triển, xem [pc_spec.md](pc_spec.md)) | App, khay, chế độ chỉ xem, CLI, thử đổi MAC thật trên adapter Wi-Fi có hoàn tác |
+| Windows 11 Pro Insider (máy phát triển, xem [pc_spec.md](pc_spec.md)) | App, khay, chế độ chỉ xem, CLI, thử đổi MAC thật trên adapter Wi-Fi có hoàn tác, build bản cài NSIS/MSI có ký và kiểm tra chữ ký |
 | GitHub `windows-latest` | Build, test, cài/gỡ NSIS + MSI, dọn tác vụ cũ, smoke test GUI |
 | GitHub `ubuntu-24.04` | Build, test, đổi MAC thật trên interface giả, cài `.deb` + smoke test GUI (Xvfb) |
 | Container `fedora:43` | Cài `.rpm` và giải quyết phụ thuộc |

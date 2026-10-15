@@ -26,7 +26,9 @@ ra thiết bị qua địa chỉ phần cứng. Đây là ứng dụng desktop n
   hiện tại*, hoặc *giả lập hãng* (Apple, Samsung, Intel… 59 hãng, 11 nghìn tiền tố từ IEEE). Bạn cũng
   có thể tự nhập địa chỉ theo mọi định dạng phổ biến.
 - **Địa chỉ gốc thật.** Địa chỉ phần cứng (vĩnh viễn) được đọc từ driver nên **Khôi phục** dùng được
-  bất cứ lúc nào — kể cả với thay đổi do công cụ khác hoặc RandomMac 1.x tạo ra.
+  bất cứ lúc nào — kể cả với địa chỉ do công cụ khác hoặc RandomMac 1.x đặt. Các tính năng riêng tư
+  của hệ điều hành (*random hardware addresses* của Windows, chế độ `random`/`stable` của
+  NetworkManager) được giữ nguyên.
 - **Tự động hoá.** Đổi MAC các adapter đã chọn khi đăng nhập, mỗi *N* phút khi app đang chạy, và
   (tuỳ chọn) khôi phục tất cả khi thoát. **Khôi phục tất cả** có ngay trong khay hệ thống.
 - **Danh sách chặn.** Chặn địa chỉ cụ thể hoặc tiền tố hãng, cho mọi adapter hoặc từng adapter;
@@ -214,6 +216,11 @@ thì không. Hãy kiểm tra thêm *Settings → Network & internet → Wi-Fi �
 bật, Windows tự thay địa chỉ. Một số driver bỏ qua hoàn toàn thiết lập này; RandomMac phát hiện, khôi
 phục trạng thái trước đó và báo *"Driver bỏ qua địa chỉ mới"*.
 
+**Khôi phục báo địa chỉ do hệ điều hành đặt.**
+Adapter đó không có thay đổi nào của RandomMac: địa chỉ đến từ *random hardware addresses* của Windows
+hoặc từ kết nối NetworkManager đặt chế độ `random`/`stable`. RandomMac không ghi đè các tính năng riêng
+tư này — hãy tắt chúng cho mạng đó nếu bạn muốn dùng địa chỉ phần cứng.
+
 **Mạng bị ngắt một lúc.**
 Bình thường — adapter phải khởi động lại (Windows) hoặc kết nối phải kích hoạt lại (Linux) để địa chỉ
 mới có hiệu lực.
@@ -256,9 +263,10 @@ npm run tauri dev
 ## Ghi nhận AI
 
 Ứng dụng được xây dựng và kiểm thử với sự hỗ trợ của AI **Anthropic Claude** (v1.0.0: Claude Opus
-4.6; v1.1.x: Claude Opus 4.7; v2.0.0: Claude Opus 5.5 qua Claude Code — viết lại đa nền tảng). Nhà phát
-triển (poli0981) chịu trách nhiệm review, kiểm thử trên máy thật/máy ảo và mọi quyết định cuối cùng.
-Xem chi tiết trong [README tiếng Anh](../../../README.md#ai-acknowledgment).
+4.6; v1.1.x: Claude Opus 4.7; v2.0.0: Claude Opus 5.5 qua Claude Code — viết lại đa nền tảng). AI viết
+code, viết và chạy test (CI, và test trên adapter thật ở máy nhà phát triển khi được cho phép), review
+code, viết tài liệu và bản dịch. Nhà phát triển (poli0981) quyết định nội dung và duyệt mọi thay đổi,
+mọi bản phát hành. Xem chi tiết trong [README tiếng Anh](../../../README.md#ai-acknowledgment).
 
 ## Pháp lý
 

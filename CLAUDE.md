@@ -59,7 +59,12 @@ cargo deny check
   `src-tauri/permissions/app-commands.toml` + a wrapper in `src/lib/api.ts` (+ `devmock.ts`).
 - Errors crossing to the UI are `ApiError { code, message }`; add new codes to `en.ts`/`vi.ts`
   (`error.<CODE>`) and to the list in `i18n.test.ts`.
-- External programs: absolute paths, fixed `PATH`, no shell, validated arguments (`process.rs`).
+- External programs: absolute paths, fixed `PATH`, no shell, validated arguments, always through
+  `randommac_net::process::run` (it also decodes UTF-8/OEM-code-page output). On Windows locate
+  system programs with `platform::windows::system32()` — never from `%SystemRoot%`/`%windir%`.
+- Changes from the app go through `ops_runner` (own task + op lock + events); never abort a task
+  that is in the middle of a change. UI settings edits go through `app.saveSettings` (queued).
+- A new external link in the UI must also be added to `src-tauri/src/links.rs` (exact host/path).
 - Never bump versions by hand: `npm run version:set X.Y.Z` (Cargo.toml, Cargo.lock, package.json,
   package-lock.json; `tauri.conf.json` deliberately has no `version`).
 
@@ -71,9 +76,11 @@ cargo deny check
 2. PR → CI green → squash-merge.
 3. `git tag -a vX.Y.Z -m "RandomMac X.Y.Z" && git push origin vX.Y.Z` on the merge commit.
 4. `release.yml` builds/signs (Windows: nsis+msi; Ubuntu 24.04: deb+rpm+appimage + CLI archives),
-   verifies, generates `latest.json` + `SHA256SUMS.txt`, attests, publishes, dispatches
-   `announce-release.yml` and `discussion-on-release.yml`. Re-run with `workflow_dispatch` (input
-   `tag`, optional `dry_run`) — it is idempotent; never move a published tag.
+   verifies the assets and every `.sig` against the pubkey in `tauri.conf.json`, generates
+   `latest.json` + `SHA256SUMS.txt`, attests, publishes, dispatches `announce-release.yml` and
+   `discussion-on-release.yml`. A failed run is re-run with `workflow_dispatch` (input `tag`,
+   optional `dry_run`): it builds the tagged sources with the workflow of the dispatch branch and
+   refuses to touch an already published release. Never move a tag — ship a patch version.
 
 ## Gotchas (learned the hard way)
 
@@ -98,7 +105,13 @@ cargo deny check
   `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
 - The GUI refuses to run as root on Linux (`RANDOMMAC_ALLOW_ROOT=1` overrides, for debugging only).
 - The updater signing key lives outside the repository (`*.key` is gitignored). Losing it means
-  existing installs can never auto-update again.
+  existing installs can never auto-update again. tauri-cli only *warns* when the key does not
+  match the pubkey in `tauri.conf.json`; `release-assets.mjs verify` is what fails the release.
+- NetworkManager originals are stored per connection UUID (`state.json` → `nmProfiles`); NM's own
+  `random`/`stable`/`preserve`/`permanent` values are policies, not RandomMac overrides — Restore
+  must not erase them. Windows "random hardware addresses" likewise yields `CHANGED_BY_OS`.
+- For pull requests, CI `paths-ignore` is evaluated on the whole PR diff: a docs-only push to a PR
+  that also changes code re-runs the full CI. Docs-only follow-ups are faster as their own PR.
 
 ## Safety when testing on the maintainer's machine
 
