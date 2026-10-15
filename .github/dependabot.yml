@@ -40,6 +40,9 @@ updates:
       # their native support first.
       - dependency-name: typescript
         update-types: [version-update:semver-major]
+      # Node's type definitions follow the Node major in .nvmrc (24); bump them together.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
     groups:
       tauri-js:
         patterns: ["@tauri-apps/*"]
