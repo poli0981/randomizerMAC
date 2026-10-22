@@ -1,7 +1,7 @@
 {
   "name": "randommac",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "RandomMac — randomize, set and restore network adapter MAC addresses on Windows and Linux.",
   "license": "MIT",
   "type": "module",
