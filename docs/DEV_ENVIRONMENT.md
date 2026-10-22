@@ -9,7 +9,7 @@ How to build, run, test and release RandomMac 2.x. For the design, see
 |---|---|---|
 | Git | 2.x | |
 | [rustup](https://rustup.rs/) | any | `rust-toolchain.toml` pins Rust **1.98.0** (+ rustfmt, clippy); rustup installs it on first use. MSRV is 1.89. |
-| [Node.js](https://nodejs.org/) | **24** (`.nvmrc`), ≥ 22 works | npm 10+. |
+| [Node.js](https://nodejs.org/) | **26** (`.nvmrc`) | npm 11+. |
 | Tauri prerequisites | see below | WebView2/WebKitGTK and native build tools. |
 
 ### Windows 10/11
@@ -77,12 +77,19 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 npm run lint            # eslint + prettier --check
-npm run check           # svelte-check (warnings fail)
+npm run check           # svelte-check --tsgo: TypeScript 7 type check (warnings fail)
 npm test                # vitest
 npm run build           # vite build into dist/ (needed by cargo builds of src-tauri)
 node scripts/version.mjs check
 cargo deny check        # advisories, licenses, bans (cargo install cargo-deny)
 ```
+
+`npm run check` type-checks with **TypeScript 7**: `@typescript/native` is an npm alias of
+`typescript@7`, and svelte-check `--tsgo` runs its `tsc` on the svelte2tsx output in
+`.svelte-check/` (gitignored). The `typescript` package itself is an alias of
+`@typescript/typescript6`, because svelte-check, svelte2tsx and typescript-eslint still need the
+TypeScript 6 API, which TypeScript 7.0 does not ship. Drop `--tsgo` to compare with TypeScript 6:
+`npx svelte-check --tsconfig ./tsconfig.json`.
 
 `cargo build -p randommac` needs `dist/` to exist — run `npm run build` once first.
 
@@ -124,6 +131,7 @@ deny.toml                  cargo-deny policy
 crates/
   randommac-core/          OS-independent logic: MAC type, generator, OUI table, blacklist,
                            history, settings (+ v1 migration), atomic storage, paths, lock
+    tests/vectors/         test vectors shared by Rust and TypeScript
   randommac-net/           NetworkBackend trait; windows.rs, linux.rs (+ *_parse.rs, testable
                            on any OS), mock.rs; ops.rs = validate → apply → verify → record
   randommac-cli/           randommac-cli (+ tests/cli.rs)
@@ -135,7 +143,6 @@ src-tauri/
   windows/hooks.nsh        NSIS install/uninstall hooks
 src/                       Svelte 5 UI: App.svelte, lib/{api,stores,i18n,components,pages}
 scripts/                   version.mjs, gen-oui.mjs, build-sidecar.mjs, release-assets.mjs
-tests/vectors/             test vectors shared by Rust and TypeScript
 .github/workflows/         ci.yml, release.yml, Discord/Discussions notifications
 ```
 

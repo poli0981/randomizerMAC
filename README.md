@@ -263,7 +263,7 @@ In most places, yes — but some networks forbid it in their terms of use. Read 
 ## Build from source
 
 You need Rust (the version in `rust-toolchain.toml` is installed automatically by rustup),
-Node.js 24 and the Tauri prerequisites for your OS — see
+Node.js 26 and the Tauri prerequisites for your OS — see
 [docs/DEV_ENVIRONMENT.md](docs/DEV_ENVIRONMENT.md).
 
 ```bash

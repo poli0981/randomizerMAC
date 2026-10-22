@@ -5,6 +5,35 @@ All notable changes to RandomMac (named "RANDOM MAC" in 1.x) are documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-10-22
+
+A maintenance release: the application behaves exactly as 2.0.0. The certificate check used by
+update downloads gets a security fix, and the build and check toolchain moves to Node.js 26 and
+TypeScript 7.
+
+### Security
+
+- **rustls-webpki 0.103.16** ([RUSTSEC-2026-0382](https://rustsec.org/advisories/RUSTSEC-2026-0382)):
+  the HTTPS client used for update checks and downloads no longer accepts certificate chains
+  through the distrusted emSign intermediates, whose private keys are known.
+- `deny.toml` documents why the new zip 4 advisories (RUSTSEC-2026-0367/0368/0369) do not apply —
+  zip 4 is used only by tauri-plugin-updater for signature-verified `.zip`/`.tar.gz` update
+  bundles, which RandomMac does not publish — and the zbus 5 "unmaintained" notices
+  (RUSTSEC-2026-0370/0371/0372), until upstream moves to zip 9 and zbus 6.
+
+### Changed
+
+- **Node.js 26** for development, CI and the release pipeline (`.nvmrc`; `engines.node` is now
+  `>=26`; `@types/node` 26).
+- **TypeScript 7 type checking**: `npm run check` (and CI) runs `svelte-check --tsgo`, i.e. the
+  native TypeScript 7 compiler (`@typescript/native`, an npm alias of `typescript@7`), over the
+  `.svelte` and `.ts` sources. `typescript` is now an npm alias of `@typescript/typescript6`,
+  because svelte-check, svelte2tsx and typescript-eslint still need the TypeScript 6 API, which
+  TypeScript 7.0 does not ship. svelte-check 4.7.7.
+- `tsconfig.json` no longer lists `DOM.Iterable` (part of `DOM` since TypeScript 6).
+- Dependabot keeps `@types/node` on the Node major from `.nvmrc`; the two TypeScript aliases are
+  updated by hand.
+
 ## [2.0.0] - 2026-10-15
 
 A complete rewrite. RandomMac now runs on **Windows 10/11 and Linux (Ubuntu, Fedora and other
@@ -386,6 +415,7 @@ First public release of RANDOM MAC, a lightweight Windows utility for randomizin
 - **Start Minimized** toggle may not function correctly in all scenarios
 - **App Icon** is placeholder only (no custom icon designed yet)
 
+[2.0.1]: https://github.com/poli0981/randomizerMAC/releases/tag/v2.0.1
 [2.0.0]: https://github.com/poli0981/randomizerMAC/releases/tag/v2.0.0
 [1.1.3]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.3
 [1.1.2]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.2

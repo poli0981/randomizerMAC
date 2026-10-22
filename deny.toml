@@ -14,6 +14,14 @@ yanked = "warn"
 # Every ignore needs a written reason.
 ignore = [
   { id = "RUSTSEC-2024-0370", reason = "proc-macro-error is unmaintained (no known vulnerability); build-time only, pulled in by Tauri's GTK3 stack (gtk3-macros) on Linux" },
+  # zip 4 has no fixed release; tauri-plugin-updater (2.14 too) still requires zip ^4.
+  { id = "RUSTSEC-2026-0367", reason = "zip 4 is used only by tauri-plugin-updater to unpack v1-compatible .zip/.tar.gz update bundles; RandomMac publishes raw installers (createUpdaterArtifacts: true) and the updater checks the minisign signature before it extracts anything. Remove once the updater moves to zip >= 9" },
+  { id = "RUSTSEC-2026-0368", reason = "same as RUSTSEC-2026-0367 (zip 4 in tauri-plugin-updater, only for signature-verified archives)" },
+  { id = "RUSTSEC-2026-0369", reason = "same as RUSTSEC-2026-0367 (zip 4 in tauri-plugin-updater, only for signature-verified archives)" },
+  # zvariant, zbus_names and zvariant_derive were merged into zbus 6.
+  { id = "RUSTSEC-2026-0370", reason = "zvariant is unmaintained (merged into zbus 6; no known vulnerability); pulled in by zbus 5, used by RandomMac's Linux tray detection, notify-rust and tauri-plugin-single-instance. Remove once they move to zbus 6" },
+  { id = "RUSTSEC-2026-0371", reason = "zbus_names is unmaintained (merged into zbus 6; no known vulnerability); same zbus 5 users as RUSTSEC-2026-0370" },
+  { id = "RUSTSEC-2026-0372", reason = "zvariant_derive is unmaintained (merged into zbus 6; no known vulnerability); same zbus 5 users as RUSTSEC-2026-0370" },
 ]
 
 [licenses]
