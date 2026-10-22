@@ -250,7 +250,7 @@ có NetworkManager/polkit).
 
 ## Build từ mã nguồn
 
-Cần Rust (phiên bản trong `rust-toolchain.toml` được rustup tự cài), Node.js 24 và các gói Tauri cần
+Cần Rust (phiên bản trong `rust-toolchain.toml` được rustup tự cài), Node.js 26 và các gói Tauri cần
 cho hệ điều hành của bạn — xem [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md).
 
 ```bash

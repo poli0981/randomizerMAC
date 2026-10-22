@@ -6,13 +6,13 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=26"
   },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
+    "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings --tsgo",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",
@@ -32,7 +32,8 @@
     "@tauri-apps/cli": "^2.12.2",
     "@testing-library/svelte": "^5.4.2",
     "@tsconfig/svelte": "^5.0.8",
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.5",
+    "@typescript/native": "npm:typescript@~7.0.2",
     "eslint": "^10.12.0",
     "eslint-plugin-svelte": "^3.23.1",
     "globals": "^17.13.0",
@@ -40,8 +41,8 @@
     "prettier": "^3.9.10",
     "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.57.2",
-    "svelte-check": "^4.7.6",
-    "typescript": "~6.0.3",
+    "svelte-check": "^4.7.7",
+    "typescript": "npm:@typescript/typescript6@~6.0.2",
     "typescript-eslint": "^8.71.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.4"

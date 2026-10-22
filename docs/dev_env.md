@@ -9,7 +9,7 @@
 | Tool      | Version                          | Notes                                                                    |
 |-----------|----------------------------------|--------------------------------------------------------------------------|
 | Rust      | 1.98.0 (via `rustup`)            | **Required by RandomMac 2.x**; pinned by `rust-toolchain.toml`           |
-| Node.js   | 24.x LTS (`.nvmrc`), npm 11      | **Required by RandomMac 2.x** (Svelte UI, Tauri CLI); `nvm-windows` to switch |
+| Node.js   | 26.x (`.nvmrc`), npm 11          | **Required by RandomMac 2.x** (Svelte UI, Tauri CLI); `nvm-windows` to switch |
 | Git       | 2.x+                             | Required                                                                 |
 | .NET SDK  | 10.x                             | Not used by RandomMac 2.x (1.x was .NET/WinUI 3)                         |
 | Python    | 3.12.x                           | Not used by RandomMac                                                    |

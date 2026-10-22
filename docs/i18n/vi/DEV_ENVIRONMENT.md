@@ -10,7 +10,7 @@ Cách build, chạy, kiểm thử và phát hành RandomMac 2.x. Thiết kế t�
 |---|---|---|
 | Git | 2.x | |
 | [rustup](https://rustup.rs/) | bất kỳ | `rust-toolchain.toml` cố định Rust **1.98.0** (+ rustfmt, clippy); rustup tự cài ở lần dùng đầu. MSRV là 1.89. |
-| [Node.js](https://nodejs.org/) | **24** (`.nvmrc`), ≥ 22 vẫn chạy | npm 10+. |
+| [Node.js](https://nodejs.org/) | **26** (`.nvmrc`) | npm 11+. |
 | Thành phần cho Tauri | xem bên dưới | WebView2/WebKitGTK và công cụ build native. |
 
 ### Windows 10/11
@@ -78,12 +78,18 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 npm run lint            # eslint + prettier --check
-npm run check           # svelte-check (cảnh báo cũng tính là lỗi)
+npm run check           # svelte-check --tsgo: kiểm tra kiểu bằng TypeScript 7 (cảnh báo cũng tính là lỗi)
 npm test                # vitest
 npm run build           # vite build ra dist/ (cần cho cargo build src-tauri)
 node scripts/version.mjs check
 cargo deny check        # advisories, giấy phép, bans (cargo install cargo-deny)
 ```
+
+`npm run check` kiểm tra kiểu bằng **TypeScript 7**: `@typescript/native` là npm alias của
+`typescript@7`, và svelte-check `--tsgo` chạy `tsc` của nó trên kết quả svelte2tsx trong
+`.svelte-check/` (đã gitignore). Bản thân gói `typescript` là alias của `@typescript/typescript6`,
+vì svelte-check, svelte2tsx và typescript-eslint vẫn cần API của TypeScript 6 mà TypeScript 7.0
+không có. Bỏ `--tsgo` để so sánh với TypeScript 6: `npx svelte-check --tsconfig ./tsconfig.json`.
 
 `cargo build -p randommac` cần thư mục `dist/` — chạy `npm run build` một lần trước.
 

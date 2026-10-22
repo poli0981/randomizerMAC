@@ -35,12 +35,10 @@ updates:
     labels: [dependencies, javascript]
     commit-message:
       prefix: "chore(deps)"
+    # `typescript` (npm:@typescript/typescript6, the TypeScript 6 API) and `@typescript/native`
+    # (npm:typescript@7) are npm aliases, which Dependabot skips: update them by hand (CLAUDE.md).
     ignore:
-      # svelte-check and typescript-eslint support TypeScript 5–6 only; TypeScript 7 (Go) needs
-      # their native support first.
-      - dependency-name: typescript
-        update-types: [version-update:semver-major]
-      # Node's type definitions follow the Node major in .nvmrc (24); bump them together.
+      # Node's type definitions follow the Node major in .nvmrc (26); bump them together.
       - dependency-name: "@types/node"
         update-types: [version-update:semver-major]
     groups:

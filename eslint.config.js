@@ -6,7 +6,15 @@ import svelteConfig from "./svelte.config.js";
 
 export default ts.config(
   {
-    ignores: ["dist/", "node_modules/", "target/", "src-tauri/", "crates/", "coverage/"],
+    ignores: [
+      "dist/",
+      "node_modules/",
+      "target/",
+      "src-tauri/",
+      "crates/",
+      "coverage/",
+      ".svelte-check/",
+    ],
   },
   js.configs.recommended,
   ...ts.configs.recommended,

@@ -57,7 +57,7 @@ jobs:
         run: npx eslint .
       - name: Prettier
         run: npx prettier --check .
-      - name: svelte-check
+      - name: Type check (svelte-check, TypeScript 7)
         run: npm run check
       - name: Unit tests
         run: npm test
