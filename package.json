@@ -22,7 +22,7 @@
     "version:set": "node scripts/version.mjs set"
   },
   "dependencies": {
-    "@lucide/svelte": "^1.59.0",
+    "@lucide/svelte": "^1.61.0",
     "@tauri-apps/api": "^2.12.4",
     "dompurify": "^3.4.17",
     "marked": "^18.1.1"
