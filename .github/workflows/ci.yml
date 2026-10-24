@@ -50,7 +50,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Versions are in sync
         run: node scripts/version.mjs check
       - name: ESLint
@@ -99,7 +99,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       # tauri::generate_context! embeds the built frontend.
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run build
       - name: rustfmt
         run: cargo fmt --all -- --check
@@ -192,7 +192,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Build the CLI sidecar
         run: node scripts/build-sidecar.mjs
       - name: Build bundles (unsigned, no updater artifacts)
@@ -299,7 +299,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - uses: actions/download-artifact@v8
         with:
           pattern: coverage-*
