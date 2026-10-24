@@ -27,6 +27,10 @@ cargo test --workspace --locked
 npm run lint && npm run check && npm test && npm run build
 node scripts/version.mjs check
 cargo deny check
+
+# coverage (CI sends it to SonarQube Cloud)
+cargo llvm-cov --workspace --html        # needs `rustup component add llvm-tools` + cargo-llvm-cov
+npm run test:coverage
 ```
 
 - `cargo build/clippy -p randommac` needs `dist/` → run `npm run build` first.
@@ -47,12 +51,19 @@ cargo deny check
 - `src/` — `lib/api.ts` (only place that calls `invoke`), `lib/stores/app.svelte.ts`,
   `lib/i18n/{en,vi}.ts`, `lib/pages/*`, `lib/components/*`.
 - `scripts/` — `version.mjs`, `gen-oui.mjs` (regenerates `oui/vendors.rs` + `index.bin` from the IEEE
-  CSV), `build-sidecar.mjs`, `release-assets.mjs` (verify assets, `latest.json`, `SHA256SUMS.txt`).
+  CSV), `build-sidecar.mjs`, `release-assets.mjs` (verify assets, `latest.json`, `SHA256SUMS.txt`),
+  `lcov-paths.mjs` (repository-relative LCOV paths so the Windows and Linux reports merge).
+- `sonar-project.properties` — SonarQube Cloud scope, coverage reports and the coverage exclusions
+  (each with its reason). The analysis is the `sonar` job of `ci.yml`.
 
 ## Conventions
 
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `chore(deps):`, `ci(deps):`, `feat!:`). Branch from
   `master`; PRs are squash-merged.
+- Quality gate (SonarQube Cloud, *Sonar way*): new code needs ≥ 80 % coverage, no new issues,
+  ≤ 3 % duplication and reviewed hotspots — the CI `sonar` job fails otherwise. Put testable logic
+  where it is measured (`randommac-core`, `randommac-net`, `src/lib/*.ts`), not in the Tauri glue
+  that `sonar-project.properties` excludes from coverage.
 - New UI string → add to `en.ts` **and** `vi.ts` (tests enforce identical keys and placeholders).
   Rust-side strings (tray, notifications, dialogs) are in `src-tauri/src/i18n.rs`.
 - New Tauri command → `commands.rs` + `generate_handler!` in `lib.rs` + the list in `build.rs` +

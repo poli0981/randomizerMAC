@@ -13,6 +13,11 @@ updates:
     labels: [dependencies, rust]
     commit-message:
       prefix: "chore(deps)"
+    # Propose a release only after it has been public for a few days (compromised releases are
+    # usually yanked by then). Security updates are not delayed.
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
     groups:
       # Tauri crates must move together with @tauri-apps/* (see the npm groups below).
       tauri:
@@ -22,6 +27,18 @@ updates:
       rust-minor-patch:
         update-types: [minor, patch]
         exclude-patterns: ["tauri", "tauri-*", "windows", "windows-*"]
+
+  # The pinned toolchain in rust-toolchain.toml (new clippy lints arrive with it).
+  - package-ecosystem: rust-toolchain
+    directory: /
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "04:00"
+      timezone: Asia/Ho_Chi_Minh
+    labels: [dependencies, rust]
+    commit-message:
+      prefix: "build(deps)"
 
   # Frontend packages.
   - package-ecosystem: npm
@@ -35,6 +52,9 @@ updates:
     labels: [dependencies, javascript]
     commit-message:
       prefix: "chore(deps)"
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
     # `typescript` (npm:@typescript/typescript6, the TypeScript 6 API) and `@typescript/native`
     # (npm:typescript@7) are npm aliases, which Dependabot skips: update them by hand (CLAUDE.md).
     ignore:
@@ -45,11 +65,29 @@ updates:
       tauri-js:
         patterns: ["@tauri-apps/*"]
       svelte-vite:
-        patterns: ["svelte", "svelte-check", "@sveltejs/*", "vite", "vitest", "@testing-library/*", "jsdom"]
+        patterns: ["svelte", "svelte-check", "@sveltejs/*", "vite", "vitest", "@vitest/*", "@testing-library/*", "jsdom"]
       lint:
         patterns: ["eslint", "@eslint/*", "eslint-*", "typescript-eslint", "prettier", "prettier-*", "globals"]
+      # Without exclude-patterns this catch-all also took updates of the three groups above.
       npm-minor-patch:
         update-types: [minor, patch]
+        exclude-patterns:
+          - "@tauri-apps/*"
+          - "svelte"
+          - "svelte-check"
+          - "@sveltejs/*"
+          - "vite"
+          - "vitest"
+          - "@vitest/*"
+          - "@testing-library/*"
+          - "jsdom"
+          - "eslint"
+          - "@eslint/*"
+          - "eslint-*"
+          - "typescript-eslint"
+          - "prettier"
+          - "prettier-*"
+          - "globals"
 
   # GitHub Actions used by the workflows.
   - package-ecosystem: github-actions
@@ -63,6 +101,8 @@ updates:
     labels: [dependencies, github-actions]
     commit-message:
       prefix: "ci(deps)"
+    cooldown:
+      default-days: 3
     groups:
       actions:
         patterns: ["*"]

@@ -23,5 +23,13 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.ts"],
+    // `npm run test:coverage` → coverage/lcov.info, imported by SonarQube Cloud (.svelte files
+    // are not analyzed there, so only TypeScript modules are measured).
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.ts"],
+      exclude: ["src/**/*.test.ts", "src/**/*.d.ts"],
+      reporter: ["text-summary", "lcov"],
+    },
   },
 });

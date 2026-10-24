@@ -1,6 +1,8 @@
 # RandomMac
 
 [![CI](https://github.com/poli0981/randomizerMAC/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/poli0981/randomizerMAC/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=poli0981_randomizerMAC&metric=alert_status)](https://sonarcloud.io/summary/overall?id=poli0981_randomizerMAC)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=poli0981_randomizerMAC&metric=coverage)](https://sonarcloud.io/component_measures?id=poli0981_randomizerMAC&metric=coverage)
 [![Release](https://img.shields.io/github/v/release/poli0981/randomizerMAC?sort=semver)](https://github.com/poli0981/randomizerMAC/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../../../LICENSE)
 

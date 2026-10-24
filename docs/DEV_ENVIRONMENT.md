@@ -84,6 +84,24 @@ node scripts/version.mjs check
 cargo deny check        # advisories, licenses, bans (cargo install cargo-deny)
 ```
 
+### Coverage and SonarQube Cloud
+
+CI runs the Rust tests with [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) on Windows
+and Linux (each report covers its own backend) and the UI tests with Vitest coverage, then sends
+the reports with the analysis to
+[SonarQube Cloud](https://sonarcloud.io/project/overview?id=poli0981_randomizerMAC). The
+*Sonar way* quality gate fails the CI job when new code has less than 80 % coverage, new issues,
+more than 3 % duplication or unreviewed security hotspots. What is deliberately not measured (the
+Tauri runtime glue, build scripts, release tooling) is listed with the reason in
+`sonar-project.properties`. Pull requests from forks and from Dependabot are not analyzed (no
+`SONAR_TOKEN`). Locally:
+
+```bash
+rustup component add llvm-tools && cargo install cargo-llvm-cov --locked
+cargo llvm-cov --workspace --html   # target/llvm-cov/html/index.html
+npm run test:coverage               # coverage/lcov-report/index.html (.ts modules; .svelte files are not analyzed)
+```
+
 `npm run check` type-checks with **TypeScript 7**: `@typescript/native` is an npm alias of
 `typescript@7`, and svelte-check `--tsgo` runs its `tsc` on the svelte2tsx output in
 `.svelte-check/` (gitignored). The `typescript` package itself is an alias of
@@ -142,8 +160,10 @@ src-tauri/
   tauri*.conf.json         base, per-OS and release configuration
   windows/hooks.nsh        NSIS install/uninstall hooks
 src/                       Svelte 5 UI: App.svelte, lib/{api,stores,i18n,components,pages}
-scripts/                   version.mjs, gen-oui.mjs, build-sidecar.mjs, release-assets.mjs
-.github/workflows/         ci.yml, release.yml, Discord/Discussions notifications
+scripts/                   version.mjs, gen-oui.mjs, build-sidecar.mjs, release-assets.mjs,
+                           lcov-paths.mjs (coverage paths for SonarQube Cloud)
+.github/workflows/         ci.yml (+ SonarQube Cloud job), release.yml, Discord/Discussions notifications
+sonar-project.properties   SonarQube Cloud analysis scope and coverage reports
 ```
 
 ## Conventions
@@ -184,7 +204,8 @@ a tag. Once a release is published, re-runs refuse to touch it. Tags with a suff
 (`v2.1.0-beta.1`) become pre-releases and are not offered to the updater.
 
 Repository secrets: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (updater
-signing — **back up the key**, without it no update can ever be delivered), `DISCORD_*` webhooks.
+signing — **back up the key**, without it no update can ever be delivered), `DISCORD_*` webhooks,
+`SONAR_TOKEN` (SonarQube Cloud analysis in CI).
 
 ## Tested configurations
 
