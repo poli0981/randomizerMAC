@@ -166,3 +166,28 @@ pub struct Capabilities {
     /// A polkit authentication front-end (`pkexec`) is installed.
     pub pkexec: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn method_names_match_serde() {
+        for method in [
+            ChangeMethod::WindowsRegistry,
+            ChangeMethod::NetworkManager,
+            ChangeMethod::Iproute2,
+            ChangeMethod::Mock,
+        ] {
+            let json = serde_json::to_value(method).expect("serialize");
+            assert_eq!(json, serde_json::Value::String(method.as_str().into()));
+        }
+    }
+
+    #[test]
+    fn default_options_wait_twenty_seconds() {
+        let opts = ChangeOptions::default();
+        assert_eq!(opts.linux_method, LinuxMethod::Auto);
+        assert_eq!(opts.verify_timeout, Duration::from_secs(20));
+    }
+}

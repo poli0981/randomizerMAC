@@ -89,5 +89,16 @@ mod tests {
         let resolved = AppPaths::resolve().expect("home dir available in tests");
         assert!(resolved.config_dir.ends_with(APP_ID));
         assert!(resolved.data_dir.ends_with(APP_ID));
+        assert!(resolved.log_dir.starts_with(&resolved.data_dir));
+        assert_eq!(p.blacklist_file(), Path::new("root").join("blacklist.json"));
+        assert_eq!(p.state_file(), Path::new("root").join("state.json"));
+        assert_eq!(p.lock_file(), Path::new("root").join("operation.lock"));
+    }
+
+    #[test]
+    fn legacy_folder_only_on_windows() {
+        let dir = legacy_v1_dir();
+        assert_eq!(dir.is_some(), cfg!(windows));
+        assert!(dir.is_none_or(|d| d.ends_with("RandomMac")));
     }
 }

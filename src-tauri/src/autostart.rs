@@ -161,11 +161,29 @@ mod windows {
         )
     }
 
+    /// UTF-16LE with a byte order mark, as `schtasks /Create /XML` expects for `encoding="UTF-16"`.
+    fn utf16_with_bom(text: &str) -> Vec<u8> {
+        let mut bytes = vec![0xff, 0xfe];
+        for unit in text.encode_utf16() {
+            bytes.extend_from_slice(&unit.to_le_bytes());
+        }
+        bytes
+    }
+
     /// Command line of a task, from `schtasks /Query /XML` output.
     fn task_command(xml: &str) -> Option<String> {
         let start = xml.find("<Command>")? + "<Command>".len();
         let end = xml[start..].find("</Command>")? + start;
-        Some(xml[start..end].trim().trim_matches('"').to_string())
+        Some(xml_unescape(xml[start..end].trim().trim_matches('"')))
+    }
+
+    /// Reverses [`xml_escape`] (and `&apos;`); `&amp;` last so `&amp;lt;` stays `&lt;`.
+    fn xml_unescape(s: &str) -> String {
+        s.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&apos;", "'")
+            .replace("&amp;", "&")
     }
 
     fn query(name: &str) -> Option<String> {
@@ -199,12 +217,7 @@ mod windows {
             "randommac-task-{}.xml",
             randommac_core::random::new_id()
         ));
-        let xml = task_xml(&sid, &exe, minimized);
-        let mut bytes = vec![0xff, 0xfe];
-        for unit in xml.encode_utf16() {
-            bytes.extend_from_slice(&unit.to_le_bytes());
-        }
-        std::fs::write(&path, bytes)?;
+        std::fs::write(&path, utf16_with_bom(&task_xml(&sid, &exe, minimized)))?;
         let path_str = path.to_string_lossy().into_owned();
         let result = schtasks(&["/Create", "/TN", &name, "/XML", &path_str, "/F"]);
         let _ = std::fs::remove_file(&path);
@@ -318,12 +331,58 @@ mod windows {
             );
             assert_eq!(xml_escape("a&b<c>"), "a&amp;b&lt;c&gt;");
         }
+
+        #[test]
+        fn xml_escapes_values_and_omits_minimized() {
+            let xml = task_xml("S-1-5-21-2", Path::new(r"C:\R&D\randommac.exe"), false);
+            assert!(xml.contains("<Arguments>--autostart</Arguments>"));
+            assert!(xml.contains(r#"<Command>"C:\R&amp;D\randommac.exe"</Command>"#));
+            assert!(xml.contains("<UserId>S-1-5-21-2</UserId>"));
+            // is_enabled() compares this with current_exe(), so entities must be decoded.
+            assert_eq!(task_command(&xml).as_deref(), Some(r"C:\R&D\randommac.exe"));
+            assert_eq!(xml_escape(r#""q""#), "&quot;q&quot;");
+            assert_eq!(xml_unescape("&amp;lt;&apos;&gt;"), "&lt;'>");
+            let tricky = r#"a&b<c>"d"&lt;"#;
+            assert_eq!(xml_unescape(&xml_escape(tricky)), tricky);
+        }
+
+        #[test]
+        fn task_command_needs_both_tags() {
+            assert_eq!(task_command("<Task/>"), None);
+            assert_eq!(task_command("<Command>x.exe"), None);
+            assert_eq!(
+                task_command("<Command> \"C:\\a b\\x.exe\" </Command>").as_deref(),
+                Some(r"C:\a b\x.exe")
+            );
+        }
+
+        #[test]
+        fn task_files_are_utf16_with_a_bom() {
+            assert_eq!(utf16_with_bom("Aé"), [0xff, 0xfe, 0x41, 0x00, 0xe9, 0x00]);
+            let xml = task_xml("S-1-5-21-3", Path::new(r"C:\x.exe"), true);
+            let bytes = utf16_with_bom(&xml);
+            let units: Vec<u16> = bytes[2..]
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|c| u16::from_le_bytes(*c))
+                .collect();
+            assert_eq!(String::from_utf16(&units).expect("utf-16"), xml);
+        }
+
+        #[test]
+        fn read_only_queries() {
+            assert!(task_name().is_ok_and(|n| n.starts_with(TASK_PREFIX)));
+            // Only queries the scheduler; nothing is created or removed.
+            let _ = is_enabled();
+            heal(false, false);
+        }
     }
 }
 
 #[cfg(target_os = "linux")]
 mod linux {
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     use super::*;
 
@@ -344,14 +403,22 @@ mod linux {
 
     pub fn set(enabled: bool, minimized: bool) -> ApiResult<()> {
         let path = entry_path().ok_or_else(|| ApiError::new("INTERNAL", "no config directory"))?;
-        if !enabled {
-            match std::fs::remove_file(&path) {
-                Ok(()) => return Ok(()),
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-                Err(e) => return Err(e.into()),
-            }
+        if enabled {
+            write_entry(&path, &exec_target()?, minimized)
+        } else {
+            remove_entry(&path)
         }
-        let target = desktop_exec_arg(&exec_target()?).ok_or_else(|| {
+    }
+
+    fn remove_entry(path: &Path) -> ApiResult<()> {
+        match std::fs::remove_file(path) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.into()),
+            _ => Ok(()),
+        }
+    }
+
+    fn write_entry(path: &Path, program: &str, minimized: bool) -> ApiResult<()> {
+        let target = desktop_exec_arg(program).ok_or_else(|| {
             ApiError::new(
                 "AUTOSTART_FAILED",
                 "the program path cannot be used in an autostart entry",
@@ -364,7 +431,7 @@ mod linux {
         let content = format!(
             "[Desktop Entry]\nType=Application\nName=RandomMac\nComment=Randomize network adapter MAC addresses\nExec={exec}\nIcon=randommac\nTerminal=false\nX-GNOME-Autostart-enabled=true\n"
         );
-        randommac_core::storage::write_atomic(&path, content.as_bytes())?;
+        randommac_core::storage::write_atomic(path, content.as_bytes())?;
         Ok(())
     }
 
@@ -375,6 +442,57 @@ mod linux {
     pub fn heal(enabled: bool, minimized: bool) {
         if enabled && !is_enabled() {
             let _ = set(true, minimized);
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn writes_and_removes_the_desktop_entry() {
+            let dir = tempfile::tempdir().expect("tempdir");
+            let path = dir.path().join("autostart").join("randommac.desktop");
+            write_entry(&path, "/opt/Random Mac/randommac", true).expect("write");
+            let content = std::fs::read_to_string(&path).expect("read");
+            assert!(content.starts_with("[Desktop Entry]\nType=Application\n"));
+            assert!(
+                content.contains("\nExec=\"/opt/Random Mac/randommac\" --autostart --minimized\n"),
+                "{content}"
+            );
+            write_entry(&path, "/usr/bin/randommac", false).expect("rewrite");
+            let content = std::fs::read_to_string(&path).expect("read");
+            assert!(content.contains("\nExec=\"/usr/bin/randommac\" --autostart\n"));
+
+            remove_entry(&path).expect("remove");
+            assert!(!path.exists());
+            // Removing a missing entry is not an error.
+            remove_entry(&path).expect("remove again");
+        }
+
+        #[test]
+        fn refuses_paths_a_desktop_entry_cannot_hold() {
+            let dir = tempfile::tempdir().expect("tempdir");
+            let path = dir.path().join("randommac.desktop");
+            let err = write_entry(&path, "/tmp/a\nb", false).expect_err("newline");
+            assert_eq!(err.code, "AUTOSTART_FAILED");
+            assert!(!path.exists());
+        }
+
+        #[test]
+        fn removing_fails_for_non_files() {
+            let dir = tempfile::tempdir().expect("tempdir");
+            assert!(remove_entry(dir.path()).is_err());
+        }
+
+        #[test]
+        fn entry_lives_in_the_autostart_folder() {
+            let path = entry_path().expect("config dir");
+            assert!(path.ends_with(format!("autostart/{}.desktop", randommac_core::APP_ID)));
+            assert!(exec_target().is_ok_and(|t| !t.is_empty()));
+            // Read-only checks; nothing is created.
+            let _ = is_enabled();
+            heal(false, false);
         }
     }
 }

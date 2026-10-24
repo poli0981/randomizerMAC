@@ -114,5 +114,42 @@ mod tests {
         assert!(t(Lang::Vi, Key::TrayRandomize, &["Ethernet"]).contains("Ethernet"));
         assert_eq!(Lang::resolve(Language::Vi), Lang::Vi);
         assert_eq!(Lang::resolve(Language::En), Lang::En);
+        // The system language is either of the two.
+        assert!(matches!(
+            Lang::resolve(Language::System),
+            Lang::En | Lang::Vi
+        ));
+    }
+
+    #[test]
+    fn every_key_is_translated_with_the_same_placeholders() {
+        use Key::*;
+        let keys = [
+            TrayShow,
+            TrayRandomize,
+            TrayRestore,
+            TrayRestoreAll,
+            TrayCheckUpdates,
+            TrayQuit,
+            TrayNoAdapter,
+            NotifyChanged,
+            NotifyRestored,
+            NotifyFailed,
+            NotifyRolledBack,
+            NotifyStartupSummary,
+            NotifyUpdate,
+            NotifyStillRunning,
+            DialogExport,
+            DialogImport,
+        ];
+        let placeholders = |s: &str| (0..3).filter(|i| s.contains(&format!("{{{i}}}"))).count();
+        for key in keys {
+            let (en, vi) = (template(Lang::En, key), template(Lang::Vi, key));
+            assert!(!en.is_empty() && !vi.is_empty(), "{key:?}");
+            assert_ne!(en, vi, "{key:?} is not translated");
+            assert_eq!(placeholders(en), placeholders(vi), "{key:?}");
+            // Every placeholder is replaced when arguments are given.
+            assert!(!t(Lang::Vi, key, &["a", "b"]).contains('{'), "{key:?}");
+        }
     }
 }

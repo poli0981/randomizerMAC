@@ -190,5 +190,5 @@ Secret của repo: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSW
 |---|---|
 | Windows 11 Pro Insider (máy phát triển, xem [pc_spec.md](pc_spec.md)) | App, khay, chế độ chỉ xem, CLI, thử đổi MAC thật trên adapter Wi-Fi có hoàn tác, build bản cài NSIS/MSI có ký và kiểm tra chữ ký |
 | GitHub `windows-latest` | Build, test, cài/gỡ NSIS + MSI, dọn tác vụ cũ, smoke test GUI |
-| GitHub `ubuntu-24.04` | Build, test, đổi MAC thật trên interface giả, cài `.deb` + smoke test GUI (Xvfb) |
+| GitHub `ubuntu-24.04` | Build, test, đổi MAC thật trên interface giả (iproute2, và NetworkManager qua một `nmcli` giả lập), cài `.deb` + smoke test GUI (Xvfb) |
 | Container `fedora:43` | Cài `.rpm` và giải quyết phụ thuộc |

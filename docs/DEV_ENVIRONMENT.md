@@ -213,7 +213,7 @@ signing — **back up the key**, without it no update can ever be delivered), `D
 |---|---|
 | Windows 11 Pro Insider (developer machine, see [pc_spec.md](pc_spec.md)) | App, tray, read-only mode, CLI, real change attempt on a Wi-Fi adapter with rollback, signed NSIS/MSI release builds with signature verification |
 | GitHub `windows-latest` | Build, tests, NSIS + MSI install/uninstall, legacy task cleanup, GUI smoke test |
-| GitHub `ubuntu-24.04` | Build, tests, real change on a dummy interface, `.deb` install + GUI smoke test (Xvfb) |
+| GitHub `ubuntu-24.04` | Build, tests, real change on a dummy interface (iproute2, and NetworkManager through a stand-in `nmcli`), `.deb` install + GUI smoke test (Xvfb) |
 | `fedora:43` container | `.rpm` installation and dependency resolution |
 
 ## Data locations

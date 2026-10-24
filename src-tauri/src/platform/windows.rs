@@ -349,6 +349,41 @@ mod tests {
         let sid = current_user_sid().expect("sid");
         assert!(sid.starts_with("S-1-"));
         assert!(system32("schtasks.exe").is_absolute());
+        assert!(system32("schtasks.exe").is_file());
         assert!(SecurityDescriptor::from_sddl("D:P(A;OICI;FA;;;SY)").is_some());
+    }
+
+    #[test]
+    fn security_descriptors() {
+        assert!(SecurityDescriptor::from_sddl("not sddl").is_none());
+        let sd = SecurityDescriptor::from_sddl("D:(A;;GA;;;SY)").expect("sddl");
+        let sa = sd.attributes();
+        assert_eq!(sa.nLength as usize, size_of::<sec::SECURITY_ATTRIBUTES>());
+        assert_eq!(sa.lpSecurityDescriptor, sd.0);
+        assert_eq!(sa.bInheritHandle, 0);
+    }
+
+    #[test]
+    fn quoting_escapes_quotes_and_tabs() {
+        assert_eq!(quote_arg("a\tb"), "\"a\tb\"");
+        assert_eq!(quote_arg(r#"say "hi""#), r#""say \"hi\"""#);
+        assert_eq!(wide("ab"), [u16::from(b'a'), u16::from(b'b'), 0]);
+    }
+
+    #[test]
+    fn waits_for_processes_and_removes_temp_dirs() {
+        let mut child = Command::new(system32("cmd.exe"))
+            .args(["/C", "exit 0"])
+            .spawn()
+            .expect("spawn");
+        wait_for_process(child.id(), 10_000);
+        assert!(child.try_wait().expect("try_wait").is_some());
+        // Unknown processes return at once.
+        wait_for_process(u32::MAX - 1, 10_000);
+
+        let dir = tempfile::tempdir().expect("tempdir").keep();
+        std::fs::write(dir.join("update.exe"), b"x").expect("write");
+        remove_temp_dir(&dir);
+        assert!(!dir.exists());
     }
 }

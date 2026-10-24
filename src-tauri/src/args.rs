@@ -110,4 +110,31 @@ mod tests {
         assert_eq!(a.forwarded(), vec!["--autostart", "--minimized"]);
         assert!(parse(&[]).forwarded().is_empty());
     }
+
+    #[test]
+    fn installer_hooks_and_demo_backend() {
+        let a = parse(&[
+            "--cleanup-legacy",
+            "--cleanup-uninstall",
+            "--smoke-test",
+            "--no-elevate",
+            "-V",
+            "/?",
+        ]);
+        assert!(a.cleanup_legacy && a.cleanup_uninstall && a.smoke_test && a.no_elevate);
+        assert!(a.version && a.help);
+        // The demo backend exists only in debug builds and is forwarded on relaunch.
+        let demo = parse(&["--mock", "--after-pid", "x"]);
+        assert_eq!(demo.mock, cfg!(debug_assertions));
+        assert_eq!(demo.after_pid, None);
+        if demo.mock {
+            assert_eq!(demo.forwarded(), vec!["--mock"]);
+        }
+        // The test harness' own arguments are not RandomMac flags.
+        assert!(!Args::parse().cleanup_uninstall);
+        assert_eq!(
+            USAGE.lines().next(),
+            Some("Usage: randommac [--minimized] [--no-elevate]")
+        );
+    }
 }

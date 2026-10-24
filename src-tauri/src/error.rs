@@ -85,3 +85,52 @@ impl From<tauri_plugin_updater::Error> for ApiError {
         Self::new("UPDATE_FAILED", e.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn constructors_use_the_codes_the_ui_translates() {
+        let e = ApiError::invalid("bad pattern");
+        assert_eq!(
+            (e.code.as_str(), e.message.as_str()),
+            ("INVALID_INPUT", "bad pattern")
+        );
+        assert_eq!(ApiError::busy().code, "BUSY");
+        assert_eq!(ApiError::read_only().code, "NOT_ELEVATED");
+        assert_eq!(
+            ApiError::new("X", "y").to_string(),
+            "X: y",
+            "Display is code: message"
+        );
+    }
+
+    #[test]
+    fn conversions_keep_backend_codes() {
+        let e: ApiError = NetError::NmNoActiveConnection.into();
+        assert_eq!(e.code, "NM_NO_ACTIVE_CONNECTION");
+        assert_eq!(e.message, NetError::NmNoActiveConnection.to_string());
+        let e: ApiError = OpError::Busy.into();
+        assert_eq!(e.code, "BUSY");
+        let e: ApiError = std::io::Error::other("disk").into();
+        assert_eq!((e.code.as_str(), e.message.as_str()), ("IO_ERROR", "disk"));
+        let e: ApiError = serde_json::from_str::<u8>("x").expect_err("invalid").into();
+        assert_eq!(e.code, "PARSE_ERROR");
+        let e: ApiError = anyhow::anyhow!("inner").context("outer").into();
+        assert_eq!(
+            (e.code.as_str(), e.message.as_str()),
+            ("INTERNAL", "outer: inner")
+        );
+        let e: ApiError = tauri::Error::WindowNotFound.into();
+        assert_eq!(e.code, "INTERNAL");
+        let e: ApiError = tauri_plugin_updater::Error::ReleaseNotFound.into();
+        assert_eq!(e.code, "UPDATE_FAILED");
+    }
+
+    #[test]
+    fn serializes_camel_case() {
+        let json = serde_json::to_value(ApiError::new("BUSY", "x")).expect("json");
+        assert_eq!(json, serde_json::json!({ "code": "BUSY", "message": "x" }));
+    }
+}
