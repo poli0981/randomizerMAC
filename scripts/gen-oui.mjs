@@ -142,12 +142,12 @@ for (const r of rows) {
   if (r.length < 3 || r[0] !== "MA-L") continue;
   const hex = r[1].trim().toUpperCase();
   if (!/^[0-9A-F]{6}$/.test(hex)) continue;
-  const first = parseInt(hex.slice(0, 2), 16);
+  const first = Number.parseInt(hex.slice(0, 2), 16);
   if (first & 0x03) continue; // never index multicast or locally administered prefixes
   const org = r[2].trim();
   const idx = VENDORS.findIndex(([, , , pats]) => pats.some((p) => p.test(org)));
   if (idx < 0) continue;
-  records.push([parseInt(hex, 16), idx]);
+  records.push([Number.parseInt(hex, 16), idx]);
   counts[idx]++;
 }
 records.sort((a, b) => a[0] - b[0]);

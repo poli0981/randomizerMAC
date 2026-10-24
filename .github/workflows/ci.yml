@@ -53,10 +53,9 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Versions are in sync
         run: node scripts/version.mjs check
-      - name: ESLint
-        run: npx eslint .
-      - name: Prettier
-        run: npx prettier --check .
+      # Through the package scripts (locked versions in node_modules), not npx.
+      - name: ESLint and Prettier
+        run: npm run lint
       - name: Type check (svelte-check, TypeScript 7)
         run: npm run check
       - name: Unit tests (with coverage)

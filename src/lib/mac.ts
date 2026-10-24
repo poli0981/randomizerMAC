@@ -25,7 +25,7 @@ export function parseMac(input: string): number[] | null {
   if (!hex.every((c) => /^[0-9a-fA-F]$/.test(c))) return null;
   const bytes: number[] = [];
   for (let i = 0; i < 12; i += 2) {
-    bytes.push(parseInt(hex[i]! + hex[i + 1]!, 16));
+    bytes.push(Number.parseInt(hex[i]! + hex[i + 1]!, 16));
   }
   return bytes;
 }

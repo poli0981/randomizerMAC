@@ -8,7 +8,7 @@
 
 | Công cụ  | Phiên bản                        | Ghi chú                                                                   |
 |----------|----------------------------------|---------------------------------------------------------------------------|
-| Rust     | 1.98.0 (qua `rustup`)            | **Bắt buộc cho RandomMac 2.x**; cố định bởi `rust-toolchain.toml`         |
+| Rust     | 1.99.1 (qua `rustup`)            | **Bắt buộc cho RandomMac 2.x**; cố định bởi `rust-toolchain.toml`         |
 | Node.js  | 26.x (`.nvmrc`), npm 11          | **Bắt buộc cho RandomMac 2.x** (giao diện Svelte, Tauri CLI); dùng `nvm-windows` để chuyển phiên bản |
 | Git      | 2.x+                             | Bắt buộc                                                                  |
 | .NET SDK | 10.x                             | RandomMac 2.x không dùng (bản 1.x là .NET/WinUI 3)                        |

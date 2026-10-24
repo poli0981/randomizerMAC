@@ -8,7 +8,7 @@ How to build, run, test and release RandomMac 2.x. For the design, see
 | Tool | Version | Notes |
 |---|---|---|
 | Git | 2.x | |
-| [rustup](https://rustup.rs/) | any | `rust-toolchain.toml` pins Rust **1.98.0** (+ rustfmt, clippy); rustup installs it on first use. MSRV is 1.89. |
+| [rustup](https://rustup.rs/) | any | `rust-toolchain.toml` pins Rust **1.99.1** (+ rustfmt, clippy); rustup installs it on first use. MSRV is 1.89. |
 | [Node.js](https://nodejs.org/) | **26** (`.nvmrc`) | npm 11+. |
 | Tauri prerequisites | see below | WebView2/WebKitGTK and native build tools. |
 

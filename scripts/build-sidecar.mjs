@@ -9,8 +9,23 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const triple =
+// The triple ends up on the cargo command line and in file paths, so only known targets are
+// accepted (CI passes x86_64-pc-windows-msvc / x86_64-unknown-linux-gnu).
+const TARGETS = [
+  "x86_64-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+];
+const requested =
   process.argv[2] ?? execFileSync("rustc", ["--print", "host-tuple"], { encoding: "utf8" }).trim();
+const triple = TARGETS.find((t) => t === requested);
+if (!triple) {
+  console.error(`unsupported target: ${JSON.stringify(requested)} (known: ${TARGETS.join(", ")})`);
+  process.exit(2);
+}
 const exe = triple.includes("windows") ? ".exe" : "";
 
 execFileSync(

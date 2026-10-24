@@ -296,7 +296,7 @@ docs/                    documentation
 
 | Part | Technology |
 |---|---|
-| Core, backends, CLI | Rust 1.98 (edition 2024), clap, serde, tracing |
+| Core, backends, CLI | Rust 1.99 (edition 2024), clap, serde, tracing |
 | Desktop shell | Tauri 2 (WebView2 on Windows, WebKitGTK on Linux) |
 | UI | Svelte 5, TypeScript, Vite, Lucide icons |
 | Windows APIs | SetupAPI, registry, IP Helper (`windows-sys`) |

@@ -20,7 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI analyzes every push and pull request with SonarQube Cloud, with coverage from the Rust tests
   on Windows and Linux, real changes on a Linux dummy interface (iproute2 and a stand-in
   NetworkManager) and the UI tests. CodeQL now also scans the Rust code; Dependabot waits a few
-  days before proposing new releases and also updates the pinned Rust toolchain.
+  days before proposing new releases and also updates the pinned Rust toolchain (now 1.99.1).
+- Build scripts: `build-sidecar.mjs` accepts only known target triples; CI installs npm packages
+  without lifecycle scripts and runs ESLint/Prettier from the locked `node_modules`; the release
+  workflow's download checks refuse non-HTTPS redirects.
 
 ## [2.0.1] - 2026-10-22
 

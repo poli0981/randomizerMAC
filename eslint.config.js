@@ -14,6 +14,7 @@ export default ts.config(
       "crates/",
       "coverage/",
       ".svelte-check/",
+      ".claude/",
     ],
   },
   js.configs.recommended,

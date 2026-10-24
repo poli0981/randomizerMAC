@@ -9,7 +9,7 @@ Cách build, chạy, kiểm thử và phát hành RandomMac 2.x. Thiết kế t�
 | Công cụ | Phiên bản | Ghi chú |
 |---|---|---|
 | Git | 2.x | |
-| [rustup](https://rustup.rs/) | bất kỳ | `rust-toolchain.toml` cố định Rust **1.98.0** (+ rustfmt, clippy); rustup tự cài ở lần dùng đầu. MSRV là 1.89. |
+| [rustup](https://rustup.rs/) | bất kỳ | `rust-toolchain.toml` cố định Rust **1.99.1** (+ rustfmt, clippy); rustup tự cài ở lần dùng đầu. MSRV là 1.89. |
 | [Node.js](https://nodejs.org/) | **26** (`.nvmrc`) | npm 11+. |
 | Thành phần cho Tauri | xem bên dưới | WebView2/WebKitGTK và công cụ build native. |
 

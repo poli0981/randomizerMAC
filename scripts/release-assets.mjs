@@ -144,7 +144,7 @@ if (cmd === "verify") {
 } else if (cmd === "sums") {
   const lines = files(dir)
     .filter((f) => f !== "SHA256SUMS.txt")
-    .sort()
+    .sort((a, b) => a.localeCompare(b, "en"))
     .map(
       (f) =>
         `${createHash("sha256")
