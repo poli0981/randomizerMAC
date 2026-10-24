@@ -1,6 +1,8 @@
 # RandomMac
 
 [![CI](https://github.com/poli0981/randomizerMAC/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/poli0981/randomizerMAC/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=poli0981_randomizerMAC&metric=alert_status)](https://sonarcloud.io/summary/overall?id=poli0981_randomizerMAC)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=poli0981_randomizerMAC&metric=coverage)](https://sonarcloud.io/component_measures?id=poli0981_randomizerMAC&metric=coverage)
 [![Release](https://img.shields.io/github/v/release/poli0981/randomizerMAC?sort=semver)](https://github.com/poli0981/randomizerMAC/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%2010%2F11%20%7C%20Ubuntu%20%7C%20Fedora-61AFEF)
@@ -300,7 +302,7 @@ docs/                    documentation
 | Windows APIs | SetupAPI, registry, IP Helper (`windows-sys`) |
 | Linux | sysfs, ethtool ioctl, NetworkManager (`nmcli`), iproute2, polkit, D-Bus (`zbus`) |
 | Packaging | NSIS, WiX (MSI), deb, rpm, AppImage; signed updater manifest |
-| CI/CD | GitHub Actions (Windows + Ubuntu, Fedora package test), cargo-deny, CodeQL |
+| CI/CD | GitHub Actions (Windows + Ubuntu, Fedora package test), cargo-deny, CodeQL, SonarQube Cloud (cargo-llvm-cov + Vitest coverage) |
 
 ## Credits
 

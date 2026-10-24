@@ -16,6 +16,7 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "tauri": "tauri",
     "version:check": "node scripts/version.mjs check",
     "version:set": "node scripts/version.mjs set"
@@ -34,6 +35,7 @@
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^26.6.5",
     "@typescript/native": "npm:typescript@~7.0.2",
+    "@vitest/coverage-v8": "^5.0.5",
     "eslint": "^10.13.0",
     "eslint-plugin-svelte": "^3.23.1",
     "globals": "^17.13.0",

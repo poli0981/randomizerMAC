@@ -85,6 +85,23 @@ node scripts/version.mjs check
 cargo deny check        # advisories, giấy phép, bans (cargo install cargo-deny)
 ```
 
+### Coverage và SonarQube Cloud
+
+CI chạy test Rust bằng [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) trên Windows và
+Linux (mỗi báo cáo phủ backend của hệ điều hành đó) và test UI bằng Vitest có coverage, rồi gửi các
+báo cáo cùng lần phân tích lên
+[SonarQube Cloud](https://sonarcloud.io/project/overview?id=poli0981_randomizerMAC). Quality gate
+*Sonar way* làm job CI thất bại khi code mới có coverage dưới 80 %, có issue mới, trùng lặp quá 3 %
+hoặc còn security hotspot chưa review. Những phần cố ý không đo (glue của Tauri runtime, build
+script, công cụ phát hành) được liệt kê kèm lý do trong `sonar-project.properties`. Pull request từ
+fork và từ Dependabot không được phân tích (không có `SONAR_TOKEN`). Chạy trên máy:
+
+```bash
+rustup component add llvm-tools && cargo install cargo-llvm-cov --locked
+cargo llvm-cov --workspace --html   # target/llvm-cov/html/index.html
+npm run test:coverage               # coverage/lcov-report/index.html (module .ts; file .svelte không được phân tích)
+```
+
 `npm run check` kiểm tra kiểu bằng **TypeScript 7**: `@typescript/native` là npm alias của
 `typescript@7`, và svelte-check `--tsgo` chạy `tsc` của nó trên kết quả svelte2tsx trong
 `.svelte-check/` (đã gitignore). Bản thân gói `typescript` là alias của `@typescript/typescript6`,
@@ -165,7 +182,7 @@ chạy lại sẽ từ chối động vào nó. Tag có hậu tố (`v2.1.0-beta
 
 Secret của repo: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (ký bản cập nhật —
 **hãy sao lưu khoá**, mất khoá thì không thể phát hành bản cập nhật tự động nữa), các webhook
-`DISCORD_*`.
+`DISCORD_*`, `SONAR_TOKEN` (phân tích SonarQube Cloud trong CI).
 
 ## Cấu hình đã kiểm thử
 
