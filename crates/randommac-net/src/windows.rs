@@ -913,6 +913,129 @@ mod tests {
         assert_eq!(guid_to_string(&g), s);
     }
 
+    /// A device instance id that does not exist: every change stops before touching anything.
+    fn fake_adapter(state: AdapterState) -> Adapter {
+        Adapter {
+            id: r"PCI\RANDOMMAC_TEST_DOES_NOT_EXIST\0".into(),
+            name: "x".into(),
+            description: String::new(),
+            interface_name: "x".into(),
+            kind: AdapterKind::Ethernet,
+            is_virtual: false,
+            state,
+            connected: false,
+            current_mac: None,
+            permanent_mac: None,
+            override_value: None,
+            supports_change: Support::Unknown,
+            methods: vec![],
+            nm_connection: None,
+            driver: None,
+            ipv4: vec![],
+            ipv6: vec![],
+        }
+    }
+
+    #[test]
+    fn changes_check_elevation_and_the_device() {
+        let backend = WindowsBackend::new();
+        let mac: MacAddress = "02:00:00:00:00:01".parse().expect("mac");
+        let opts = ChangeOptions::default();
+        let mut stages = Vec::new();
+        let mut progress = |s: Stage| stages.push(s);
+        let up = fake_adapter(AdapterState::Up);
+        let disabled = fake_adapter(AdapterState::Disabled);
+        let results = [
+            backend.apply(&up, mac, &opts, &mut progress).map(|_| ()),
+            backend
+                .apply(&disabled, mac, &opts, &mut progress)
+                .map(|_| ()),
+            backend.restore(&up, None, &opts, &mut progress).map(|_| ()),
+            backend.set_enabled(&up, true),
+            backend.set_enabled(&up, false),
+        ];
+        if is_elevated() {
+            let not_found = NetError::NotFound(up.id.clone());
+            assert_eq!(results[0], Err(not_found.clone()));
+            assert_eq!(
+                results[1].as_ref().map_err(NetError::code),
+                Err("UNSUPPORTED")
+            );
+            assert_eq!(results[2], Err(not_found.clone()));
+            assert_eq!(results[3], Err(not_found.clone()));
+            assert_eq!(results[4], Err(not_found));
+            assert_eq!(stages, [Stage::Preparing, Stage::Preparing]);
+        } else {
+            assert!(results.iter().all(|r| r == &Err(NetError::NotElevated)));
+            assert!(stages.is_empty());
+        }
+        assert_eq!(backend.capabilities().can_change, is_elevated());
+    }
+
+    #[test]
+    fn unknown_devices_and_interfaces() {
+        let id = r"PCI\RANDOMMAC_TEST_DOES_NOT_EXIST\0";
+        assert_eq!(
+            DevInfoSet::open_instance(id).map(|_| ()),
+            Err(NetError::NotFound(id.into()))
+        );
+        assert_eq!(restart_device(id), Err(NetError::NotFound(id.into())));
+        let guid = "{00000000-0000-0000-0000-00000000F00D}";
+        assert!(interface_row(guid).is_none());
+        let mac: MacAddress = "02:00:00:00:00:01".parse().expect("mac");
+        assert_eq!(wait_for_address(guid, mac, Duration::from_millis(1)), None);
+        assert!(parse_guid("not a guid").is_none());
+    }
+
+    #[test]
+    fn os_errors_and_strings() {
+        assert_eq!(os_error("x", 5), NetError::PermissionDenied("x".into()));
+        assert_eq!(
+            os_error("x", 87),
+            NetError::Os {
+                context: "x".into(),
+                code: 87
+            }
+        );
+        assert_eq!(from_wide(&wide("abc")), "abc");
+        assert_eq!(from_wide(&[0x61, 0x62]), "ab");
+        let report = WindowsBackend::report(ChangeStatus::RolledBack, None, None, None, Some("D"));
+        assert_eq!(report.method, ChangeMethod::WindowsRegistry);
+        assert_eq!(report.detail_code.as_deref(), Some("D"));
+        assert!(!report.temporary);
+    }
+
+    #[test]
+    fn reads_registry_values() {
+        let key = RegKey::open(
+            reg::HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+            reg::KEY_READ,
+        )
+        .expect("CurrentVersion key");
+        // REG_SZ, also readable as a number.
+        let build = key.get_string("CurrentBuildNumber").expect("build number");
+        assert_eq!(key.get_dword("CurrentBuildNumber"), build.parse().ok());
+        // REG_DWORD.
+        assert!(
+            key.get_dword("CurrentMajorVersionNumber")
+                .is_some_and(|v| v >= 10)
+        );
+        assert_eq!(key.get_string("CurrentMajorVersionNumber"), None);
+        assert_eq!(key.get_string("RandomMacTestMissingValue"), None);
+        assert_eq!(key.get_dword("RandomMacTestMissingValue"), None);
+        // Binary values are neither.
+        assert_eq!(key.get_dword("DigitalProductId"), None);
+        assert!(
+            RegKey::open(
+                reg::HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\RandomMacTestMissing",
+                reg::KEY_READ
+            )
+            .is_none()
+        );
+    }
+
     #[test]
     fn changes_require_elevation() {
         if is_elevated() {

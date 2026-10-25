@@ -246,6 +246,81 @@ mod tests {
     }
 
     #[test]
+    fn layer_writes_events_to_the_buffer_and_the_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let buffer = Arc::new(LogBuffer::default());
+        let layer = AppLayer {
+            buffer: buffer.clone(),
+            file: Some(Arc::new(RotatingFile::new(dir.path()))),
+        };
+        tracing::subscriber::with_default(tracing_subscriber::registry().with(layer), || {
+            tracing::info!(target: "randommac::test", adapter = "Wi-Fi", "changed");
+            tracing::warn!(code = 5, "slow {}", "driver");
+            tracing::error!(message = "plain");
+            tracing::debug!("details");
+            tracing::trace!("noise");
+        });
+        let entries = buffer.since(None);
+        let levels: Vec<&str> = entries.iter().map(|e| e.level.as_str()).collect();
+        assert_eq!(levels, ["info", "warn", "error", "debug", "trace"]);
+        assert_eq!(entries[0].target, "randommac::test");
+        assert_eq!(entries[0].message, "changed adapter=Wi-Fi");
+        assert_eq!(entries[1].message, "slow driver code=5");
+        assert_eq!(entries[2].message, "plain");
+        assert!(entries.windows(2).all(|w| w[0].seq < w[1].seq));
+
+        let file = fs::read_to_string(dir.path().join("randommac.log")).expect("log file");
+        assert_eq!(file.lines().count(), 5, "{file}");
+        assert!(
+            file.contains("INFO  randommac::test: changed adapter=Wi-Fi"),
+            "{file}"
+        );
+    }
+
+    #[test]
+    fn layer_without_a_file_only_buffers() {
+        let buffer = Arc::new(LogBuffer::default());
+        let layer = AppLayer {
+            buffer: buffer.clone(),
+            file: None,
+        };
+        tracing::subscriber::with_default(tracing_subscriber::registry().with(layer), || {
+            tracing::info!(text = "quoted", "hello");
+        });
+        assert_eq!(buffer.since(None)[0].message, "hello text=quoted");
+    }
+
+    #[test]
+    fn unwritable_log_folder_is_ignored() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("not-a-folder");
+        fs::write(&file, b"").expect("write");
+        let f = RotatingFile::new(&file);
+        f.write_line("lost\n");
+        assert_eq!(fs::read(&file).expect("read"), b"");
+    }
+
+    #[test]
+    fn init_returns_a_buffer_that_receives_events() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let buffer = init(Some(dir.path()));
+        // Restore the default panic hook for the other tests.
+        let _ = std::panic::take_hook();
+        tracing::warn!(target: "randommac::init_test", "hello from init");
+        assert!(
+            buffer
+                .since(None)
+                .iter()
+                .any(|e| e.target == "randommac::init_test" && e.message == "hello from init")
+        );
+        // A second call keeps the first subscriber.
+        let second = init(None);
+        let _ = std::panic::take_hook();
+        tracing::warn!(target: "randommac::init_test", "again");
+        assert!(second.since(None).is_empty());
+    }
+
+    #[test]
     fn file_rotates() {
         let dir = tempfile::tempdir().expect("tempdir");
         let f = RotatingFile::new(dir.path());

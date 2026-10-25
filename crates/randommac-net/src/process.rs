@@ -172,6 +172,42 @@ mod tests {
         assert_eq!(err.code(), "INVALID_INPUT");
     }
 
+    #[test]
+    fn reports_programs_that_cannot_start() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let missing = dir.path().join("missing-program");
+        let err = run(&missing, &[], Some("input"), Duration::from_secs(1)).expect_err("missing");
+        assert_eq!(err.code(), "COMMAND_FAILED");
+        assert!(err.to_string().contains("missing-program"), "{err}");
+    }
+
+    #[test]
+    fn finds_the_first_existing_program() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let present = dir.path().join("present");
+        std::fs::write(&present, b"").expect("write");
+        let absent = dir.path().join("absent");
+        let (absent, present) = (
+            absent.to_str().expect("utf-8"),
+            present.to_str().expect("utf-8"),
+        );
+        assert_eq!(
+            find_program(&[absent, present]),
+            Some(PathBuf::from(present))
+        );
+        assert_eq!(find_program(&[absent]), None);
+        // Directories do not count as programs.
+        assert_eq!(find_program(&[dir.path().to_str().expect("utf-8")]), None);
+        assert!(
+            Output {
+                code: Some(0),
+                stdout: String::new(),
+                stderr: String::new(),
+            }
+            .success()
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn captures_output_and_stdin() {
@@ -199,12 +235,63 @@ mod tests {
     }
 
     #[cfg(windows)]
+    fn system32(program: &str) -> PathBuf {
+        let root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        PathBuf::from(root).join("System32").join(program)
+    }
+
+    #[cfg(windows)]
     #[test]
     fn runs_system_programs() {
-        let root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
-        let cmd = PathBuf::from(root).join("System32").join("cmd.exe");
+        let cmd = system32("cmd.exe");
         let out = run(&cmd, &["/C", "echo hi"], None, Duration::from_secs(10)).expect("run");
         assert!(out.success());
         assert_eq!(out.stdout.trim(), "hi");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn feeds_stdin_and_captures_errors() {
+        let out = run(
+            &system32("sort.exe"),
+            &[],
+            Some("pear\r\napple\r\n"),
+            Duration::from_secs(10),
+        )
+        .expect("run");
+        assert!(out.success());
+        assert_eq!(out.stdout.lines().collect::<Vec<_>>(), ["apple", "pear"]);
+
+        let cmd = system32("cmd.exe");
+        let out = run(
+            &cmd,
+            &["/C", "echo oops 1>&2 & exit 3"],
+            None,
+            Duration::from_secs(10),
+        )
+        .expect("run");
+        assert_eq!(out.code, Some(3));
+        assert!(!out.success());
+        assert_eq!(out.stderr.trim(), "oops");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn times_out() {
+        let err = run(
+            &system32("ping.exe"),
+            &["-n", "30", "127.0.0.1"],
+            None,
+            Duration::from_millis(300),
+        )
+        .expect_err("timeout");
+        assert_eq!(err.code(), "TIMEOUT");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn decodes_empty_oem_output() {
+        assert_eq!(decode_oem(&[]).as_deref(), Some(""));
+        assert_eq!(decode_oem(b"abc").as_deref(), Some("abc"));
     }
 }

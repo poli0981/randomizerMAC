@@ -131,6 +131,17 @@ npm run test:coverage
   must not erase them. Windows "random hardware addresses" likewise yields `CHANGED_BY_OS`.
 - For pull requests, CI `paths-ignore` is evaluated on the whole PR diff: a docs-only push to a PR
   that also changes code re-runs the full CI. Docs-only follow-ups are faster as their own PR.
+- SonarQube Cloud counts a source file missing from every LCOV report as 0 % covered. Rust coverage
+  is merged from three reports: the Rust job on Windows and on Linux (each covers its own backend)
+  and the instrumented CLI in the *Linux MAC change* job, which also drives the NetworkManager
+  method through `crates/randommac-net/tests/fake-nmcli.sh` (installed as `/usr/bin/nmcli`).
+  `.svelte` files are not analyzed at all; keep UI logic in `.ts` modules.
+- The `sonar` job is skipped for Dependabot and fork PRs (no `SONAR_TOKEN`); PR decoration comes
+  from the SonarQube Cloud GitHub App ("SonarCloud Code Analysis" check). CI installs npm packages
+  with `--ignore-scripts` (Sonar `githubactions:S6505`); no dependency needs install scripts.
+- CodeQL default setup: the REST API rejects `rust` in `languages`, but switching the setup off and
+  on again without `languages` (`state=not-configured`, then `state=configured`) auto-detects
+  actions, JavaScript/TypeScript and Rust.
 
 ## Safety when testing on the maintainer's machine
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi as mock } from "vitest";
 import { en } from "./en";
 import { vi } from "./vi";
 import { i18n } from "./index.svelte";
@@ -69,5 +69,26 @@ describe("t()", () => {
     expect(i18n.error("BUSY")).toBe(vi["error.BUSY"]);
     expect(i18n.error("SOMETHING_NEW")).toContain("SOMETHING_NEW");
     i18n.setLanguage("en");
+  });
+
+  it("keeps placeholders without a value and reports missing codes", () => {
+    i18n.setLanguage("en");
+    expect(i18n.t("common.copied", {})).toBe("Copied {value}");
+    expect(i18n.t("common.copied")).toBe("Copied {value}");
+    expect(i18n.error(null)).toBe(i18n.t("error.unknown", { code: "?" }));
+    expect(i18n.error(undefined)).toContain("?");
+  });
+
+  it("follows the system language and marks the document", () => {
+    const languages = mock.spyOn(navigator, "languages", "get");
+    languages.mockReturnValue(["vi-VN", "en-US"]);
+    i18n.setLanguage("system");
+    expect(i18n.locale).toBe("vi");
+    expect(document.documentElement.lang).toBe("vi");
+    languages.mockReturnValue(["de-DE", "en-GB"]);
+    i18n.setLanguage("system");
+    expect(i18n.locale).toBe("en");
+    expect(document.documentElement.lang).toBe("en");
+    languages.mockRestore();
   });
 });

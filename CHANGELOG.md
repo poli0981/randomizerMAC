@@ -5,6 +5,26 @@ All notable changes to RandomMac (named "RANDOM MAC" in 1.x) are documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Windows: the autostart task is recognized when the installation folder contains `&`. The task's
+  command line was compared with the program path without decoding XML entities, so RandomMac
+  re-created the task at every start.
+- The RandomMac 1.x import reports only the history entries it keeps; entries older than the
+  history retention period are dropped right away but were counted as imported.
+
+### Changed
+
+- CI analyzes every push and pull request with SonarQube Cloud, with coverage from the Rust tests
+  on Windows and Linux, real changes on a Linux dummy interface (iproute2 and a stand-in
+  NetworkManager) and the UI tests. CodeQL now also scans the Rust code; Dependabot waits a few
+  days before proposing new releases and also updates the pinned Rust toolchain (now 1.99.1).
+- Build scripts: `build-sidecar.mjs` accepts only known target triples; CI installs npm packages
+  without lifecycle scripts and runs ESLint/Prettier from the locked `node_modules`; the release
+  workflow's download checks refuse non-HTTPS redirects.
+
 ## [2.0.1] - 2026-10-22
 
 A maintenance release: the application behaves exactly as 2.0.0. The certificate check used by

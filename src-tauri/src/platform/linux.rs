@@ -86,3 +86,42 @@ pub fn tray_host_available() -> bool {
         Err(_) => false,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prepare_allows_normal_users() {
+        // prepare() may set an environment variable on NVIDIA systems; only run it where it
+        // does not (CI), since tests are multi-threaded.
+        if std::path::Path::new("/sys/module/nvidia").exists() {
+            return;
+        }
+        // SAFETY: geteuid has no preconditions.
+        let root = unsafe { libc::geteuid() } == 0;
+        let allowed = std::env::var_os("RANDOMMAC_ALLOW_ROOT").is_some();
+        assert_eq!(prepare().is_ok(), !root || allowed);
+    }
+
+    #[test]
+    fn appimage_variables_are_scrubbed() {
+        for var in [
+            "LD_LIBRARY_PATH",
+            "LD_PRELOAD",
+            "APPIMAGE",
+            "GTK_PATH",
+            "PYTHONPATH",
+        ] {
+            assert!(APPIMAGE_VARS.contains(&var), "{var}");
+        }
+        assert!(!APPIMAGE_VARS.contains(&"PATH"));
+    }
+
+    #[test]
+    fn tray_detection_never_fails() {
+        // A missing session bus (CI) or watcher means "no tray"; either way it must not panic.
+        let first = tray_host_available();
+        assert_eq!(tray_host_available(), first);
+    }
+}

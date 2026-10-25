@@ -65,6 +65,61 @@ describe("describeOutcome", () => {
     ).toBe("info");
   });
 
+  it("confirms restores", () => {
+    const out = describeOutcome(result("applied"), true, null, fmt, "windows");
+    expect(out).toEqual({
+      kind: "success",
+      message: i18n.t("result.restored", { adapter: "Wi-Fi" }),
+    });
+  });
+
+  it("warns when the change could not be verified or needs a reboot", () => {
+    expect(describeOutcome(result("unverified"), false, null, fmt, "linux")).toEqual({
+      kind: "warning",
+      message: i18n.t("result.unverified"),
+    });
+    expect(describeOutcome(result("rebootRequired"), false, null, fmt, "windows")).toEqual({
+      kind: "warning",
+      message: i18n.t("result.rebootRequired"),
+    });
+  });
+
+  it("explains rollbacks elsewhere without the Wi-Fi hint", () => {
+    const ethernet = { kind: "ethernet" } as Parameters<typeof describeOutcome>[2];
+    for (const [adapter, os] of [
+      [ethernet, "windows"],
+      [null, "windows"],
+      [{ kind: "wireless" } as Parameters<typeof describeOutcome>[2], "linux"],
+    ] as const) {
+      expect(describeOutcome(result("rolledBack"), false, adapter, fmt, os).message).toBe(
+        i18n.t("result.rolledBack"),
+      );
+    }
+  });
+
+  it("reports failures with the most specific code", () => {
+    const r = result("failed", "VERIFY_TIMEOUT");
+    expect(describeOutcome(r, false, null, fmt, "linux")).toEqual({
+      kind: "error",
+      message: i18n.error("VERIFY_TIMEOUT"),
+    });
+    r.entry.errorCode = "DRIVER_REJECTED";
+    expect(describeOutcome(r, false, null, fmt, "linux").message).toBe(
+      i18n.error("DRIVER_REJECTED"),
+    );
+    r.report = null;
+    expect(describeOutcome(r, false, null, fmt, "linux").message).toBe(
+      i18n.error("DRIVER_REJECTED"),
+    );
+  });
+
+  it("formats the requested address when none was observed", () => {
+    const r = result("applied");
+    r.report!.observedMac = null;
+    const lower = { separator: "hyphen", uppercase: false } as const;
+    expect(describeOutcome(r, false, null, lower, "linux").message).toContain("02-11-22-33-44-55");
+  });
+
   it("falls back to error codes when there is no report", () => {
     const r = result("failed");
     r.report = null;

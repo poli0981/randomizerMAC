@@ -178,12 +178,64 @@ mod tests {
     }
 
     #[test]
+    fn ambiguous_names_and_addresses_resolve_to_nothing() {
+        let backend = MockBackend::new(MockScenario::Normal);
+        let mut list = backend.list_adapters().expect("list");
+        let mut twin = list[0].clone();
+        twin.id = "twin".into();
+        let mac = twin.current_mac.expect("current mac").to_string();
+        let name = twin.name.clone();
+        list.push(twin);
+        assert!(resolve_adapter(&list, &name).is_none());
+        assert!(resolve_adapter(&list, &mac).is_none());
+        assert_eq!(
+            resolve_adapter(&list, " twin ").map(|a| a.id.as_str()),
+            Some("twin")
+        );
+    }
+
+    #[test]
     fn unsupported_backend_reports_errors() {
         let b = UnsupportedBackend;
         assert!(!b.capabilities().can_change);
         assert_eq!(
             b.list_adapters().expect_err("unsupported").code(),
             "UNSUPPORTED"
+        );
+        assert_eq!(
+            b.find_adapter("x").expect_err("unsupported").code(),
+            "UNSUPPORTED"
+        );
+
+        let adapter = MockBackend::new(MockScenario::Normal)
+            .list_adapters()
+            .expect("list")
+            .remove(0);
+        let mac: MacAddress = "02:11:22:33:44:55".parse().expect("mac");
+        let opts = ChangeOptions::default();
+        let mut stages = Vec::new();
+        let mut progress = |s: Stage| stages.push(s);
+        let errors = [
+            b.apply(&adapter, mac, &opts, &mut progress)
+                .expect_err("apply"),
+            b.restore(&adapter, None, &opts, &mut progress)
+                .expect_err("restore"),
+            b.set_enabled(&adapter, false).expect_err("disable"),
+        ];
+        assert!(errors.iter().all(|e| e.code() == "UNSUPPORTED"));
+        assert!(stages.is_empty());
+    }
+
+    #[test]
+    fn find_adapter_reports_unknown_ids() {
+        let backend = MockBackend::new(MockScenario::Normal);
+        assert_eq!(
+            backend.find_adapter("mock-wifi").expect("found").id,
+            "mock-wifi"
+        );
+        assert_eq!(
+            backend.find_adapter("missing").expect_err("missing"),
+            NetError::NotFound("missing".into())
         );
     }
 

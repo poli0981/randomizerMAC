@@ -8,7 +8,7 @@ How to build, run, test and release RandomMac 2.x. For the design, see
 | Tool | Version | Notes |
 |---|---|---|
 | Git | 2.x | |
-| [rustup](https://rustup.rs/) | any | `rust-toolchain.toml` pins Rust **1.98.0** (+ rustfmt, clippy); rustup installs it on first use. MSRV is 1.89. |
+| [rustup](https://rustup.rs/) | any | `rust-toolchain.toml` pins Rust **1.99.1** (+ rustfmt, clippy); rustup installs it on first use. MSRV is 1.89. |
 | [Node.js](https://nodejs.org/) | **26** (`.nvmrc`) | npm 11+. |
 | Tauri prerequisites | see below | WebView2/WebKitGTK and native build tools. |
 
@@ -213,7 +213,7 @@ signing — **back up the key**, without it no update can ever be delivered), `D
 |---|---|
 | Windows 11 Pro Insider (developer machine, see [pc_spec.md](pc_spec.md)) | App, tray, read-only mode, CLI, real change attempt on a Wi-Fi adapter with rollback, signed NSIS/MSI release builds with signature verification |
 | GitHub `windows-latest` | Build, tests, NSIS + MSI install/uninstall, legacy task cleanup, GUI smoke test |
-| GitHub `ubuntu-24.04` | Build, tests, real change on a dummy interface, `.deb` install + GUI smoke test (Xvfb) |
+| GitHub `ubuntu-24.04` | Build, tests, real change on a dummy interface (iproute2, and NetworkManager through a stand-in `nmcli`), `.deb` install + GUI smoke test (Xvfb) |
 | `fedora:43` container | `.rpm` installation and dependency resolution |
 
 ## Data locations

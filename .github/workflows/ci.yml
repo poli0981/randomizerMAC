@@ -53,10 +53,9 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Versions are in sync
         run: node scripts/version.mjs check
-      - name: ESLint
-        run: npx eslint .
-      - name: Prettier
-        run: npx prettier --check .
+      # Through the package scripts (locked versions in node_modules), not npx.
+      - name: ESLint and Prettier
+        run: npm run lint
       - name: Type check (svelte-check, TypeScript 7)
         run: npm run check
       - name: Unit tests (with coverage)
@@ -131,17 +130,30 @@ jobs:
         with:
           persist-credentials: false
       - name: Install the pinned Rust toolchain
-        run: rustup toolchain install --profile minimal
+        run: rustup toolchain install --profile minimal --component llvm-tools
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: cli
-      - run: cargo build -p randommac-cli --locked
+      - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
+        with:
+          tool: cargo-llvm-cov
+      # The real changes below run this instrumented CLI; its coverage of the Linux backend is
+      # merged with the unit tests' by the SonarQube Cloud job.
+      - name: Build the CLI with coverage instrumentation
+        run: |
+          source <(cargo llvm-cov show-env --sh)
+          cargo llvm-cov clean --workspace
+          cargo build -p randommac-cli --locked
       - name: Set, randomize and restore a real (dummy) interface
         run: |
           set -euo pipefail
+          source <(cargo llvm-cov show-env --sh)
           sudo ip link add dummy0 type dummy
           sudo ip link set dummy0 up
-          cli() { sudo ./target/debug/randommac-cli --data-dir "$RUNNER_TEMP/randommac" "$@"; }
+          cli() {
+            sudo LLVM_PROFILE_FILE="$LLVM_PROFILE_FILE" ./target/debug/randommac-cli \
+              --data-dir "$RUNNER_TEMP/randommac" "$@"
+          }
           addr() { cat /sys/class/net/dummy0/address; }
           before=$(addr)
           echo "original: $before"
@@ -159,6 +171,48 @@ jobs:
             echo "::error::malicious interface name was accepted"; exit 1
           fi
           ip link show lo | grep -q "state UNKNOWN"
+
+          # NetworkManager method against a stand-in nmcli (crates/randommac-net/tests/fake-nmcli.sh).
+          sudo install -m 0755 crates/randommac-net/tests/fake-nmcli.sh /usr/bin/nmcli
+          sudo nmcli fake-setup dummy0
+          cloned() { sudo cat "/run/fake-nm/connections/$1/cloned"; }
+          cli --json show dummy0 > "$RUNNER_TEMP/show.json"
+          grep -q '"networkManager"' "$RUNNER_TEMP/show.json"
+          cli set dummy0 02:12:34:56:78:9b
+          test "$(addr)" = "02:12:34:56:78:9b"
+          test "$(cloned rm-test-a)" = "02:12:34:56:78:9b"
+          # The profile had no cloned-mac-address: back to the hardware address, then unset again.
+          cli restore dummy0
+          test "$(addr)" = "$before"
+          test -z "$(cloned rm-test-a)"
+          # A driver that ignores the address: the profile is rolled back (exit code 5).
+          sudo touch /run/fake-nm/ignore
+          if cli set dummy0 02:12:34:56:78:9c; then
+            echo "::error::an ignored change was reported as applied"; exit 1
+          fi
+          sudo rm /run/fake-nm/ignore
+          test "$(addr)" = "$before"
+          test -z "$(cloned rm-test-a)"
+          # Roaming: changed through one profile, restored while another one is active.
+          cli set dummy0 02:12:34:56:78:9d
+          sudo nmcli --wait 60 connection up uuid rm-test-b
+          cli restore dummy0
+          test "$(addr)" = "$before"
+          test -z "$(cloned rm-test-a)"
+          test -z "$(cloned rm-test-b)"
+          cli history
+      - name: Coverage report
+        run: |
+          source <(cargo llvm-cov show-env --sh)
+          mkdir -p coverage
+          cargo llvm-cov report --lcov --output-path coverage/rust-Linux-integration.info
+          sed -i "s#^SF:$GITHUB_WORKSPACE/#SF:#" coverage/rust-Linux-integration.info
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-rust-Linux-integration
+          path: coverage/rust-Linux-integration.info
+          retention-days: 7
+          if-no-files-found: error
 
   bundle:
     name: Bundle (${{ matrix.os }})
@@ -278,7 +332,7 @@ jobs:
 
   sonar:
     name: SonarQube Cloud
-    needs: [frontend, rust]
+    needs: [frontend, rust, linux-integration]
     # SONAR_TOKEN is not available to pull requests from forks or from Dependabot.
     if: >-
       github.event_name != 'pull_request' ||

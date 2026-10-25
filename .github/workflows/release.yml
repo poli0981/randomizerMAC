@@ -228,11 +228,11 @@ jobs:
         run: |
           set -euo pipefail
           for i in 1 2 3 4 5 6; do
-            if curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/latest.json" -o latest.json \
+            if curl -fsSL --proto =https --proto-redir =https "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/latest.json" -o latest.json \
               && [ "$(jq -r .version latest.json)" = "$VERSION" ]; then
               jq -r '.platforms | keys[]' latest.json
               for u in $(jq -r '.platforms[].url' latest.json | sort -u); do
-                curl -fsIL -o /dev/null "$u"
+                curl -fsIL --proto =https --proto-redir =https -o /dev/null "$u"
               done
               echo "latest.json OK"; exit 0
             fi

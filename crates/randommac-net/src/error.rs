@@ -80,3 +80,79 @@ impl From<std::io::Error> for NetError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_error_has_a_stable_code() {
+        let mac: MacAddress = "02:11:22:33:44:55".parse().expect("mac");
+        let cases = [
+            (NetError::NotFound("x".into()), "ADAPTER_NOT_FOUND"),
+            (NetError::NotElevated, "NOT_ELEVATED"),
+            (NetError::PermissionDenied("x".into()), "PERMISSION_DENIED"),
+            (NetError::AuthCancelled, "AUTH_CANCELLED"),
+            (NetError::AuthUnavailable("x".into()), "AUTH_UNAVAILABLE"),
+            (NetError::Unsupported("x".into()), "UNSUPPORTED"),
+            (NetError::InvalidInput("x".into()), "INVALID_INPUT"),
+            (NetError::NmUnavailable("x".into()), "NM_UNAVAILABLE"),
+            (NetError::NmNoActiveConnection, "NM_NO_ACTIVE_CONNECTION"),
+            (NetError::VerifyTimeout, "VERIFY_TIMEOUT"),
+            (NetError::RollbackFailed("x".into()), "ROLLBACK_FAILED"),
+            (NetError::NoOriginal, "NO_ORIGINAL"),
+            (
+                NetError::CommandFailed {
+                    program: "ip".into(),
+                    code: Some(2),
+                    stderr: "bad".into(),
+                },
+                "COMMAND_FAILED",
+            ),
+            (NetError::Timeout("x".into()), "TIMEOUT"),
+            (
+                NetError::Os {
+                    context: "x".into(),
+                    code: 5,
+                },
+                "OS_ERROR",
+            ),
+            (NetError::Io("x".into()), "IO_ERROR"),
+            (
+                NetError::DriverRejected {
+                    requested: mac,
+                    actual: None,
+                },
+                "DRIVER_REJECTED",
+            ),
+        ];
+        for (error, code) in cases {
+            assert_eq!(error.code(), code, "{error}");
+            assert!(!error.to_string().is_empty());
+        }
+    }
+
+    #[test]
+    fn messages_include_the_details() {
+        let e = NetError::CommandFailed {
+            program: "nmcli".into(),
+            code: None,
+            stderr: "not running".into(),
+        };
+        assert_eq!(e.to_string(), "nmcli failed (exit code None): not running");
+        let e = NetError::Os {
+            context: "opening the driver key".into(),
+            code: 5,
+        };
+        assert_eq!(e.to_string(), "opening the driver key failed (OS error 5)");
+    }
+
+    #[test]
+    fn io_errors_keep_permission_problems_apart() {
+        use std::io::{Error, ErrorKind};
+        let denied: NetError = Error::new(ErrorKind::PermissionDenied, "no access").into();
+        assert_eq!(denied, NetError::PermissionDenied("no access".into()));
+        let other: NetError = Error::new(ErrorKind::NotFound, "missing").into();
+        assert_eq!(other, NetError::Io("missing".into()));
+    }
+}

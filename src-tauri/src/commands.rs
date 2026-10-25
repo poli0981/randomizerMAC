@@ -774,30 +774,35 @@ pub async fn bundle_export(
         ) else {
             return Ok(None);
         };
-        let file = std::fs::File::create(&path)?;
-        let mut zip = zip::ZipWriter::new(file);
-        let opts = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated);
-        let mut add = |name: &str, bytes: Vec<u8>| -> ApiResult<()> {
-            zip.start_file(name, opts)
-                .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
-            zip.write_all(&bytes)?;
-            Ok(())
-        };
-        add("settings.json", serde_json::to_vec_pretty(&settings)?)?;
-        add(
-            "blacklist.json",
-            serde_json::to_vec_pretty(&store.load_blacklist().0)?,
-        )?;
-        add(
-            "history.json",
-            serde_json::to_vec_pretty(&store.load_history().0)?,
-        )?;
-        zip.finish()
-            .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
+        write_bundle(&path, &settings, &store)?;
         Ok(Some(path.display().to_string()))
     })
     .await
+}
+
+fn write_bundle(path: &PathBuf, settings: &Settings, store: &ops::DataStore) -> ApiResult<()> {
+    let file = std::fs::File::create(path)?;
+    let mut zip = zip::ZipWriter::new(file);
+    let opts = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    let mut add = |name: &str, bytes: Vec<u8>| -> ApiResult<()> {
+        zip.start_file(name, opts)
+            .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
+        zip.write_all(&bytes)?;
+        Ok(())
+    };
+    add("settings.json", serde_json::to_vec_pretty(settings)?)?;
+    add(
+        "blacklist.json",
+        serde_json::to_vec_pretty(&store.load_blacklist().0)?,
+    )?;
+    add(
+        "history.json",
+        serde_json::to_vec_pretty(&store.load_history().0)?,
+    )?;
+    zip.finish()
+        .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
+    Ok(())
 }
 
 #[tauri::command]

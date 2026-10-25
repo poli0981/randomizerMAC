@@ -726,6 +726,352 @@ mod tests {
         assert_eq!(permanent_address("bad name"), None);
     }
 
+    fn mac(s: &str) -> MacAddress {
+        s.parse().expect("mac")
+    }
+
+    /// A sysfs + udev tree with a physical Ethernet card, a Wi-Fi card, a virtual interface and
+    /// interfaces RandomMac skips (loopback, a non-Ethernet link type).
+    fn fixture() -> (tempfile::TempDir, LinuxBackend) {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let net = tmp.path().join("net");
+        let udev = tmp.path().join("udev");
+        let write = |iface: &str, file: &str, value: &str| {
+            let path = net.join(iface).join(file);
+            std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
+            std::fs::write(path, value).expect("write");
+        };
+        for (iface, ifindex, address, kind) in [
+            ("eth9", "7", "52:54:00:12:34:56", "1"),
+            ("wlan9", "8", "02:11:22:33:44:55", "1"),
+            ("veth9", "9", "0a:00:00:00:00:09", "1"),
+            ("lo", "1", "00:00:00:00:00:00", "772"),
+            ("ppp9", "10", "00:00:00:00:00:00", "512"),
+        ] {
+            write(iface, "ifindex", ifindex);
+            write(iface, "address", address);
+            write(iface, "type", kind);
+        }
+        write("eth9", "operstate", "up\n");
+        write("eth9", "carrier", "1\n");
+        write("eth9", "flags", "0x1003\n");
+        write("eth9", "addr_assign_type", "0\n");
+        write("eth9", "device/uevent", "DRIVER=e1000e\n");
+        write("wlan9", "operstate", "down\n");
+        write("wlan9", "addr_assign_type", "3\n");
+        write("wlan9", "device/uevent", "DRIVER=iwlwifi\n");
+        std::fs::create_dir_all(net.join("wlan9/wireless")).expect("mkdir");
+        write("veth9", "operstate", "up\n");
+        write("veth9", "carrier", "0\n");
+        std::fs::create_dir_all(&udev).expect("mkdir");
+        std::fs::write(
+            udev.join("n7"),
+            "E:ID_VENDOR_FROM_DATABASE=Intel Corporation\nE:ID_MODEL_FROM_DATABASE=Ethernet Connection I219-V\n",
+        )
+        .expect("udev");
+        let backend = LinuxBackend::with_roots(&net, &udev);
+        (tmp, backend)
+    }
+
+    fn adapter(name: &str) -> Adapter {
+        Adapter {
+            id: name.into(),
+            name: name.into(),
+            description: String::new(),
+            interface_name: name.into(),
+            kind: AdapterKind::Ethernet,
+            is_virtual: false,
+            state: AdapterState::Up,
+            connected: true,
+            current_mac: Some(mac("02:aa:bb:cc:dd:ee")),
+            permanent_mac: Some(mac("52:54:00:12:34:56")),
+            override_value: None,
+            supports_change: Support::Yes,
+            methods: vec![ChangeMethod::Iproute2],
+            nm_connection: None,
+            driver: None,
+            ipv4: vec![],
+            ipv6: vec![],
+        }
+    }
+
+    fn nm_connection(cloned_mac: &str) -> NmConnection {
+        NmConnection {
+            uuid: "7a1b".into(),
+            name: "Wired connection 1".into(),
+            setting: "802-3-ethernet".into(),
+            cloned_mac: cloned_mac.into(),
+        }
+    }
+
+    #[test]
+    fn lists_fixture_adapters() {
+        let (_tmp, backend) = fixture();
+        let adapters = backend.list_adapters().expect("list");
+        let names: Vec<&str> = adapters.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["eth9", "veth9", "wlan9"]);
+
+        let eth = &adapters[0];
+        assert_eq!(eth.kind, AdapterKind::Ethernet);
+        assert!(!eth.is_virtual);
+        assert_eq!((eth.state, eth.connected), (AdapterState::Up, true));
+        assert_eq!(
+            eth.description,
+            "Intel Corporation Ethernet Connection I219-V"
+        );
+        assert_eq!(eth.driver.as_deref(), Some("e1000e"));
+        // Not a real device: no ethtool answer, so the address the kernel calls permanent is used.
+        assert_eq!(eth.permanent_mac, Some(mac("52:54:00:12:34:56")));
+        assert_eq!(eth.override_value, None);
+        assert!(eth.nm_connection.is_none() || LinuxBackend::nmcli().is_some());
+
+        let veth = &adapters[1];
+        assert!(veth.is_virtual);
+        assert_eq!((veth.state, veth.connected), (AdapterState::Up, false));
+        assert_eq!(veth.description, "Virtual network interface");
+        assert_eq!(veth.permanent_mac, None);
+
+        let wlan = &adapters[2];
+        assert_eq!(wlan.kind, AdapterKind::Wireless);
+        assert_eq!((wlan.state, wlan.connected), (AdapterState::Down, false));
+        assert_eq!(wlan.description, "iwlwifi network interface");
+        // A random (assign type 3) address is not the hardware address.
+        assert_eq!(wlan.permanent_mac, None);
+        for a in &adapters {
+            assert_eq!(
+                a.supports_change,
+                if a.methods.is_empty() {
+                    Support::No
+                } else {
+                    Support::Yes
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn waits_for_the_address_in_sysfs() {
+        let (_tmp, backend) = fixture();
+        let current = mac("52:54:00:12:34:56");
+        assert_eq!(backend.current_address("eth9"), Some(current));
+        assert_eq!(backend.current_address("missing9"), None);
+        assert_eq!(
+            backend.wait_for("eth9", current, Duration::from_secs(5)),
+            Some(current)
+        );
+        // Gives up after the timeout and reports what the interface shows.
+        assert_eq!(
+            backend.wait_for("eth9", mac("02:00:00:00:00:01"), Duration::ZERO),
+            Some(current)
+        );
+    }
+
+    #[test]
+    fn apply_checks_the_name_and_the_method_first() {
+        let (_tmp, backend) = fixture();
+        let target = mac("02:00:00:00:00:01");
+        let mut stages = Vec::new();
+        let mut progress = |s: Stage| stages.push(s);
+        let opts = ChangeOptions::default();
+        assert_eq!(
+            backend.apply(&adapter("bad name"), target, &opts, &mut progress),
+            Err(NetError::InvalidInput("bad name".into()))
+        );
+        let nm = ChangeOptions {
+            linux_method: LinuxMethod::NetworkManager,
+            ..ChangeOptions::default()
+        };
+        let err = backend
+            .apply(&adapter("eth9"), target, &nm, &mut progress)
+            .expect_err("no NetworkManager connection");
+        assert!(
+            matches!(
+                err,
+                NetError::NmUnavailable(_) | NetError::NmNoActiveConnection
+            ),
+            "{err:?}"
+        );
+        // iproute2 on an interface that disappeared: nothing is run.
+        let iproute2 = ChangeOptions {
+            linux_method: LinuxMethod::Iproute2,
+            ..ChangeOptions::default()
+        };
+        assert_eq!(
+            backend.apply(&adapter("gone9"), target, &iproute2, &mut progress),
+            Err(NetError::NotFound("gone9".into()))
+        );
+        assert_eq!(stages, [Stage::Preparing; 3]);
+    }
+
+    #[test]
+    fn chooses_network_manager_only_with_an_active_connection() {
+        let (_tmp, backend) = fixture();
+        let mut a = adapter("eth9");
+        assert_eq!(
+            backend.choose_method(&a, LinuxMethod::Auto),
+            Ok(ChangeMethod::Iproute2)
+        );
+        assert_eq!(
+            backend.choose_method(&a, LinuxMethod::Iproute2),
+            Ok(ChangeMethod::Iproute2)
+        );
+        a.methods.insert(0, ChangeMethod::NetworkManager);
+        assert_eq!(
+            backend.choose_method(&a, LinuxMethod::Auto),
+            Ok(ChangeMethod::NetworkManager)
+        );
+        assert_eq!(
+            backend.choose_method(&a, LinuxMethod::NetworkManager),
+            Ok(ChangeMethod::NetworkManager)
+        );
+        assert_eq!(
+            backend.choose_method(&a, LinuxMethod::Iproute2),
+            Ok(ChangeMethod::Iproute2)
+        );
+        let mut nm_without_connection = adapter("eth9");
+        nm_without_connection.nm_connection = Some(nm_connection(""));
+        assert_eq!(
+            backend.apply_nm(
+                &adapter("eth9"),
+                mac("02:00:00:00:00:01"),
+                &ChangeOptions::default(),
+                &mut |_| {}
+            ),
+            Err(NetError::NmNoActiveConnection)
+        );
+    }
+
+    #[test]
+    fn restore_without_commands() {
+        let (_tmp, backend) = fixture();
+        let opts = ChangeOptions::default();
+        let mut a = adapter("eth9");
+        a.permanent_mac = None;
+        assert_eq!(
+            backend.restore(&a, None, &opts, &mut |_| {}),
+            Err(NetError::NoOriginal)
+        );
+
+        // Already at the recorded original address.
+        let original = OriginalRecord {
+            mac: a.current_mac,
+            nm_profiles: Default::default(),
+            recorded_at: chrono::Utc::now(),
+        };
+        let report = backend
+            .restore(&a, Some(&original), &opts, &mut |_| {})
+            .expect("nothing to do");
+        assert_eq!(report.status, ChangeStatus::Applied);
+        assert_eq!(report.method, ChangeMethod::Iproute2);
+        assert!(report.temporary);
+        assert_eq!(report.observed_mac, a.current_mac);
+    }
+
+    #[test]
+    fn restore_leaves_network_manager_privacy_policies_alone() {
+        let (_tmp, backend) = fixture();
+        let opts = ChangeOptions::default();
+        for policy in ["random", "stable"] {
+            let mut a = adapter("eth9");
+            a.methods = vec![ChangeMethod::NetworkManager];
+            a.nm_connection = Some(nm_connection(policy));
+            let report = backend
+                .restore(&a, None, &opts, &mut |_| {})
+                .expect("policy");
+            assert_eq!(report.status, ChangeStatus::Unverified);
+            assert_eq!(report.detail_code.as_deref(), Some("CHANGED_BY_OS"));
+            assert_eq!(report.method, ChangeMethod::NetworkManager);
+            assert!(!report.temporary);
+
+            a.current_mac = a.permanent_mac;
+            let report = backend
+                .restore(&a, None, &opts, &mut |_| {})
+                .expect("policy");
+            assert_eq!(report.status, ChangeStatus::Applied);
+            assert_eq!(report.detail_code.as_deref(), Some("NOTHING_TO_RESTORE"));
+        }
+    }
+
+    #[test]
+    fn restoring_saved_profiles_needs_network_manager() {
+        if LinuxBackend::nmcli().is_some() {
+            return; // never touch real connection profiles
+        }
+        let (_tmp, backend) = fixture();
+        let original = OriginalRecord {
+            mac: Some(mac("52:54:00:12:34:56")),
+            nm_profiles: [("old-profile".to_string(), String::new())].into(),
+            recorded_at: chrono::Utc::now(),
+        };
+        let err = backend
+            .restore(
+                &adapter("eth9"),
+                Some(&original),
+                &ChangeOptions::default(),
+                &mut |_| {},
+            )
+            .expect_err("NetworkManager needed");
+        assert!(matches!(err, NetError::NmUnavailable(_)), "{err:?}");
+        assert!(matches!(
+            LinuxBackend::nm_run(&["--version"], NMCLI_TIMEOUT),
+            Err(NetError::NmUnavailable(_))
+        ));
+        assert!(!LinuxBackend::nm_running());
+        assert!(LinuxBackend::nm_device("eth9").is_none());
+        assert!(LinuxBackend::nm_connection("old-profile").is_none());
+    }
+
+    #[test]
+    fn nmcli_failures_are_classified() {
+        let out = |code, stderr: &str| Output {
+            code,
+            stdout: String::new(),
+            stderr: stderr.into(),
+        };
+        assert_eq!(
+            LinuxBackend::nm_check(out(Some(0), ""), "connection up"),
+            Ok(())
+        );
+        assert!(matches!(
+            LinuxBackend::nm_check(
+                out(Some(4), "Error: Not authorized to control networking."),
+                "x"
+            ),
+            Err(NetError::PermissionDenied(_))
+        ));
+        assert!(matches!(
+            LinuxBackend::nm_check(out(Some(4), "insufficient privileges"), "x"),
+            Err(NetError::PermissionDenied(_))
+        ));
+        assert_eq!(
+            LinuxBackend::nm_check(out(Some(10), "Error: unknown connection"), "connection up"),
+            Err(NetError::CommandFailed {
+                program: "nmcli connection up".into(),
+                code: Some(10),
+                stderr: "Error: unknown connection".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn real_system_is_listed() {
+        let backend = LinuxBackend::default();
+        let caps = backend.capabilities();
+        assert_eq!(caps.platform, "linux");
+        assert_eq!(caps.elevated, LinuxBackend::is_root());
+        let adapters = backend.list_adapters().expect("sysfs");
+        assert!(
+            adapters
+                .iter()
+                .all(|a| a.name != "lo" && valid_ifname(&a.name))
+        );
+        assert_eq!(system_backend_platform(), "linux");
+    }
+
+    fn system_backend_platform() -> &'static str {
+        crate::system_backend().capabilities().platform
+    }
+
     #[test]
     fn enumerates_fixture_without_nm() {
         let tmp = tempfile::tempdir().expect("tempdir");

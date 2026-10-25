@@ -610,4 +610,41 @@ mod tests {
     fn cli_definition_is_valid() {
         Cli::command().debug_assert();
     }
+
+    #[test]
+    fn exit_codes_follow_the_documented_table() {
+        let auth = [
+            NetError::NotElevated,
+            NetError::PermissionDenied("x".into()),
+            NetError::AuthCancelled,
+            NetError::AuthUnavailable("x".into()),
+        ];
+        assert!(auth.iter().all(|e| net_exit(e) == 3));
+        assert_eq!(net_exit(&NetError::NotFound("x".into())), 4);
+        assert_eq!(net_exit(&NetError::InvalidInput("x".into())), 6);
+        assert_eq!(net_exit(&NetError::VerifyTimeout), 5);
+        assert_eq!(net_exit(&NetError::NmNoActiveConnection), 5);
+
+        assert_eq!(op_exit(&OpError::Net(NetError::AuthCancelled)), 3);
+        assert_eq!(op_exit(&OpError::Busy), 1);
+        assert_eq!(op_exit(&OpError::Storage("disk".into())), 1);
+        assert_eq!(ExitCodeTag(4).to_string(), "exit 4");
+    }
+
+    #[test]
+    fn hints_for_fixable_errors() {
+        assert!(hint(&NetError::NotElevated).is_some_and(|h| h.contains("administrator")));
+        assert!(hint(&NetError::AuthUnavailable("x".into())).is_some_and(|h| h.contains("sudo")));
+        assert!(
+            hint(&NetError::NmNoActiveConnection).is_some_and(|h| h.contains("--method iproute2"))
+        );
+        assert_eq!(hint(&NetError::VerifyTimeout), None);
+    }
+
+    #[test]
+    fn exit_codes_survive_the_error_chain() {
+        let e = fail(6, "bad address");
+        assert_eq!(e.downcast_ref::<ExitCodeTag>().map(|t| t.0), Some(6));
+        assert_eq!(e.root_cause().to_string(), "bad address");
+    }
 }
