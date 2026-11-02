@@ -22,10 +22,10 @@
     "version:set": "node scripts/version.mjs set"
   },
   "dependencies": {
-    "@lucide/svelte": "^1.61.0",
+    "@lucide/svelte": "^1.65.0",
     "@tauri-apps/api": "^2.12.4",
     "dompurify": "^3.4.17",
-    "marked": "^18.1.1"
+    "marked": "^18.1.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -33,7 +33,7 @@
     "@tauri-apps/cli": "^2.12.4",
     "@testing-library/svelte": "^5.4.2",
     "@tsconfig/svelte": "^5.0.8",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@typescript/native": "npm:typescript@~7.0.2",
     "@vitest/coverage-v8": "^5.0.5",
     "eslint": "^10.13.0",
