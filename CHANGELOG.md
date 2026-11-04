@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-11-04
+
+A maintenance release: RandomMac behaves as 2.0.1 apart from two bug fixes. The updater no longer
+contains zip 4, which has a critical advisory, and all dependencies are up to date.
+
+### Security
+
+- **tauri-plugin-updater 2.14.1** moved from zip 4 to zip 9, so zip 4 is gone from RandomMac and
+  its advisories no longer apply:
+  [GHSA-m665-v7pm-7grj](https://github.com/advisories/GHSA-m665-v7pm-7grj) (critical, parser
+  differential between the local and central headers),
+  [RUSTSEC-2026-0429](https://rustsec.org/advisories/RUSTSEC-2026-0429) (abort on a symlink entry
+  with a large declared size) and RUSTSEC-2026-0367/0368/0369. 2.0.1 was not exploitable through
+  them — zip 4 only unpacked `.zip`/`.tar.gz` update bundles, which RandomMac does not publish,
+  after their signature had been verified — but the code is no longer shipped. `deny.toml` no
+  longer ignores the zip 4 advisories; `src-tauri/Cargo.toml` requires tauri-plugin-updater
+  ≥ 2.14.1 and zip ≥ 9.3 (used for the diagnostics archive).
+
 ### Fixed
 
 - Windows: the autostart task is recognized when the installation folder contains `&`. The task's
@@ -24,6 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build scripts: `build-sidecar.mjs` accepts only known target triples; CI installs npm packages
   without lifecycle scripts and runs ESLint/Prettier from the locked `node_modules`; the release
   workflow's download checks refuse non-HTTPS redirects.
+- Dependencies: Tauri plugins dialog 2.8.4, notification 2.8.0, single-instance 2.5.5 and
+  updater 2.14.1 (rfd 0.17), zip 9.3 and the other Rust crates; Svelte 5.57.3, svelte-check
+  4.7.8, Vitest 5.1, ESLint 10.14, eslint-plugin-svelte 3.24, typescript-eslint 8.72.1,
+  @lucide/svelte 1.67, marked 18.1.3, @types/node 26.6.6; CI actions SonarQube scan 8.4.1 and
+  taiki-e/install-action 2.90.0. The yanked async-executor 1.14.0 is replaced by 1.14.1.
 
 ## [2.0.1] - 2026-10-22
 
@@ -435,6 +458,7 @@ First public release of RANDOM MAC, a lightweight Windows utility for randomizin
 - **Start Minimized** toggle may not function correctly in all scenarios
 - **App Icon** is placeholder only (no custom icon designed yet)
 
+[2.0.2]: https://github.com/poli0981/randomizerMAC/releases/tag/v2.0.2
 [2.0.1]: https://github.com/poli0981/randomizerMAC/releases/tag/v2.0.1
 [2.0.0]: https://github.com/poli0981/randomizerMAC/releases/tag/v2.0.0
 [1.1.3]: https://github.com/poli0981/randomizerMAC/releases/tag/v1.1.3
