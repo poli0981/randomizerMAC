@@ -16,6 +16,7 @@ pub mod random;
 pub mod settings;
 pub mod state;
 pub mod storage;
+pub mod timefmt;
 
 pub use blacklist::{Blacklist, BlacklistEntry, BlockReason, MacPattern};
 pub use generator::{GenerateError, GenerateRequest, GenerationMode, generate};

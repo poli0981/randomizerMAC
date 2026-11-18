@@ -12,6 +12,17 @@ use crate::error::NetError;
 /// `PATH` given to child processes on Unix.
 pub const SAFE_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
+/// Reads a child's pipe to the end on its own thread, so a full stdout cannot block stderr.
+fn read_in_thread<R: Read + Send + 'static>(pipe: Option<R>) -> thread::JoinHandle<String> {
+    thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(mut pipe) = pipe {
+            let _ = pipe.read_to_end(&mut buf);
+        }
+        decode(buf)
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Output {
     pub code: Option<i32>,
@@ -73,22 +84,8 @@ pub fn run(
         // Small scripts fit in the pipe buffer; dropping the handle closes stdin.
         pipe.write_all(input.as_bytes())?;
     }
-    let mut stdout = child.stdout.take();
-    let mut stderr = child.stderr.take();
-    let out_reader = thread::spawn(move || {
-        let mut buf = Vec::new();
-        if let Some(p) = stdout.as_mut() {
-            let _ = p.read_to_end(&mut buf);
-        }
-        decode(buf)
-    });
-    let err_reader = thread::spawn(move || {
-        let mut buf = Vec::new();
-        if let Some(p) = stderr.as_mut() {
-            let _ = p.read_to_end(&mut buf);
-        }
-        decode(buf)
-    });
+    let out_reader = read_in_thread(child.stdout.take());
+    let err_reader = read_in_thread(child.stderr.take());
     let deadline = Instant::now() + timeout;
     let status = loop {
         if let Some(status) = child.try_wait()? {

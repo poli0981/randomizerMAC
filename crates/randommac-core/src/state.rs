@@ -3,10 +3,10 @@
 
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::mac::MacAddress;
+use crate::timefmt::{self, OffsetDateTime};
 
 pub const STATE_SCHEMA_VERSION: u32 = 1;
 
@@ -21,7 +21,8 @@ pub struct OriginalRecord {
     /// tracked separately because the adapter can roam between connections.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub nm_profiles: BTreeMap<String, String>,
-    pub recorded_at: DateTime<Utc>,
+    #[serde(with = "timefmt::rfc3339")]
+    pub recorded_at: OffsetDateTime,
 }
 
 /// What [`AppState::remember`] added, so a change that did not happen can be forgotten again.
@@ -57,7 +58,7 @@ impl AppState {
         adapter_id: &str,
         current: Option<MacAddress>,
         nm_profile: Option<(&str, &str)>,
-        now: DateTime<Utc>,
+        now: OffsetDateTime,
     ) -> Remembered {
         self.schema_version = STATE_SCHEMA_VERSION;
         let mut remembered = Remembered::default();
@@ -115,7 +116,7 @@ mod tests {
 
     #[test]
     fn first_values_win() {
-        let now = Utc::now();
+        let now = timefmt::now();
         let mut s = AppState::default();
         let r = s.remember("eth0", mac("30:56:0F:09:8F:E4"), None, now);
         assert_eq!(
@@ -140,7 +141,7 @@ mod tests {
 
     #[test]
     fn profiles_are_tracked_per_connection() {
-        let now = Utc::now();
+        let now = timefmt::now();
         let mut s = AppState::default();
         let home = s.remember("wlan0", mac("50:EE:32:8C:BF:42"), Some(("home", "")), now);
         assert!(home.created && home.nm_profile.is_none());

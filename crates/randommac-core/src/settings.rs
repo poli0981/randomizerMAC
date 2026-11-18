@@ -4,13 +4,13 @@
 //! defaults and invalid values are replaced by defaults during [`Settings::sanitize`], so a
 //! hand-edited or imported file can never stop the app from starting (v1 bug M6).
 
-use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::generator::GenerationMode;
 use crate::history::HistoryPolicy;
 use crate::mac::MacFormat;
+use crate::timefmt::{self, OffsetDateTime};
 
 pub const SETTINGS_SCHEMA_VERSION: u32 = 2;
 
@@ -144,11 +144,17 @@ pub struct LinuxSettings {
 #[serde(rename_all = "camelCase", default)]
 pub struct LegacyInfo {
     /// When settings/history/blacklist were imported from RandomMac 1.x.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub imported_from_v1_at: Option<DateTime<Utc>>,
+    #[serde(
+        with = "timefmt::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub imported_from_v1_at: Option<OffsetDateTime>,
     /// The v1 elevated logon task was removed.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub legacy_task_removed_at: Option<DateTime<Utc>>,
+    #[serde(
+        with = "timefmt::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub legacy_task_removed_at: Option<OffsetDateTime>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -165,8 +171,11 @@ pub struct Settings {
     pub show_notifications: bool,
     pub confirm_before_apply: bool,
     pub auto_check_updates: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_update_check: Option<DateTime<Utc>>,
+    #[serde(
+        with = "timefmt::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_update_check: Option<OffsetDateTime>,
     #[serde(deserialize_with = "lenient")]
     pub generation_mode: GenerationMode,
     #[serde(deserialize_with = "lenient")]

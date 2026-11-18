@@ -3,11 +3,11 @@
 use std::fmt;
 use std::str::FromStr;
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::mac::MacAddress;
 use crate::random::new_id;
+use crate::timefmt::{self, OffsetDateTime};
 
 /// Addresses that are always refused, regardless of the user's list (kept from v1).
 pub const RESERVED: [MacAddress; 3] = [
@@ -121,14 +121,13 @@ impl fmt::Debug for MacPattern {
 
 impl Serialize for MacPattern {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
+        serializer.collect_str(self)
     }
 }
 
 impl<'de> Deserialize<'de> for MacPattern {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        s.parse().map_err(serde::de::Error::custom)
+        crate::mac::deserialize_parsed(deserializer)
     }
 }
 
@@ -143,7 +142,8 @@ pub struct BlacklistEntry {
     pub adapter_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
-    pub created_at: DateTime<Utc>,
+    #[serde(with = "timefmt::rfc3339")]
+    pub created_at: OffsetDateTime,
 }
 
 /// Why an address is blocked.
@@ -207,7 +207,7 @@ impl Blacklist {
         pattern: MacPattern,
         adapter_id: Option<String>,
         note: Option<String>,
-        now: DateTime<Utc>,
+        now: OffsetDateTime,
     ) -> Result<BlacklistEntry, BlacklistError> {
         if pattern.is_exact()
             && let Ok(mac) = MacAddress::try_from(pattern.bytes())
@@ -258,7 +258,7 @@ impl Blacklist {
     }
 
     /// Merges entries from another list (used by import); returns how many were added.
-    pub fn merge(&mut self, other: Blacklist, now: DateTime<Utc>) -> usize {
+    pub fn merge(&mut self, other: Blacklist, now: OffsetDateTime) -> usize {
         let mut added = 0;
         for e in other.entries {
             if self.add(e.pattern, e.adapter_id, e.note, now).is_ok() {
@@ -302,7 +302,7 @@ mod tests {
 
     #[test]
     fn matching_and_scope() {
-        let now = Utc::now();
+        let now = timefmt::now();
         let mut bl = Blacklist::default();
         let oui = bl
             .add(
@@ -335,7 +335,7 @@ mod tests {
 
     #[test]
     fn add_rejects_reserved_and_duplicates() {
-        let now = Utc::now();
+        let now = timefmt::now();
         let mut bl = Blacklist::default();
         assert_eq!(
             bl.add("00:00:00:00:00:00".parse().expect("p"), None, None, now),
@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn normalize_and_serde() {
-        let now = Utc::now();
+        let now = timefmt::now();
         let mut bl = Blacklist::default();
         bl.add("02:00:00".parse().expect("p"), None, None, now)
             .expect("add");

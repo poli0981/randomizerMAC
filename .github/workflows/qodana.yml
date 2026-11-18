@@ -1,0 +1,155 @@
+# Keep `name: Qodana` — notify-ci-failure.yml watches this workflow by name.
+name: Qodana
+
+# JetBrains Qodana static analysis, one linter per Qodana Cloud project:
+#
+#   typescript - qodana-js   (Docker, Svelte plugin)  UI, scripts, workflows  project randomMAC-TS-JS, secret QODANA_TOKEN_TS_JS, qodana.yaml
+#   rust       - qodana-rust (Docker, Early Access)   the Cargo workspace     project randomMAC-Rust,  secret QODANA_TOKEN_RUST,  qodana-rust.yaml
+#
+# Both projects are rooted at the repository root (the Cargo workspace and package.json live
+# there), so the Rust linter reads its own configuration file through `--config`.
+#
+# Every run analyses the whole project (`pr-mode: false`), so a pull request and master report the
+# same way, and each configuration holds a quality gate of zero problems. Results: Qodana Cloud,
+# check annotations on the run, and the qodana-report-* artifacts (SARIF and logs).
+#
+# Both linters need an Ultimate licence; the account runs the Qodana Ultimate trial. When the
+# licence lapses, both jobs fail at the licence check: renew it, or delete this file and the two
+# configuration files.
+#
+# Pull requests from Dependabot and forks get no repository secrets: the `tokens` job notices that
+# and the analysis is skipped there, not failed — master is analysed once they merge. The token
+# reaches the scan step only: npm packages are installed in a step that never sees it.
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/PULL_REQUEST_TEMPLATE.md"
+      - ".github/FUNDING.yml"
+      - ".github/CODEOWNERS"
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/PULL_REQUEST_TEMPLATE.md"
+      - ".github/FUNDING.yml"
+      - ".github/CODEOWNERS"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: qodana-${{ github.ref }}
+  # Superseded pull-request runs are cancelled; every push to master keeps its own result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  tokens:
+    name: Qodana tokens
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      ts-js: ${{ steps.check.outputs.ts-js }}
+      rust: ${{ steps.check.outputs.rust }}
+    steps:
+      - name: Check which Qodana tokens this run has
+        id: check
+        env:
+          HAS_TS_JS: ${{ secrets.QODANA_TOKEN_TS_JS != '' }}
+          HAS_RUST: ${{ secrets.QODANA_TOKEN_RUST != '' }}
+        run: |
+          echo "ts-js=$HAS_TS_JS" >> "$GITHUB_OUTPUT"
+          echo "rust=$HAS_RUST" >> "$GITHUB_OUTPUT"
+          if [ "$HAS_TS_JS" != true ] || [ "$HAS_RUST" != true ]; then
+            echo "::notice::No Qodana token in this run (a Dependabot or fork pull request): that analysis is skipped."
+          fi
+
+  typescript:
+    name: TypeScript / JavaScript
+    needs: tokens
+    if: needs.tokens.outputs.ts-js == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      checks: write # the action's annotations
+    steps:
+      # The pull request's own head commit, not the merge GitHub makes, so the report names a
+      # commit that exists; full history for its VCS data.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # The linter resolves imports and types from node_modules. No lifecycle scripts, as in every
+      # workflow (ci.yml).
+      - run: npm ci --ignore-scripts
+      # Docker, not native mode: the components are .svelte files, which only JetBrains' Svelte
+      # plugin reads (qodana.yaml), and plugins install in Docker mode only.
+      - name: Qodana scan
+        uses: JetBrains/qodana-action@3e8d76ff0e0241618abd808682f426afe84bab3f # v2026.2.2
+        with:
+          args: --linter qodana-js
+          pr-mode: false
+          post-pr-comment: false
+          upload-result: true
+          artifact-name: qodana-report-typescript
+          primary-cache-key: qodana-2026.2-js-${{ github.ref }}-${{ github.sha }}
+          # A prefix, so pull requests can restore the cache saved on master.
+          additional-cache-key: qodana-2026.2-js-
+          cache-default-branch-only: true
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_TS_JS }}
+
+  rust:
+    name: Rust (Early Access)
+    needs: tokens
+    if: needs.tokens.outputs.rust == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      checks: write # the action's annotations
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      # tauri::generate_context!() refuses to expand without the frontend directory (frontendDist,
+      # ../dist): an empty page stands in for the web build, which the analysis does not need.
+      - name: Stand-in for the web build
+        run: |
+          mkdir -p dist
+          echo '<!doctype html><title>stand-in</title>' > dist/index.html
+      # qodana-rust ships only as a Docker image. It runs as root so that the bootstrap in
+      # qodana-rust.yaml can install the C toolchain and the libraries Tauri links against —
+      # without them `cargo check` fails and the linter loads no Cargo package. The crates go to
+      # the cached Qodana directory.
+      - name: Qodana scan
+        uses: JetBrains/qodana-action@3e8d76ff0e0241618abd808682f426afe84bab3f # v2026.2.2
+        with:
+          args: --linter qodana-rust --config qodana-rust.yaml -u root -e CARGO_HOME=/data/cache/cargo
+          pr-mode: false
+          post-pr-comment: false
+          upload-result: true
+          artifact-name: qodana-report-rust
+          primary-cache-key: qodana-2026.2-rust-${{ github.ref }}-${{ github.sha }}
+          # A prefix, so pull requests can restore the cache saved on master.
+          additional-cache-key: qodana-2026.2-rust-
+          cache-default-branch-only: true
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_RUST }}

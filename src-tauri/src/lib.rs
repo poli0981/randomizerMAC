@@ -134,7 +134,7 @@ fn run_app(args: Args, elevated: bool, read_only: bool, temp_dir: Option<PathBuf
     if elevated {
         startup.legacy_task_removed = legacy::cleanup_legacy();
         if startup.legacy_task_removed {
-            settings.legacy.legacy_task_removed_at = Some(chrono::Utc::now());
+            settings.legacy.legacy_task_removed_at = Some(randommac_core::timefmt::now());
         }
     }
     if (first_run || startup.v1_import.is_some() || startup.legacy_task_removed)

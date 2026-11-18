@@ -5,7 +5,6 @@
 
 use std::path::Path;
 
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use serde_json::Value;
 
 use crate::blacklist::{Blacklist, MacPattern};
@@ -14,6 +13,7 @@ use crate::mac::MacAddress;
 use crate::random::new_id;
 use crate::settings::{Language, Settings, Theme};
 use crate::storage::read_text;
+use crate::timefmt::{self, OffsetDateTime};
 
 /// Adapter id used for v1 history entries (v1 only stored a volatile WMI index).
 pub const LEGACY_ADAPTER_ID: &str = "legacy-v1";
@@ -29,14 +29,8 @@ pub struct V1Data {
 }
 
 /// Parses .NET `DateTime` JSON: `…Z`, `…+07:00` or unspecified kind (treated as UTC, like v1).
-pub fn parse_v1_timestamp(s: &str) -> Option<DateTime<Utc>> {
-    let s = s.trim();
-    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
-        return Some(dt.with_timezone(&Utc));
-    }
-    NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f")
-        .ok()
-        .map(|naive| Utc.from_utc_datetime(&naive))
+pub fn parse_v1_timestamp(s: &str) -> Option<OffsetDateTime> {
+    timefmt::parse_rfc3339(s).or_else(|| timefmt::parse_naive_as_utc(s))
 }
 
 fn get<'a>(v: &'a Value, key: &str) -> Option<&'a Value> {
@@ -136,7 +130,7 @@ pub fn parse_v1_history(v1: &Value) -> Vec<HistoryEntry> {
 }
 
 /// Converts the v1 blacklist (nested `{global, adapters}` or the older flat array).
-pub fn parse_v1_blacklist(v1: &Value, now: DateTime<Utc>) -> Blacklist {
+pub fn parse_v1_blacklist(v1: &Value, now: OffsetDateTime) -> Blacklist {
     let note = Some("Imported from RandomMac 1.x".to_string());
     let mut out = Blacklist::default();
     let mut add = |raw: &Value, scope: Option<String>| {
@@ -172,7 +166,7 @@ fn read_json(path: &Path) -> Option<Value> {
 
 /// Reads everything importable from a v1 data folder. Returns `None` if nothing was found.
 /// Never modifies or deletes the v1 files.
-pub fn read_v1_dir(dir: &Path, settings: &mut Settings, now: DateTime<Utc>) -> Option<V1Data> {
+pub fn read_v1_dir(dir: &Path, settings: &mut Settings, now: OffsetDateTime) -> Option<V1Data> {
     let settings_json = read_json(&dir.join("settings.json"));
     let history_json = read_json(&dir.join("history.json"));
     let blacklist_json = read_json(&dir.join("blacklist.json"));
@@ -264,7 +258,7 @@ mod tests {
 
     #[test]
     fn blacklist_formats() {
-        let now = Utc::now();
+        let now = timefmt::now();
         let nested: Value = serde_json::from_str(
             r#"{"global":["00-00-00-00-00-00","FF-FF-FF-FF-FF-FF","AA-AA-AA-AA-AA-AA","02-00-00-00-00-01"],
                 "adapters":{"PCI\\VEN_1":["06-00-00-00-00-02","garbage"]}}"#,
@@ -288,10 +282,10 @@ mod tests {
     fn reads_directory() {
         let dir = tempfile::tempdir().expect("tempdir");
         let mut s = Settings::default();
-        assert!(read_v1_dir(dir.path(), &mut s, Utc::now()).is_none());
+        assert!(read_v1_dir(dir.path(), &mut s, timefmt::now()).is_none());
         std::fs::write(dir.path().join("settings.json"), r#"{"RunAtStartup":true}"#).expect("w");
         std::fs::write(dir.path().join("history.json"), "{ truncated").expect("w");
-        let data = read_v1_dir(dir.path(), &mut s, Utc::now()).expect("found");
+        let data = read_v1_dir(dir.path(), &mut s, timefmt::now()).expect("found");
         assert!(data.found_settings && data.run_at_startup);
         assert!(data.history.is_empty());
         assert!(

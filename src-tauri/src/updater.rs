@@ -6,7 +6,7 @@
 
 use std::time::Duration;
 
-use chrono::Utc;
+use randommac_core::timefmt;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_updater::{Update, UpdaterExt};
@@ -42,7 +42,7 @@ struct Progress {
 pub async fn check(app: &AppHandle) -> ApiResult<UpdateInfo> {
     let state = app.state::<AppState>();
     let update = app.updater()?.check().await?;
-    let now = Utc::now();
+    let now = timefmt::now();
     if let Ok(mut s) = state.settings.lock() {
         s.last_update_check = Some(now);
         let _ = state.store.save_settings(&s);
@@ -53,7 +53,7 @@ pub async fn check(app: &AppHandle) -> ApiResult<UpdateInfo> {
         version: update.as_ref().map(|u| u.version.clone()),
         date: update.as_ref().and_then(|u| u.date.map(|d| d.to_string())),
         notes: update.as_ref().and_then(|u| u.body.clone()),
-        checked_at: now.to_rfc3339(),
+        checked_at: timefmt::to_rfc3339(now),
     };
     if let Ok(mut s) = state.updater.lock() {
         s.pending = update;
@@ -186,7 +186,7 @@ pub fn spawn_startup_check(app: &AppHandle) {
         }
         let due = settings
             .last_update_check
-            .is_none_or(|t| Utc::now() - t > chrono::Duration::hours(24));
+            .is_none_or(|t| timefmt::now() - t > timefmt::Duration::hours(24));
         if !due {
             return;
         }

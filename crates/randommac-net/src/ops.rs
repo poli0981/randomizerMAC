@@ -8,11 +8,11 @@
 use std::io;
 use std::time::Duration;
 
-use chrono::Utc;
 use randommac_core::blacklist::BlockReason;
 use randommac_core::history::HistoryPolicy;
 use randommac_core::lock::OperationLock;
 use randommac_core::storage::{self, LoadStatus};
+use randommac_core::timefmt;
 use randommac_core::{
     AppPaths, AppState, Blacklist, ChangeSource, ChangeStatus, History, HistoryAction,
     HistoryEntry, MacAddress, Settings, random::new_id,
@@ -109,7 +109,7 @@ impl DataStore {
     /// Appends one entry under the retention policy.
     pub fn append_history(&self, entry: HistoryEntry, policy: HistoryPolicy) -> io::Result<()> {
         let (mut history, _) = self.load_history();
-        history.push(entry, policy, Utc::now());
+        history.push(entry, policy, timefmt::now());
         self.save_history(&history)
     }
 
@@ -172,7 +172,7 @@ fn history_entry(
     };
     HistoryEntry {
         id: new_id(),
-        timestamp: Utc::now(),
+        timestamp: timefmt::now(),
         adapter_id: adapter.id.clone(),
         adapter_name: adapter.name.clone(),
         action,
@@ -242,7 +242,7 @@ pub fn apply_mac(
             .nm_connection
             .as_ref()
             .map(|c| (c.uuid.as_str(), c.cloned_mac.as_str())),
-        Utc::now(),
+        timefmt::now(),
     );
     if !remembered.is_empty() {
         store.save_state(&state)?;
@@ -428,7 +428,7 @@ mod tests {
             Err(OpError::NotAssignable(_))
         ));
         let mut bl = Blacklist::default();
-        bl.add("02:99:99".parse().expect("p"), None, None, Utc::now())
+        bl.add("02:99:99".parse().expect("p"), None, None, timefmt::now())
             .expect("add");
         store.save_blacklist(&bl).expect("save");
         let blocked: MacAddress = "02:99:99:00:00:01".parse().expect("mac");

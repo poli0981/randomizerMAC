@@ -1,0 +1,58 @@
+# Qodana for JavaScript / TypeScript: the Svelte UI (src/), the build configuration, scripts/ and
+# the workflows. Run by .github/workflows/qodana.yml (job `typescript`, Docker), reported to the
+# Qodana Cloud project randomMAC-TS-JS (secret QODANA_TOKEN_TS_JS). The Rust workspace has its own
+# project and configuration (qodana-rust.yaml).
+version: "1.0"
+linter: qodana-js
+# The components are .svelte files, which the linter reads only with JetBrains' Svelte plugin. It is
+# not bundled with Qodana for JS and installs in Docker mode only.
+plugins:
+  - id: dev.blachut.svelte.lang
+profile:
+  name: qodana.recommended
+# The quality gate: any problem fails the job.
+failureConditions:
+  severityThresholds:
+    any: 0
+exclude:
+  - name: All
+    paths:
+      # The Rust workspace is the Rust project (qodana-rust.yaml).
+      - crates
+      - src-tauri
+      # Build output, caches and reports.
+      - target
+      - dist
+      - coverage
+      - node_modules
+      - .svelte-check
+  # `${{ secrets.DISCORD_RELEASE_PIPELINE_WEBHOOK }}` is a reference to a repository secret, not a
+  # secret: the "discord-client-secret" rule only sees the word.
+  - name: HardcodedPasswords
+    paths:
+      - .github/workflows/notify-release-pipeline.yml
+  # `\]` and `\}` outside a character class stay escaped: they read as the literal brackets they
+  # are, and the patterns stay valid if they ever get the `u` or `v` flag, where a lone `]` or `}`
+  # is a syntax error. ESLint's no-useless-escape accepts them too.
+  - name: RegExpRedundantEscape
+  # The dark palette is declared twice on purpose: for the "System" theme inside
+  # `@media (prefers-color-scheme: dark)` and for an explicit "Dark" choice (`[data-theme="dark"]`).
+  # Plain CSS cannot share one declaration block between a media query and a selector.
+  - name: DuplicatedCode
+    paths:
+      - src/app.css
+  # In .svelte files the Svelte plugin's type engine does not follow the template's control flow
+  # (`{#if settings}` and `{@const}` do not narrow; discriminated unions stay wide) and does not
+  # resolve the Lucide icon components' types, so it reports values as possibly null and
+  # assignments as mistyped where they are not. svelte-check (TypeScript 7, --fail-on-warnings)
+  # type-checks every component in CI; the TypeScript modules in src/lib stay analyzed here.
+  - name: TypeScriptValidateTypes
+    paths:
+      - src/App.svelte
+      - src/lib/components
+      - src/lib/pages
+  - name: TypeScriptUnresolvedReference
+    paths:
+      - src/App.svelte
+      - src/lib/components
+      - src/lib/pages

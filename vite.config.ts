@@ -11,7 +11,7 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
     host: host || false,
-    hmr: host ? { protocol: "ws", host, port: 1421 } : undefined,
+    ws: host ? { protocol: "ws", host, port: 1421 } : undefined,
     watch: { ignored: ["**/src-tauri/**", "**/crates/**", "**/target/**"] },
   },
   build: {
@@ -22,7 +22,7 @@ export default defineConfig({
   resolve: process.env.VITEST ? { conditions: ["browser"] } : undefined,
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "scripts/**/*.test.mjs"],
     // `npm run test:coverage` → coverage/lcov.info, imported by SonarQube Cloud (.svelte files
     // are not analyzed there, so only TypeScript modules are measured).
     coverage: {

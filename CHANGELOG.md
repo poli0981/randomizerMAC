@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **chrono → time.** RustSec marks chrono unmaintained
+  ([RUSTSEC-2026-0543](https://rustsec.org/advisories/RUSTSEC-2026-0543)); RandomMac's own
+  timestamps now use the `time` crate, which Tauri already depended on. The files RandomMac keeps
+  (settings, history, blacklist, state) still store RFC 3339 timestamps with `Z`, so files written by
+  2.0.x load unchanged and 2.0.x can read the new ones.
+
+### Changed
+
+- CI: JetBrains Qodana (Ultimate) analyzes the Rust workspace and the TypeScript/Svelte UI on
+  every push and pull request, with a quality gate of zero problems. The licenses of all npm
+  packages are now checked against an allow-list like the Rust crates' (`npm run check:licenses`),
+  and pull requests that add a dependency with a high or critical advisory are blocked. The Linux
+  integration job creates its dummy interface with a fixed address, so udev can no longer rewrite
+  it while the job reads it (the job failed at random).
+- Dependencies: Rust 1.100.0 (the workspace's minimum is now Rust 1.90, as Tauri requires),
+  tauri-plugin-notification 2.8.1, zip 9.5.1 and the other Rust crates; jsdom 31, Vite 8.3.8,
+  ESLint 10.15, eslint-plugin-svelte 3.24.1, typescript-eslint 8.72.2, Prettier 3.10.1,
+  @lucide/svelte 1.73, marked 18.2.0, DOMPurify 3.4.18; CI actions SonarQube scan 8.5.0 and
+  taiki-e/install-action 2.90.3. New releases are taken only after they have been public for three
+  days, as Dependabot does.
+
 ## [2.0.2] - 2026-11-04
 
 A maintenance release: RandomMac behaves as 2.0.1 apart from two bug fixes. The updater no longer
