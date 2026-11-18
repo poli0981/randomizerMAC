@@ -204,6 +204,95 @@ jobs:
           test -z "$(cloned rm-test-a)"
           test -z "$(cloned rm-test-b)"
           cli history
+      - name: Change DNS through the stand-in NetworkManager
+        run: |
+          set -euo pipefail
+          source <(cargo llvm-cov show-env --sh)
+          cli() {
+            sudo LLVM_PROFILE_FILE="$LLVM_PROFILE_FILE" ./target/debug/randommac-cli \
+              --data-dir "$RUNNER_TEMP/randommac" "$@"
+          }
+          # The fake nmcli of the previous step, a fake busctl for NetworkManager's DNS mode
+          # (crates/randommac-net/tests/fake-busctl.sh) and a local DNS server answering the
+          # reachability check that runs before a change.
+          sudo mv /usr/bin/busctl /usr/bin/busctl.real
+          sudo install -m 0755 crates/randommac-net/tests/fake-busctl.sh /usr/bin/busctl
+          sudo nmcli fake-setup dummy0
+          cat >"$RUNNER_TEMP/dns-responder.py" <<'PY'
+          import socket
+          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          s.bind(("127.0.0.2", 53))
+          while True:
+              query, peer = s.recvfrom(512)
+              if len(query) >= 12:
+                  reply = bytearray(query)
+                  reply[2] |= 0x80  # QR: a response with RCODE 0
+                  s.sendto(bytes(reply), peer)
+          PY
+          sudo python3 "$RUNNER_TEMP/dns-responder.py" &
+          sleep 1
+          profile() { sudo cat "/run/fake-nm/connections/rm-test-a/$1"; }
+          effective() { sudo cat "/run/fake-nm/effective$1"; }
+          cli dns show dummy0
+          cli --json dns show dummy0 > "$RUNNER_TEMP/dns.json"
+          grep -q '"networkManager"' "$RUNNER_TEMP/dns.json"
+          # Plain DNS after the reachability check.
+          cli dns set dummy0 --servers 127.0.0.2
+          test "$(profile dns4)" = 127.0.0.2
+          test "$(profile ignore4)" = yes
+          test "$(effective 4)" = 127.0.0.2
+          # A server that does not answer is refused before anything changes (exit code 5).
+          if cli dns set dummy0 --servers 192.0.2.53; then
+            echo "::error::a DNS server that does not answer was applied"; exit 1
+          fi
+          test "$(profile dns4)" = 127.0.0.2
+          # DNS over TLS with IPv6; `device reapply` fails, so RandomMac reconnects.
+          sudo touch /run/fake-nm/reapply-fail
+          cli dns set dummy0 --provider quad9 --encryption dot --no-check
+          sudo rm /run/fake-nm/reapply-fail
+          test "$(profile dns4)" = "9.9.9.9#dns.quad9.net,149.112.112.112#dns.quad9.net"
+          test "$(profile dns6)" = "2620:fe::fe#dns.quad9.net,2620:fe::9#dns.quad9.net"
+          test "$(profile dot)" = yes
+          test "$(effective 4)" = "9.9.9.9 | 149.112.112.112"
+          cli dns show dummy0
+          # NetworkManager not keeping the servers: rolled back (exit code 5).
+          sudo touch /run/fake-nm/dns-reject
+          if cli dns set dummy0 --provider cloudflare --no-check; then
+            echo "::error::DNS servers NetworkManager did not keep were reported as applied"; exit 1
+          fi
+          sudo rm /run/fake-nm/dns-reject
+          test "$(profile dot)" = yes
+          # No systemd-resolved: DNS over TLS is refused (exit code 6).
+          printf default | sudo tee /run/fake-nm/dns-mode >/dev/null
+          if cli dns set dummy0 --provider quad9 --encryption dot --no-check; then
+            echo "::error::DNS over TLS was accepted without systemd-resolved"; exit 1
+          fi
+          printf systemd-resolved | sudo tee /run/fake-nm/dns-mode >/dev/null
+          # A profile that ignores IPv6 takes the IPv4 servers only, with a warning.
+          printf ignore | sudo tee /run/fake-nm/connections/rm-test-a/method6 >/dev/null
+          cli dns set dummy0 --servers 192.0.2.53,2001:db8::53 --encryption none --no-check \
+            | tee "$RUNNER_TEMP/dns-set.txt"
+          grep -q DNS_IPV6_SKIPPED "$RUNNER_TEMP/dns-set.txt"
+          test "$(profile dns4)" = 192.0.2.53
+          printf auto | sudo tee /run/fake-nm/connections/rm-test-a/method6 >/dev/null
+          # Back to the values from before the first change, then nothing left to restore.
+          cli dns restore dummy0
+          test -z "$(profile dns4)"
+          test -z "$(profile dns6)"
+          test "$(profile ignore4)" = no
+          test "$(profile dot)" = default
+          test "$(effective 4)" = 192.0.2.1
+          out=$(cli dns restore dummy0)
+          grep -q NOTHING_TO_RESTORE <<<"$out"
+          # "Automatic" on a profile that was automatic leaves nothing to restore either.
+          cli dns set dummy0 --provider google --encryption none --no-check
+          cli dns auto dummy0
+          test -z "$(profile dns4)"
+          test "$(profile ignore4)" = no
+          out=$(cli dns restore dummy0)
+          grep -q NOTHING_TO_RESTORE <<<"$out"
+          cli history
+          sudo mv /usr/bin/busctl.real /usr/bin/busctl
       - name: Coverage report
         run: |
           source <(cargo llvm-cov show-env --sh)
@@ -214,6 +303,95 @@ jobs:
         with:
           name: coverage-rust-Linux-integration
           path: coverage/rust-Linux-integration.info
+          retention-days: 7
+          if-no-files-found: error
+
+  windows-integration:
+    name: Windows DNS change (runner adapter)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install --profile minimal --component llvm-tools
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: cli
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-llvm-cov
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      # Hosted runners run elevated: the instrumented CLI changes the DNS servers of the adapter
+      # with the default route for real (IP Helper API); its coverage of the Windows backend is
+      # merged with the unit tests' by the SonarQube Cloud job.
+      - name: Build the CLI with coverage instrumentation
+        run: |
+          cargo llvm-cov show-env --pwsh | Invoke-Expression
+          cargo llvm-cov clean --workspace
+          cargo build -p randommac-cli --locked
+      - name: Find the adapter with the default route
+        id: adapter
+        run: |
+          $route = Get-NetRoute -DestinationPrefix 0.0.0.0/0 |
+            Sort-Object { $_.RouteMetric + $_.InterfaceMetric } | Select-Object -First 1
+          $nic = Get-NetAdapter -InterfaceIndex $route.InterfaceIndex
+          "name=$($nic.Name)" >> $env:GITHUB_OUTPUT
+          "guid=$($nic.InterfaceGuid)" >> $env:GITHUB_OUTPUT
+          Get-DnsClientServerAddress -InterfaceIndex $nic.ifIndex | Format-Table -AutoSize
+      - name: Set plain DNS and DNS over HTTPS, restore, automatic
+        env:
+          ADAPTER: ${{ steps.adapter.outputs.name }}
+          GUID: ${{ steps.adapter.outputs.guid }}
+        run: |
+          cargo llvm-cov show-env --pwsh | Invoke-Expression
+          function cli {
+            & ./target/debug/randommac-cli.exe --data-dir "$env:RUNNER_TEMP/randommac" @args
+            if ($LASTEXITCODE -ne 0) { throw "randommac-cli $args exited with $LASTEXITCODE" }
+          }
+          function servers {
+            (Get-DnsClientServerAddress -InterfaceAlias $env:ADAPTER -AddressFamily IPv4).ServerAddresses -join ','
+          }
+          function doh { (cli --json dns show $env:ADAPTER | ConvertFrom-Json).status.dohTemplate }
+          $quad9 = "HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\InterfaceSpecificParameters\$env:GUID\DohInterfaceSettings\Doh\9.9.9.9"
+          $dhcp = servers
+          cli dns show $env:ADAPTER
+          cli dns set $env:ADAPTER --provider quad9 --encryption none --no-check
+          if ((servers) -ne '9.9.9.9,149.112.112.112') { throw "IPv4 servers: $(servers)" }
+          if (doh) { throw "unexpected DoH template: $(doh)" }
+          cli dns set $env:ADAPTER --provider quad9 --encryption doh --no-check
+          if ((doh) -ne 'https://dns.quad9.net/dns-query') { throw "DoH template: $(doh)" }
+          if (-not (Test-Path $quad9)) { throw 'no DoH settings for 9.9.9.9' }
+          cli dns show $env:ADAPTER
+          # Back to DHCP, without the DoH settings of the servers that were set.
+          cli dns restore $env:ADAPTER
+          if ((servers) -ne $dhcp) { throw "after restore: $(servers), expected $dhcp" }
+          if (Test-Path $quad9) { throw 'the DoH settings of 9.9.9.9 were left behind' }
+          cli dns set $env:ADAPTER --provider cloudflare --encryption none --no-check
+          cli dns auto $env:ADAPTER
+          if ((servers) -ne $dhcp) { throw "after automatic: $(servers), expected $dhcp" }
+          cli dns restore $env:ADAPTER
+          cli history
+      - name: Reset the adapter's DNS servers
+        if: always() && steps.adapter.outputs.name != ''
+        env:
+          ADAPTER: ${{ steps.adapter.outputs.name }}
+        run: |
+          Set-DnsClientServerAddress -InterfaceAlias $env:ADAPTER -ResetServerAddresses
+          Get-DnsClientServerAddress -InterfaceAlias $env:ADAPTER | Format-Table -AutoSize
+      - name: Coverage report
+        run: |
+          cargo llvm-cov show-env --pwsh | Invoke-Expression
+          New-Item -ItemType Directory -Force coverage | Out-Null
+          cargo llvm-cov report --lcov --output-path coverage/rust-Windows-integration.info
+          node scripts/lcov-paths.mjs coverage/rust-Windows-integration.info
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-rust-Windows-integration
+          path: coverage/rust-Windows-integration.info
           retention-days: 7
           if-no-files-found: error
 
@@ -356,7 +534,7 @@ jobs:
 
   sonar:
     name: SonarQube Cloud
-    needs: [frontend, rust, linux-integration]
+    needs: [frontend, rust, linux-integration, windows-integration]
     # SONAR_TOKEN is not available to pull requests from forks or from Dependabot.
     if: >-
       github.event_name != 'pull_request' ||

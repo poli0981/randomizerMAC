@@ -1,10 +1,12 @@
 //! Platform-independent core of RandomMac.
 //!
 //! Everything here is pure logic plus file persistence: MAC parsing/formatting, random address
-//! generation, the vendor (OUI) table, blacklist, history, settings, crash-safe storage and the
-//! RandomMac 1.x import. Operating-system specific code lives in `randommac-net`.
+//! generation, the vendor (OUI) table, blacklist, history, settings, crash-safe storage, the DNS
+//! model and provider catalog, and the RandomMac 1.x import. Operating-system specific code lives
+//! in `randommac-net`.
 
 pub mod blacklist;
+pub mod dns;
 pub mod generator;
 pub mod history;
 pub mod legacy_v1;
@@ -20,7 +22,9 @@ pub mod timefmt;
 
 pub use blacklist::{Blacklist, BlacklistEntry, BlockReason, MacPattern};
 pub use generator::{GenerateError, GenerateRequest, GenerationMode, generate};
-pub use history::{ChangeSource, ChangeStatus, History, HistoryAction, HistoryEntry};
+pub use history::{
+    ChangeSource, ChangeStatus, DnsHistory, History, HistoryAction, HistoryEntry, HistoryKind,
+};
 pub use mac::{MacAddress, MacFormat, ParseMacError, Separator};
 pub use paths::{APP_ID, AppPaths};
 pub use random::{OsRandom, RandomSource};

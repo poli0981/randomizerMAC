@@ -11,7 +11,8 @@
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem::size_of;
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::path::PathBuf;
 use std::ptr::{null, null_mut};
 use std::sync::mpsc;
 use std::thread;
@@ -29,9 +30,14 @@ use windows_sys::Win32::System::Threading as th;
 use windows_sys::core::GUID;
 
 use crate::NetworkBackend;
+use crate::dns_types::{DnsCapabilities, DnsOptions, DnsReport, DnsStatus};
 use crate::error::NetError;
 use crate::types::*;
 use crate::win_classify::*;
+use randommac_core::dns::{DnsConfig, DnsOriginalRecord, DnsSnapshot};
+
+#[path = "windows_dns.rs"]
+mod dns;
 
 const RESTART_TIMEOUT: Duration = Duration::from_secs(90);
 const NETWORK_KEY: &str =
@@ -499,14 +505,11 @@ fn wait_for_address(guid: &str, expected: MacAddress, timeout: Duration) -> Opti
 }
 
 /// IPv4/IPv6 addresses keyed by `{GUID}`.
-fn ip_addresses() -> HashMap<String, (Vec<String>, Vec<String>)> {
-    let mut map: HashMap<String, (Vec<String>, Vec<String>)> = HashMap::new();
-    let flags =
-        ip::GAA_FLAG_SKIP_ANYCAST | ip::GAA_FLAG_SKIP_MULTICAST | ip::GAA_FLAG_SKIP_DNS_SERVER;
+/// The `GetAdaptersAddresses` list (in an 8-byte aligned buffer), or an empty buffer on failure.
+fn adapter_addresses(flags: u32) -> Vec<u64> {
     let mut size: u32 = 16 * 1024;
-    let mut buf: Vec<u64> = Vec::new();
     for _ in 0..4 {
-        buf = vec![0u64; (size as usize).div_ceil(8)];
+        let mut buf = vec![0u64; (size as usize).div_ceil(8)];
         // SAFETY: buf is 8-byte aligned and `size` bytes long.
         let rc = unsafe {
             ip::GetAdaptersAddresses(
@@ -518,11 +521,19 @@ fn ip_addresses() -> HashMap<String, (Vec<String>, Vec<String>)> {
             )
         };
         if rc == f::ERROR_SUCCESS {
-            break;
+            return buf;
         }
         if rc != f::ERROR_BUFFER_OVERFLOW {
-            return map;
+            break;
         }
+    }
+    Vec::new()
+}
+
+/// Calls `f` with each adapter's normalized GUID and entry of an [`adapter_addresses`] buffer.
+fn for_each_adapter(buf: &[u64], mut f: impl FnMut(String, &ip::IP_ADAPTER_ADDRESSES_LH)) {
+    if buf.is_empty() {
+        return;
     }
     let mut cur = buf.as_ptr() as *const ip::IP_ADAPTER_ADDRESSES_LH;
     while !cur.is_null() {
@@ -533,35 +544,114 @@ fn ip_addresses() -> HashMap<String, (Vec<String>, Vec<String>)> {
             let name = unsafe { CStr::from_ptr(a.AdapterName.cast()) }
                 .to_string_lossy()
                 .to_ascii_uppercase();
-            let entry = map.entry(normalize_guid(&name)).or_default();
-            let mut ucast = a.FirstUnicastAddress;
-            while !ucast.is_null() {
-                // SAFETY: unicast list nodes live inside buf.
-                let u = unsafe { &*ucast };
-                let sa = u.Address.lpSockaddr;
-                if !sa.is_null() {
-                    // SAFETY: sa points to a SOCKADDR whose family selects the concrete type.
-                    let family = unsafe { (*sa).sa_family };
-                    if family == ws::AF_INET {
-                        // SAFETY: AF_INET means SOCKADDR_IN.
-                        let sin = unsafe { &*(sa as *const ws::SOCKADDR_IN) };
-                        // SAFETY: reading the u32 view of the address union.
-                        let raw = unsafe { sin.sin_addr.S_un.S_addr };
-                        entry.0.push(Ipv4Addr::from(u32::from_be(raw)).to_string());
-                    } else if family == ws::AF_INET6 {
-                        // SAFETY: AF_INET6 means SOCKADDR_IN6.
-                        let sin6 = unsafe { &*(sa as *const ws::SOCKADDR_IN6) };
-                        // SAFETY: reading the byte view of the address union.
-                        let bytes = unsafe { sin6.sin6_addr.u.Byte };
-                        entry.1.push(Ipv6Addr::from(bytes).to_string());
-                    }
-                }
-                ucast = u.Next;
-            }
+            f(normalize_guid(&name), a);
         }
         cur = a.Next;
     }
+}
+
+/// The address in a `SOCKADDR` of family AF_INET or AF_INET6.
+fn sockaddr_ip(sa: *const ws::SOCKADDR) -> Option<IpAddr> {
+    if sa.is_null() {
+        return None;
+    }
+    // SAFETY: sa points to a SOCKADDR whose family selects the concrete type.
+    let family = unsafe { (*sa).sa_family };
+    if family == ws::AF_INET {
+        // SAFETY: AF_INET means SOCKADDR_IN; reading the u32 view of the address union.
+        let raw = unsafe { (*(sa as *const ws::SOCKADDR_IN)).sin_addr.S_un.S_addr };
+        Some(IpAddr::V4(Ipv4Addr::from(u32::from_be(raw))))
+    } else if family == ws::AF_INET6 {
+        // SAFETY: AF_INET6 means SOCKADDR_IN6; reading the byte view of the address union.
+        let bytes = unsafe { (*(sa as *const ws::SOCKADDR_IN6)).sin6_addr.u.Byte };
+        Some(IpAddr::V6(Ipv6Addr::from(bytes)))
+    } else {
+        None
+    }
+}
+
+fn ip_addresses() -> HashMap<String, (Vec<String>, Vec<String>)> {
+    let mut map: HashMap<String, (Vec<String>, Vec<String>)> = HashMap::new();
+    let buf = adapter_addresses(
+        ip::GAA_FLAG_SKIP_ANYCAST | ip::GAA_FLAG_SKIP_MULTICAST | ip::GAA_FLAG_SKIP_DNS_SERVER,
+    );
+    for_each_adapter(&buf, |guid, a| {
+        let entry = map.entry(guid).or_default();
+        let mut ucast = a.FirstUnicastAddress;
+        while !ucast.is_null() {
+            // SAFETY: unicast list nodes live inside buf.
+            let u = unsafe { &*ucast };
+            match sockaddr_ip(u.Address.lpSockaddr) {
+                Some(IpAddr::V4(v4)) => entry.0.push(v4.to_string()),
+                Some(IpAddr::V6(v6)) => entry.1.push(v6.to_string()),
+                None => {}
+            }
+            ucast = u.Next;
+        }
+    });
     map
+}
+
+/// The DNS servers an interface uses (configured or from DHCP), without Windows' IPv6
+/// placeholders.
+fn dns_servers(guid: &str) -> Vec<IpAddr> {
+    let mut servers = Vec::new();
+    let buf = adapter_addresses(
+        ip::GAA_FLAG_SKIP_UNICAST
+            | ip::GAA_FLAG_SKIP_ANYCAST
+            | ip::GAA_FLAG_SKIP_MULTICAST
+            | ip::GAA_FLAG_SKIP_FRIENDLY_NAME,
+    );
+    for_each_adapter(&buf, |name, a| {
+        if name != guid {
+            return;
+        }
+        let mut dns = a.FirstDnsServerAddress;
+        while !dns.is_null() {
+            // SAFETY: DNS server list nodes live inside buf.
+            let d = unsafe { &*dns };
+            if let Some(ip) = sockaddr_ip(d.Address.lpSockaddr)
+                && !crate::win_dns::is_placeholder_dns(&ip)
+            {
+                servers.push(ip);
+            }
+            dns = d.Next;
+        }
+    });
+    servers
+}
+
+/// The Windows directory as reported by the OS. Never taken from `%SystemRoot%`: an elevated
+/// process inherits the user's environment, which a normal process could have changed to point
+/// RandomMac at its own copies of system programs.
+pub fn system_root() -> PathBuf {
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::System::SystemInformation::GetSystemWindowsDirectoryW;
+
+    let mut buf = vec![0u16; 260];
+    for _ in 0..2 {
+        let capacity = u32::try_from(buf.len()).unwrap_or(u32::MAX);
+        // SAFETY: the pointer and length describe `buf`.
+        let len = unsafe { GetSystemWindowsDirectoryW(buf.as_mut_ptr(), capacity) } as usize;
+        if len == 0 {
+            break;
+        }
+        if len < buf.len() {
+            let path = PathBuf::from(std::ffi::OsString::from_wide(&buf[..len]));
+            if path.is_absolute() {
+                return path;
+            }
+            break;
+        }
+        // Too small: `len` is the required size including the terminating NUL.
+        buf.resize(len, 0);
+    }
+    PathBuf::from(r"C:\Windows")
+}
+
+/// A program in `System32`, by absolute path.
+pub fn system32(exe: &str) -> PathBuf {
+    system_root().join("System32").join(exe)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -582,6 +672,15 @@ impl WindowsBackend {
         } else {
             Err(NetError::NotElevated)
         }
+    }
+
+    /// The interface GUID of the adapter, read without write access to its driver key.
+    fn interface_guid(instance_id: &str) -> Result<String, NetError> {
+        let (set, data) = DevInfoSet::open_instance(instance_id)?;
+        set.driver_key(&data, false)
+            .and_then(|key| key.get_string("NetCfgInstanceId"))
+            .map(|g| normalize_guid(&g))
+            .ok_or_else(|| NetError::NotFound(instance_id.to_string()))
     }
 
     /// Opens the driver key of the adapter for writing and returns it with its interface GUID.
@@ -866,6 +965,39 @@ impl NetworkBackend for WindowsBackend {
             _ => ChangeStatus::Unverified,
         };
         Ok(Self::report(status, previous, permanent, observed, None))
+    }
+
+    fn dns_capabilities(&self, adapter: &Adapter) -> DnsCapabilities {
+        dns::capabilities(adapter)
+    }
+
+    fn dns_status(&self, adapter: &Adapter) -> Result<DnsStatus, NetError> {
+        dns::status(adapter)
+    }
+
+    fn dns_snapshot(&self, adapter: &Adapter) -> Result<DnsSnapshot, NetError> {
+        dns::snapshot(adapter)
+    }
+
+    fn apply_dns(
+        &self,
+        adapter: &Adapter,
+        config: &DnsConfig,
+        previous: &DnsSnapshot,
+        opts: &DnsOptions,
+        progress: &mut dyn FnMut(Stage),
+    ) -> Result<DnsReport, NetError> {
+        dns::apply(adapter, config, previous, opts, progress)
+    }
+
+    fn restore_dns(
+        &self,
+        adapter: &Adapter,
+        original: &DnsOriginalRecord,
+        opts: &DnsOptions,
+        progress: &mut dyn FnMut(Stage),
+    ) -> Result<DnsReport, NetError> {
+        dns::restore(adapter, original, opts, progress)
     }
 
     fn set_enabled(&self, adapter: &Adapter, enabled: bool) -> Result<(), NetError> {

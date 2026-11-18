@@ -7,12 +7,14 @@
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 
+use crate::dns::CustomDnsPreset;
+use crate::dns::presets::{self, lenient_presets};
 use crate::generator::GenerationMode;
 use crate::history::HistoryPolicy;
 use crate::mac::MacFormat;
 use crate::timefmt::{self, OffsetDateTime};
 
-pub const SETTINGS_SCHEMA_VERSION: u32 = 2;
+pub const SETTINGS_SCHEMA_VERSION: u32 = 3;
 
 /// Deserializes a value, falling back to its default when the JSON value has the wrong shape.
 fn lenient<'de, D, T>(deserializer: D) -> Result<T, D::Error>
@@ -140,6 +142,36 @@ pub struct LinuxSettings {
     pub method: LinuxMethod,
 }
 
+/// DNS preferences and the user's own DNS presets.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DnsSettings {
+    /// Encrypt (DoH, else DoT) when the adapter supports it — the tray menu and the DNS page's
+    /// default.
+    #[serde(deserialize_with = "lenient_prefer_encryption")]
+    pub prefer_encryption: bool,
+    /// Let encrypted DNS fall back to unencrypted queries when the server cannot be reached.
+    #[serde(deserialize_with = "lenient")]
+    pub allow_fallback: bool,
+    #[serde(deserialize_with = "lenient_presets")]
+    pub presets: Vec<CustomDnsPreset>,
+}
+
+impl Default for DnsSettings {
+    fn default() -> Self {
+        Self {
+            prefer_encryption: true,
+            allow_fallback: false,
+            presets: Vec::new(),
+        }
+    }
+}
+
+fn lenient_prefer_encryption<'de, D: Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value(value).unwrap_or(DnsSettings::default().prefer_encryption))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct LegacyInfo {
@@ -191,6 +223,8 @@ pub struct Settings {
     pub history: HistorySettings,
     #[serde(deserialize_with = "lenient")]
     pub legacy: LegacyInfo,
+    #[serde(deserialize_with = "lenient")]
+    pub dns: DnsSettings,
 }
 
 impl Default for Settings {
@@ -214,6 +248,7 @@ impl Default for Settings {
             linux: LinuxSettings::default(),
             history: HistorySettings::default(),
             legacy: LegacyInfo::default(),
+            dns: DnsSettings::default(),
         }
     }
 }
@@ -239,6 +274,7 @@ impl Settings {
             .clamp(MIN_INTERVAL_MINUTES, MAX_INTERVAL_MINUTES);
         self.history.max_entries = self.history.max_entries.clamp(10, 10_000);
         self.history.retention_days = self.history.retention_days.min(3650);
+        presets::sanitize(&mut self.dns.presets);
         if let GenerationMode::Vendor { vendor_id } = &self.generation_mode
             && crate::oui::vendor_by_id(vendor_id).is_none()
         {

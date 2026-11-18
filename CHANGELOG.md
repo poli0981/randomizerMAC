@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **DNS settings per adapter**, in the CLI for now (`randommac-cli dns`; the app's page follows).
+  - `dns providers` lists the built-in providers: Cloudflare, Google, Quad9, AdGuard,
+    CleanBrowsing, Control D, DNS4EU, DNS.SB and Cisco OpenDNS, each with its filtering variants,
+    IPv4 and IPv6 servers, DNS-over-HTTPS template, DNS-over-TLS host and DNSCrypt stamps.
+  - `dns set` applies a provider, a preset, the local resolver (127.0.0.1 / ::1, for
+    dnscrypt-proxy and similar) or custom servers (up to two per IP version); `dns auto` goes
+    back to automatic (DHCP); `dns restore` puts back the settings from before RandomMac's first
+    DNS change on the adapter. `--all` changes every connected physical adapter.
+  - Encryption the OS supports natively: DNS over HTTPS on Windows 11 and Windows Server 2022 or
+    later (a template per server, optionally falling back to plain DNS), DNS over TLS on Linux
+    when NetworkManager hands DNS to systemd-resolved. DNSCrypt needs a client of its own; its
+    stamps are listed for it.
+  - Every change is read back and rolled back when the OS does not keep it, and it is recorded in
+    the history. Before a change the new servers must answer from this computer (`--no-check`
+    skips that); `dns test` measures the latency of providers or servers.
+  - Windows uses the IP Helper DNS API (Windows 10 2004 or later), Linux the active
+    NetworkManager profile (`nmcli device reapply`, no reconnect).
+
 ### Security
 
 - **chrono → time.** RustSec marks chrono unmaintained
@@ -23,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and pull requests that add a dependency with a high or critical advisory are blocked. The Linux
   integration job creates its dummy interface with a fixed address, so udev can no longer rewrite
   it while the job reads it (the job failed at random).
+- CLI exit codes: 5 now also means "not supported on this adapter" (DNS) and 6 "invalid input"
+  (an address, DNS server, provider or preset); the numbers are unchanged.
+- CI changes DNS for real: on the Windows runner's network adapter (plain DNS, DNS over HTTPS,
+  restore, automatic) and through the stand-in NetworkManager of the Linux job.
 - Dependencies: Rust 1.100.0 (the workspace's minimum is now Rust 1.90, as Tauri requires),
   tauri-plugin-notification 2.8.1, zip 9.5.1 and the other Rust crates; jsdom 31, Vite 8.3.8,
   ESLint 10.15, eslint-plugin-svelte 3.24.1, typescript-eslint 8.72.2, Prettier 3.10.1,

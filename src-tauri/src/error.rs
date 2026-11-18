@@ -27,7 +27,7 @@ impl ApiError {
     }
 
     pub fn busy() -> Self {
-        Self::new("BUSY", "another MAC change is in progress")
+        Self::new("BUSY", "another change is in progress")
     }
 
     pub fn read_only() -> Self {

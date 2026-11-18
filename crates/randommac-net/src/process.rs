@@ -233,8 +233,7 @@ mod tests {
 
     #[cfg(windows)]
     fn system32(program: &str) -> PathBuf {
-        let root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
-        PathBuf::from(root).join("System32").join(program)
+        crate::windows::system32(program)
     }
 
     #[cfg(windows)]

@@ -1,26 +1,37 @@
 //! Operating-system backends for RandomMac.
 //!
-//! [`NetworkBackend`] is implemented for Windows (registry + SetupAPI), Linux (NetworkManager /
-//! iproute2) and an in-memory mock. Higher layers (GUI, CLI) handle validation against the
+//! [`NetworkBackend`] is implemented for Windows (registry + SetupAPI for MAC addresses, IP Helper
+//! for DNS), Linux (NetworkManager / iproute2) and an in-memory mock. Higher layers (GUI, CLI) handle validation against the
 //! blacklist, history and the cross-process lock; backends only talk to the operating system.
 
+pub mod dns_ops;
+pub mod dns_probe;
+pub mod dns_types;
 pub mod error;
 pub mod linux_parse;
 pub mod mock;
+pub mod nm_dns;
 pub mod ops;
 pub mod process;
 pub mod types;
 pub mod win_classify;
+pub mod win_dns;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(windows)]
 pub mod windows;
 
+pub use dns_types::*;
 pub use error::NetError;
 pub use types::*;
 
+use randommac_core::dns::{DnsConfig, DnsOriginalRecord, DnsSnapshot};
 use randommac_core::{MacAddress, OriginalRecord};
+
+fn dns_unsupported() -> NetError {
+    NetError::Unsupported("DNS settings are not supported on this platform".into())
+}
 
 /// Operations every platform backend provides.
 pub trait NetworkBackend: Send + Sync {
@@ -61,6 +72,50 @@ pub trait NetworkBackend: Send + Sync {
         Err(NetError::Unsupported(
             "enabling or disabling adapters is not supported on this platform".into(),
         ))
+    }
+
+    /// What can be done with the adapter's DNS settings.
+    fn dns_capabilities(&self, adapter: &Adapter) -> DnsCapabilities {
+        let _ = adapter;
+        DnsCapabilities::unsupported(DnsReason::UnsupportedPlatform)
+    }
+
+    /// The adapter's DNS settings and the servers it uses.
+    fn dns_status(&self, adapter: &Adapter) -> Result<DnsStatus, NetError> {
+        let _ = adapter;
+        Err(dns_unsupported())
+    }
+
+    /// The adapter's DNS settings in the backend's own terms (what "Restore original DNS" puts
+    /// back).
+    fn dns_snapshot(&self, adapter: &Adapter) -> Result<DnsSnapshot, NetError> {
+        let _ = adapter;
+        Err(dns_unsupported())
+    }
+
+    /// Applies `config`, verifies it, and goes back to `previous` when the system did not take it.
+    fn apply_dns(
+        &self,
+        adapter: &Adapter,
+        config: &DnsConfig,
+        previous: &DnsSnapshot,
+        opts: &DnsOptions,
+        progress: &mut dyn FnMut(Stage),
+    ) -> Result<DnsReport, NetError> {
+        let _ = (adapter, config, previous, opts, progress);
+        Err(dns_unsupported())
+    }
+
+    /// Puts back the settings recorded before RandomMac's first DNS change.
+    fn restore_dns(
+        &self,
+        adapter: &Adapter,
+        original: &DnsOriginalRecord,
+        opts: &DnsOptions,
+        progress: &mut dyn FnMut(Stage),
+    ) -> Result<DnsReport, NetError> {
+        let _ = (adapter, original, opts, progress);
+        Err(dns_unsupported())
     }
 }
 

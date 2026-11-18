@@ -18,10 +18,15 @@ use randommac_core::settings::LinuxMethod;
 use randommac_core::{ChangeStatus, MacAddress, OriginalRecord};
 
 use crate::NetworkBackend;
+use crate::dns_types::{DnsCapabilities, DnsOptions, DnsReport, DnsStatus};
 use crate::error::NetError;
 use crate::linux_parse::*;
 use crate::process::{self, Output};
 use crate::types::*;
+use randommac_core::dns::{DnsConfig, DnsOriginalRecord, DnsSnapshot};
+
+#[path = "linux_dns.rs"]
+mod dns;
 
 const NMCLI: &[&str] = &["/usr/bin/nmcli", "/bin/nmcli", "/usr/sbin/nmcli"];
 const IP: &[&str] = &["/usr/sbin/ip", "/sbin/ip", "/usr/bin/ip", "/bin/ip"];
@@ -466,6 +471,39 @@ pub fn permanent_address(ifname: &str) -> Option<MacAddress> {
 }
 
 impl NetworkBackend for LinuxBackend {
+    fn dns_capabilities(&self, adapter: &Adapter) -> DnsCapabilities {
+        dns::capabilities(adapter)
+    }
+
+    fn dns_status(&self, adapter: &Adapter) -> Result<DnsStatus, NetError> {
+        dns::status(adapter)
+    }
+
+    fn dns_snapshot(&self, adapter: &Adapter) -> Result<DnsSnapshot, NetError> {
+        dns::snapshot(adapter)
+    }
+
+    fn apply_dns(
+        &self,
+        adapter: &Adapter,
+        config: &DnsConfig,
+        previous: &DnsSnapshot,
+        opts: &DnsOptions,
+        progress: &mut dyn FnMut(Stage),
+    ) -> Result<DnsReport, NetError> {
+        dns::apply(adapter, config, previous, opts, progress)
+    }
+
+    fn restore_dns(
+        &self,
+        adapter: &Adapter,
+        original: &DnsOriginalRecord,
+        opts: &DnsOptions,
+        progress: &mut dyn FnMut(Stage),
+    ) -> Result<DnsReport, NetError> {
+        dns::restore(adapter, original, opts, progress)
+    }
+
     fn capabilities(&self) -> Capabilities {
         let root = Self::is_root();
         let ip = process::find_program(IP).is_some();

@@ -10,7 +10,7 @@ pub const APP_ID: &str = "io.github.poli0981.randommac";
 pub struct AppPaths {
     /// settings.json, blacklist.json
     pub config_dir: PathBuf,
-    /// history.json, state.json, operation.lock
+    /// history.json, state.json, dns-state.json, operation.lock
     pub data_dir: PathBuf,
     pub log_dir: PathBuf,
 }
@@ -60,6 +60,11 @@ impl AppPaths {
 
     pub fn state_file(&self) -> PathBuf {
         self.data_dir.join("state.json")
+    }
+
+    /// The adapters' DNS settings from before RandomMac's first DNS change.
+    pub fn dns_state_file(&self) -> PathBuf {
+        self.data_dir.join("dns-state.json")
     }
 
     pub fn lock_file(&self) -> PathBuf {

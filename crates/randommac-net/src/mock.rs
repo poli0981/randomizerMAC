@@ -1,13 +1,17 @@
 //! In-memory backend for UI development, screenshots and tests. Selected with
 //! `RANDOMMAC_BACKEND=mock` in debug builds or `--mock` in the CLI; it never touches real adapters.
 
+use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
+use randommac_core::dns::{DnsConfig, DnsOriginalRecord, DnsSnapshot, FamilyDns};
 use randommac_core::{ChangeStatus, MacAddress, OriginalRecord};
 
 use crate::NetworkBackend;
+use crate::dns_types::*;
 use crate::error::NetError;
 use crate::types::*;
 
@@ -34,8 +38,13 @@ impl MockScenario {
 
 pub struct MockBackend {
     adapters: Mutex<Vec<Adapter>>,
+    /// DNS settings per adapter id (absent = automatic).
+    dns: Mutex<HashMap<String, DnsConfig>>,
     scenario: MockScenario,
 }
+
+/// The server the mock's "router" hands out when DNS is automatic.
+const MOCK_DHCP_DNS: Ipv4Addr = Ipv4Addr::new(192, 168, 1, 1);
 
 fn mac(s: &str) -> MacAddress {
     s.parse().unwrap_or_default()
@@ -119,6 +128,7 @@ impl MockBackend {
     pub fn new(scenario: MockScenario) -> Self {
         Self {
             adapters: Mutex::new(sample_adapters()),
+            dns: Mutex::new(HashMap::new()),
             scenario,
         }
     }
@@ -137,6 +147,41 @@ impl MockBackend {
             120
         };
         thread::sleep(Duration::from_millis(ms));
+    }
+
+    fn dns_config(&self, id: &str) -> DnsConfig {
+        self.dns
+            .lock()
+            .map(|m| m.get(id).cloned().unwrap_or_else(DnsConfig::automatic))
+            .unwrap_or_else(|_| DnsConfig::automatic())
+    }
+
+    fn set_dns_config(&self, id: &str, config: DnsConfig) -> Result<(), NetError> {
+        self.dns
+            .lock()
+            .map_err(|_| NetError::Io("mock DNS state poisoned".into()))?
+            .insert(id.to_string(), config);
+        Ok(())
+    }
+
+    fn dns_report(&self, previous: &DnsConfig, requested: &DnsConfig, applied: bool) -> DnsReport {
+        let observed = if applied { requested } else { previous };
+        DnsReport {
+            method: DnsMethod::Mock,
+            status: if applied {
+                ChangeStatus::Applied
+            } else {
+                ChangeStatus::RolledBack
+            },
+            previous: Some(previous.summary()),
+            requested: Some(requested.summary()),
+            observed: Some(observed.summary()),
+            effective: effective_servers(observed),
+            detail_code: (!applied).then(|| codes::DNS_NOT_APPLIED.to_string()),
+            warnings: Vec::new(),
+            cache_flushed: applied,
+            nm_connection_uuid: None,
+        }
     }
 
     fn update<F: FnOnce(&mut Adapter)>(&self, id: &str, f: F) -> Result<Adapter, NetError> {
@@ -274,6 +319,120 @@ impl NetworkBackend for MockBackend {
         })
         .map(|_| ())
     }
+
+    fn dns_capabilities(&self, adapter: &Adapter) -> DnsCapabilities {
+        let disabled = adapter.state == AdapterState::Disabled;
+        DnsCapabilities {
+            supported: true,
+            reason: None,
+            can_change: !disabled,
+            change_reason: disabled.then_some(DnsReason::AdapterDisabled),
+            ipv4: FeatureSupport::YES,
+            ipv6: FeatureSupport::YES,
+            doh: FeatureSupport::YES,
+            dot: FeatureSupport::YES,
+            method: Some(DnsMethod::Mock),
+        }
+    }
+
+    fn dns_status(&self, adapter: &Adapter) -> Result<DnsStatus, NetError> {
+        let config = self.dns_config(&adapter.id);
+        let effective = effective_servers(&config);
+        let (doh_template, dot_server_name, fallback) = match &config.encryption {
+            randommac_core::dns::DnsEncryption::None => (None, None, None),
+            randommac_core::dns::DnsEncryption::Doh {
+                template,
+                allow_fallback,
+            } => (Some(template.clone()), None, Some(*allow_fallback)),
+            randommac_core::dns::DnsEncryption::Dot {
+                server_name,
+                allow_fallback,
+            } => (None, server_name.clone(), Some(*allow_fallback)),
+        };
+        Ok(DnsStatus {
+            configured: config.summary(),
+            doh_template,
+            dot_server_name,
+            fallback,
+            effective_ipv4: effective
+                .iter()
+                .filter_map(|ip| match ip {
+                    IpAddr::V4(a) => Some(*a),
+                    IpAddr::V6(_) => None,
+                })
+                .collect(),
+            effective_ipv6: effective
+                .iter()
+                .filter_map(|ip| match ip {
+                    IpAddr::V6(a) => Some(*a),
+                    IpAddr::V4(_) => None,
+                })
+                .collect(),
+            profile_override: false,
+            nm_connection_uuid: None,
+        })
+    }
+
+    fn dns_snapshot(&self, adapter: &Adapter) -> Result<DnsSnapshot, NetError> {
+        Ok(DnsSnapshot::Mock {
+            config: self.dns_config(&adapter.id),
+        })
+    }
+
+    fn apply_dns(
+        &self,
+        adapter: &Adapter,
+        config: &DnsConfig,
+        previous: &DnsSnapshot,
+        _opts: &DnsOptions,
+        progress: &mut dyn FnMut(Stage),
+    ) -> Result<DnsReport, NetError> {
+        if adapter.state == AdapterState::Disabled {
+            return Err(NetError::Unsupported("the adapter is disabled".into()));
+        }
+        let before = match previous {
+            DnsSnapshot::Mock { config } => config.clone(),
+            _ => self.dns_config(&adapter.id),
+        };
+        for stage in [Stage::Preparing, Stage::Writing, Stage::Verifying] {
+            progress(stage);
+            self.pause();
+        }
+        if self.scenario == MockScenario::DriverIgnores {
+            progress(Stage::RollingBack);
+            return Ok(self.dns_report(&before, config, false));
+        }
+        self.set_dns_config(&adapter.id, config.clone())?;
+        Ok(self.dns_report(&before, config, true))
+    }
+
+    fn restore_dns(
+        &self,
+        adapter: &Adapter,
+        original: &DnsOriginalRecord,
+        _opts: &DnsOptions,
+        progress: &mut dyn FnMut(Stage),
+    ) -> Result<DnsReport, NetError> {
+        let Some(DnsSnapshot::Mock { config }) = &original.interface else {
+            return Err(NetError::NoOriginal);
+        };
+        let before = self.dns_config(&adapter.id);
+        for stage in [Stage::Preparing, Stage::Writing, Stage::Verifying] {
+            progress(stage);
+            self.pause();
+        }
+        self.set_dns_config(&adapter.id, config.clone())?;
+        Ok(self.dns_report(&before, config, true))
+    }
+}
+
+/// The servers a mock adapter uses: its static ones, or the "router" when automatic.
+fn effective_servers(config: &DnsConfig) -> Vec<IpAddr> {
+    let mut list = config.servers();
+    if matches!(config.ipv4, FamilyDns::Automatic) {
+        list.insert(0, IpAddr::V4(MOCK_DHCP_DNS));
+    }
+    list
 }
 
 #[cfg(test)]
