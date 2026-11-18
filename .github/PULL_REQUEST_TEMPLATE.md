@@ -5,8 +5,9 @@
 ## Type of change
 
 - [ ] Bug fix
-- [ ] New feature
+- [ ] New feature (only when agreed with the maintainer first — the project is in maintenance mode)
 - [ ] Breaking change
+- [ ] Accessibility
 - [ ] Language / translation
 - [ ] Documentation
 - [ ] Refactoring (no functional change)
@@ -35,6 +36,7 @@
 - [ ] `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` pass
 - [ ] `cargo test --workspace` passes
 - [ ] `npm run lint`, `npm run check` and `npm test` pass
+- [ ] For UI changes: keyboard-only pass done; `npm test` includes the axe-core scan
 - [ ] New user-facing strings are in both `src/lib/i18n/en.ts` and `src/lib/i18n/vi.ts`
 - [ ] Tested manually (describe how — e.g. mock backend, dummy interface, real adapter)
 - [ ] No unrelated files (IDE settings, generated files, personal data)

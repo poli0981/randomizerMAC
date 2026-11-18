@@ -14,6 +14,7 @@
   import AdapterPicker from "../components/AdapterPicker.svelte";
   import ConfirmDialog from "../components/ConfirmDialog.svelte";
   import { app } from "../stores/app.svelte";
+  import { rescueFocus } from "../focus";
   import { api } from "../api";
   import { i18n, t, type MessageKey } from "../i18n/index.svelte";
   import { formatDate } from "../format";
@@ -53,9 +54,15 @@
   }
 
   async function removeRule(id: string) {
+    const at = app.blacklist.findIndex((r) => r.id === id);
     try {
       await api.blacklistRemove(id);
       await app.refreshBlacklist();
+      // The removed row's button is gone: go to the row that took its place, or to the form.
+      await rescueFocus(() => {
+        const buttons = document.querySelectorAll<HTMLElement>("[data-rule-remove]");
+        return buttons[Math.min(at, buttons.length - 1)] ?? document.getElementById("bl-pattern");
+      });
     } catch (e) {
       app.toastError(e);
     }
@@ -103,8 +110,8 @@
             }}
           >
             <option value="system">{t("settings.language.system")}</option>
-            <option value="en">English</option>
-            <option value="vi">Tiếng Việt</option>
+            <option value="en" lang="en">English</option>
+            <option value="vi" lang="vi">Tiếng Việt</option>
           </select>
         </div>
         <div class="field">
@@ -338,6 +345,7 @@
               <button
                 class="btn ghost icon small"
                 aria-label="{t('common.remove')} {r.pattern}"
+                data-rule-remove
                 onclick={() => removeRule(r.id)}
               >
                 <Trash2 size={14} aria-hidden="true" />
@@ -449,13 +457,14 @@
           type="number"
           min="10"
           max="10000"
+          aria-describedby="hist-max-unit"
           value={s.history.maxEntries}
           onchange={(e) => {
             const max = Number(e.currentTarget.value) || 500;
             save((x) => (x.history.maxEntries = max));
           }}
         />
-        <span class="subtle">{t("settings.historyMaxUnit")}</span>
+        <span id="hist-max-unit" class="subtle">{t("settings.historyMaxUnit")}</span>
         <label for="hist-days">{t("settings.historyDays")}</label>
         <input
           id="hist-days"
@@ -463,13 +472,14 @@
           type="number"
           min="0"
           max="3650"
+          aria-describedby="hist-days-unit"
           value={s.history.retentionDays}
           onchange={(e) => {
             const days = Number(e.currentTarget.value) || 0;
             save((x) => (x.history.retentionDays = days));
           }}
         />
-        <span class="subtle">{t("settings.historyDaysUnit")}</span>
+        <span id="hist-days-unit" class="subtle">{t("settings.historyDaysUnit")}</span>
       </div>
       <div class="row">
         <button class="btn small danger" onclick={() => (confirmReset = true)}

@@ -4,8 +4,14 @@
 
 | Version | Supported |
 |---------|-----------|
-| 2.0.x   | Yes |
-| 1.x     | No — please upgrade to 2.x (1.x has a known privilege-escalation issue in its startup task, fixed in 2.0.0) |
+| 2.1.x   | Yes |
+| 2.0.x   | No — please upgrade to 2.1.x |
+| 1.x     | No — please upgrade to 2.1.x (1.x has a known privilege-escalation issue in its startup task, fixed in 2.0.0) |
+
+RandomMac is in
+[maintenance mode](https://github.com/poli0981/randomizerMAC/blob/master/CONTRIBUTING.md#maintenance-mode):
+it gets no new features, but security fixes continue, including fixes for dependencies with a high
+or critical CVE and for serious security issues in runtimes such as Node.js.
 
 ## Reporting a vulnerability
 

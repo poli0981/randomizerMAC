@@ -1,0 +1,83 @@
+name: Accessibility issue
+description: Report something that is hard or impossible to use with a keyboard, screen reader, zoom or other assistive technology
+title: "[A11y]: "
+labels: ["accessibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for telling us about a barrier. You don't need to know the cause — describe what you tried and what happened.
+        What already works, and the known limitations with their workarounds, are listed in [ACCESSIBILITY.md](https://github.com/poli0981/randomizerMAC/blob/master/ACCESSIBILITY.md).
+        **Prefer email?** Write to **accessibility@poli0981.dev** with "Accessibility" in the subject.
+
+  - type: textarea
+    id: task
+    attributes:
+      label: What were you trying to do?
+      description: The task, and where in RandomMac (page, dialog, tray menu, notification, command line).
+      placeholder: Apply a new MAC address to my Wi-Fi adapter on the Dashboard, using only the keyboard.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead?
+      description: What you heard, saw or could not do. Steps to reproduce help, but are not required.
+      placeholder: After Ctrl+Enter, Narrator said nothing, so I could not tell whether the address had changed.
+    validations:
+      required: true
+
+  - type: input
+    id: assistive_tech
+    attributes:
+      label: Assistive technology and version
+      description: Screen reader, voice control, magnifier, Windows contrast theme, zoom level, or keyboard only.
+      placeholder: Narrator, keyboard only
+    validations:
+      required: true
+
+  - type: input
+    id: app_version
+    attributes:
+      label: RandomMac version
+      description: Shown on the About page, or `randommac-cli --version`.
+      placeholder: "2.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: linux_desktop
+    attributes:
+      label: Linux distribution and desktop
+      description: Only if you use Linux.
+      placeholder: Ubuntu 24.04, GNOME 46
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: How much does it block you?
+      description: The levels are explained under [Severity](https://github.com/poli0981/randomizerMAC/blob/master/ACCESSIBILITY.md#severity). Skip it if you are not sure.
+      options:
+        - Critical (blocks a core task, with no workaround)
+        - High (major difficulty, but a workaround exists)
+        - Medium (confusing, but the task is possible)
+        - Low (minor annoyance)
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, a recording, log lines, or a workaround you found.

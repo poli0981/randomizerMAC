@@ -8,6 +8,7 @@
   import { formatDateTime, methodLabel } from "../format";
   import { changeText, entryKind, filterHistory, type HistoryFilters } from "../history";
   import { labelText } from "../dns";
+  import { rescueFocus } from "../focus";
 
   let query = $state("");
   let adapterFilter = $state("");
@@ -48,6 +49,8 @@
     try {
       await api.historyClear();
       await app.refreshHistory();
+      // "Clear history" is disabled now that there is nothing left.
+      await rescueFocus();
     } catch (e) {
       app.toastError(e);
     }
@@ -114,8 +117,10 @@
   {:else if filtered.length === 0}
     <p class="empty muted">{t("history.noMatch")}</p>
   {:else}
-    <div class="table-wrap">
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="table-wrap" role="region" aria-label={t("history.tableLabel")} tabindex="0">
       <table class="table">
+        <caption class="sr-only">{t("history.tableLabel")}</caption>
         <thead>
           <tr>
             <th scope="col">{t("history.col.time")}</th>
@@ -142,9 +147,12 @@
                 {/if}
               </td>
               <td>
-                <span class="badge {statusTone(h.status)}" title={h.error ?? h.errorCode ?? ""}>
+                <span class="badge {statusTone(h.status)}">
                   {t(`history.status.${h.status}` as MessageKey)}
                 </span>
+                {#if h.errorCode && h.status !== "applied"}
+                  <span class="subtle detail">{i18n.error(h.errorCode)}</span>
+                {/if}
               </td>
               <td class="subtle"
                 >{t(`history.source.${h.source}` as MessageKey)}{h.method
@@ -201,6 +209,11 @@
   }
   .nowrap {
     white-space: nowrap;
+  }
+  .detail {
+    display: block;
+    margin-top: 2px;
+    max-width: 260px;
   }
   .label {
     display: block;

@@ -1,7 +1,7 @@
 {
   "name": "randommac",
   "private": true,
-  "version": "2.0.2",
+  "version": "2.1.0",
   "description": "RandomMac — randomize, set and restore network adapter MAC addresses on Windows and Linux.",
   "license": "MIT",
   "type": "module",
@@ -37,6 +37,7 @@
     "@types/node": "^26.6.6",
     "@typescript/native": "npm:typescript@~7.0.2",
     "@vitest/coverage-v8": "^5.1.0",
+    "axe-core": "^4.14.0",
     "eslint": "^10.15.0",
     "eslint-plugin-svelte": "^3.24.1",
     "globals": "^17.14.0",

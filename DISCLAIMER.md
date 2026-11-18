@@ -1,6 +1,6 @@
 # Disclaimer
 
-**Last updated:** 2026-10-15
+**Last updated:** 2026-11-18
 
 ## General
 
@@ -38,12 +38,22 @@ made that a specific adapter will work. You can check the active address yoursel
 A change briefly interrupts the connection while the adapter restarts or the connection is
 re-activated.
 
+## DNS settings
+
+- The DNS providers listed in RandomMac are independent third parties. Their inclusion is not an
+  endorsement, and **no guarantee** is made about their availability, filtering or handling of
+  your queries. Their addresses were checked against each provider's documentation on the date
+  shown in the app and may change.
+- Custom DNS servers can stop captive portals (the sign-in pages of hotel, airport or other public
+  Wi-Fi) and company or school networks that rely on their own DNS servers from working. Choose
+  *Automatic (from the network)* or *Restore original* to go back.
+
 ## Elevated privileges
 
-Changing a MAC address requires elevated privileges: administrator rights on Windows (the app runs
-elevated after a UAC prompt, or read-only if you decline) and polkit/`pkexec` authorization on
-Linux. Running software with elevated privileges carries inherent risks. Only run software you
-trust and download it from the
+Changing a MAC address or DNS settings requires elevated privileges: administrator rights on
+Windows (the app runs elevated after a UAC prompt, or read-only if you decline) and
+polkit/`pkexec` authorization on Linux. Running software with elevated privileges carries inherent
+risks. Only run software you trust and download it from the
 [official releases](https://github.com/poli0981/randomizerMAC/releases).
 
 ## AI-assisted development
@@ -58,11 +68,25 @@ trust and download it from the
 
 ## Data privacy
 
-- All data (settings, blacklist, history, logs) is stored **locally** on your device.
-- No data is collected, transmitted or shared with any third party.
-- The only network activity is the update check, which downloads a small manifest from GitHub
-  Releases at most once a day. It can be turned off in Settings; manual checks happen only when
-  you click *Check for updates*.
+- All data (settings and DNS presets, blacklist, history, original addresses and DNS settings,
+  logs) is stored **locally** on your device.
+- No data about you is collected by the developer or shared with any third party.
+- RandomMac itself uses the network only for:
+  - **the update check**, which downloads a small manifest from GitHub Releases at most once a
+    day. It can be turned off in Settings; manual checks happen only when you click *Check for
+    updates*;
+  - **the DNS latency test**, which sends a few DNS queries (for the root zone; they contain no
+    names you visit and no personal data) to each DNS server being tested, only when you run it;
+  - **the reachability check**: before plain (unencrypted) DNS servers are applied, the same kind
+    of query is sent to them to check that they answer.
+
+  As with any connection, the servers contacted can see your IP address.
+- **Third-party DNS providers**: once you switch an adapter to other DNS servers, your device sends
+  its DNS queries — which reveal the names of the websites and services it looks up — to that
+  provider instead of your network's servers. The provider's own privacy policy and terms apply;
+  the developer has no control over third-party DNS services and accepts no responsibility for
+  them. Encrypted DNS (DNS over HTTPS or TLS) protects the queries in transit, not from the
+  provider itself.
 
 ## No warranty
 

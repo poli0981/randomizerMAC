@@ -182,6 +182,18 @@ pub fn notify(app: &AppHandle, body: String, force: bool) {
     }
 }
 
+/// A tray or automation action that could not run, in the UI language with its error code (the
+/// backend's own message is English).
+pub fn notify_error(app: &AppHandle, error: &ApiError) {
+    let lang = app.state::<AppState>().lang();
+    let body = if error.code == "BUSY" {
+        t(lang, Key::NotifyBusy, &[])
+    } else {
+        t(lang, Key::NotifyActionFailed, &[&error.code])
+    };
+    notify(app, body, true);
+}
+
 fn notify_outcome(app: &AppHandle, outcome: &Outcome, restore: bool, source: ChangeSource) {
     let lang = app.state::<AppState>().lang();
     let name = outcome.adapter.name.as_str();

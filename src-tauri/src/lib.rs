@@ -317,6 +317,8 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .title("RandomMac")
         .inner_size(1120.0, 740.0)
         .min_inner_size(880.0, 600.0)
+        // Ctrl+= / Ctrl+- / Ctrl+0 (and Ctrl+wheel on Windows) zoom the page (WCAG 1.4.4).
+        .zoom_hotkeys_enabled(true)
         .visible(false)
         .center()
         .theme(window_theme(settings.theme))

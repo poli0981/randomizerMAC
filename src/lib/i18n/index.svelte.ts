@@ -14,6 +14,11 @@ function systemLocale(): Locale {
 class I18n {
   locale = $state<Locale>(systemLocale());
 
+  constructor() {
+    // Screen readers pick their voice from <html lang>: set it before anything is shown.
+    if (typeof document !== "undefined") document.documentElement.lang = this.locale;
+  }
+
   setLanguage(setting: LanguageSetting) {
     this.locale = setting === "system" ? systemLocale() : setting;
     if (typeof document !== "undefined") {

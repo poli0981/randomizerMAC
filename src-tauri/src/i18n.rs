@@ -54,6 +54,8 @@ pub enum Key {
     NotifyDnsFailed,
     NotifyDnsRolledBack,
     NotifyDnsNothingToRestore,
+    NotifyBusy,
+    NotifyActionFailed,
     DialogExport,
     DialogImport,
 }
@@ -116,6 +118,10 @@ fn template(lang: Lang, key: Key) -> &'static str {
         }
         (Lang::En, NotifyDnsNothingToRestore) => "{0}: no DNS change to undo",
         (Lang::Vi, NotifyDnsNothingToRestore) => "{0}: không có thay đổi DNS nào để hoàn tác",
+        (Lang::En, NotifyBusy) => "Another change is in progress; try again in a moment",
+        (Lang::Vi, NotifyBusy) => "Đang có một thay đổi khác; hãy thử lại sau giây lát",
+        (Lang::En, NotifyActionFailed) => "The action could not be completed (error {0})",
+        (Lang::Vi, NotifyActionFailed) => "Không thực hiện được thao tác (lỗi {0})",
         (Lang::En, DialogExport) => "Export",
         (Lang::Vi, DialogExport) => "Xuất",
         (Lang::En, DialogImport) => "Import",
@@ -183,6 +189,8 @@ mod tests {
             NotifyDnsFailed,
             NotifyDnsRolledBack,
             NotifyDnsNothingToRestore,
+            NotifyBusy,
+            NotifyActionFailed,
             DialogExport,
             DialogImport,
         ];

@@ -8,14 +8,18 @@
     onchange: (value: boolean) => void;
   }
   let { checked, label, description, disabled = false, hint, onchange }: Props = $props();
-  const id = `toggle-${Math.random().toString(36).slice(2, 9)}`;
+  const id = $props.id();
+  const describedBy = $derived(
+    [description ? `${id}-desc` : "", hint ? `${id}-hint` : ""].filter(Boolean).join(" ") ||
+      undefined,
+  );
 </script>
 
 <div class="toggle" class:disabled>
   <div class="text">
     <label for={id}>{label}</label>
-    {#if description}<p class="subtle">{description}</p>{/if}
-    {#if hint}<p class="hint">{hint}</p>{/if}
+    {#if description}<p id="{id}-desc" class="subtle">{description}</p>{/if}
+    {#if hint}<p id="{id}-hint" class="hint">{hint}</p>{/if}
   </div>
   <input
     {id}
@@ -23,7 +27,7 @@
     role="switch"
     {checked}
     {disabled}
-    aria-checked={checked}
+    aria-describedby={describedBy}
     onchange={(e) => onchange((e.currentTarget as HTMLInputElement).checked)}
   />
 </div>
@@ -64,7 +68,7 @@
     height: 22px;
     border-radius: 999px;
     background: var(--surface-3);
-    border: 1px solid var(--border-strong);
+    border: 1px solid var(--input-border);
     position: relative;
     cursor: pointer;
     transition: background 0.15s var(--ease);
@@ -94,5 +98,29 @@
   input:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  /* Windows contrast themes would paint the track and the knob alike: use system colours. */
+  @media (forced-colors: active) {
+    input {
+      forced-color-adjust: none;
+      background: Canvas;
+      border-color: CanvasText;
+    }
+    input::after {
+      background: CanvasText;
+    }
+    input:checked {
+      background: Highlight;
+      border-color: Highlight;
+    }
+    input:checked::after {
+      background: HighlightText;
+    }
+    input:disabled {
+      border-color: GrayText;
+    }
+    input:disabled::after {
+      background: GrayText;
+    }
   }
 </style>

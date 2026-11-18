@@ -125,7 +125,7 @@ fn on_menu(app: &AppHandle, id: &str) {
                         .await
                 };
                 if let Err(e) = result {
-                    ops_runner::notify(&app, e.message.clone(), true);
+                    ops_runner::notify_error(&app, &e);
                 }
             });
         }
@@ -154,14 +154,14 @@ fn on_menu(app: &AppHandle, id: &str) {
                     None => return,
                 };
                 if let Err(e) = result {
-                    ops_runner::notify(&app, e.message.clone(), true);
+                    ops_runner::notify_error(&app, &e);
                 }
             });
         }
         "restore_all" => {
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = ops_runner::restore_all(&app, ChangeSource::Tray, false).await {
-                    ops_runner::notify(&app, e.message.clone(), true);
+                    ops_runner::notify_error(&app, &e);
                 }
             });
         }

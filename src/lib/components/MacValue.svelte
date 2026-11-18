@@ -38,7 +38,7 @@
       </button>
     {/if}
   </div>
-  <span class="value mono" aria-label="{label}: {shown}">{shown}</span>
+  <span class="value mono">{shown}</span>
   <span class="vendor subtle">{vendor ?? " "}</span>
 </div>
 

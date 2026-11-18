@@ -18,7 +18,7 @@
   import Logo from "./Logo.svelte";
   import { app } from "../stores/app.svelte";
   import { t, type MessageKey } from "../i18n/index.svelte";
-  import { pages, shortcutOf } from "../nav";
+  import { ariaShortcutOf, pages, shortcutOf } from "../nav";
   import type { Page } from "../types";
 
   let { collapsed = $bindable(false) }: { collapsed?: boolean } = $props();
@@ -48,7 +48,7 @@
   });
 </script>
 
-<nav class="sidebar" class:collapsed aria-label={t("nav.label")}>
+<nav id="sidebar" class="sidebar" class:collapsed aria-label={t("nav.label")}>
   <div class="brand">
     <Logo size={30} />
     {#if !collapsed}
@@ -67,6 +67,7 @@
           class="nav-item"
           class:active={app.page === item.page}
           aria-current={app.page === item.page ? "page" : undefined}
+          aria-keyshortcuts={ariaShortcutOf(item.page)}
           title={collapsed ? `${t(item.key)} (${shortcutOf(item.page)})` : shortcutOf(item.page)}
           onclick={() => app.navigate(item.page)}
         >
@@ -74,6 +75,7 @@
           <span class:sr-only={collapsed}>{t(item.key)}</span>
           {#if item.page === "update" && app.update?.available}
             <span class="dot" aria-hidden="true"></span>
+            <span class="sr-only">({t("nav.updateAvailable")})</span>
           {/if}
         </button>
       </li>
@@ -91,6 +93,8 @@
     <button
       class="btn ghost icon collapse"
       onclick={() => (collapsed = !collapsed)}
+      aria-expanded={!collapsed}
+      aria-controls="sidebar"
       aria-label={collapsed ? t("nav.expand") : t("nav.collapse")}
       title={collapsed ? t("nav.expand") : t("nav.collapse")}
     >
@@ -112,7 +116,9 @@
     padding: 14px 10px;
     gap: 14px;
     transition: width 0.18s var(--ease);
-    overflow: hidden;
+    /* Zoomed in, the page list may not fit: it scrolls instead of being cut off. */
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   .sidebar.collapsed {
     width: var(--sidebar-w-collapsed);
@@ -224,5 +230,15 @@
   .status.accent {
     color: var(--accent);
     background: var(--accent-soft);
+  }
+  @media (forced-colors: active) {
+    .nav-item.active {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
+    .dot {
+      forced-color-adjust: none;
+      background: Highlight;
+    }
   }
 </style>

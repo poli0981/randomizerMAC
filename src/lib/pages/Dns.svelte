@@ -1,24 +1,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import {
-    Check,
-    Copy,
-    Gauge,
-    Loader,
-    RefreshCw,
-    Save,
-    Square,
-    Trash2,
-    Undo2,
-    Zap,
-  } from "@lucide/svelte";
+  import { Copy, Gauge, Loader, RefreshCw, Save, Square, Trash2, Undo2, Zap } from "@lucide/svelte";
   import PageHeader from "../components/PageHeader.svelte";
   import ConfirmDialog from "../components/ConfirmDialog.svelte";
+  import Steps from "../components/Steps.svelte";
+  import { rescueFocus } from "../focus";
   import { app } from "../stores/app.svelte";
   import { api, events, toApiError } from "../api";
   import { i18n, t, type MessageKey } from "../i18n/index.svelte";
   import * as dns from "../dns";
-  import type { CustomDnsPreset, DnsRequest, DnsView, EncryptionChoice, Stage } from "../types";
+  import type { CustomDnsPreset, DnsRequest, DnsView, EncryptionChoice } from "../types";
 
   type Source = "provider" | "preset" | "custom" | "localResolver" | "automatic";
 
@@ -48,8 +39,6 @@
   let running = $state(false);
   let includeIpv6 = $state(false);
   let latencyStatus = $state("");
-
-  const stages: Stage[] = ["preparing", "writing", "restarting", "verifying"];
 
   const adapter = $derived(app.selected);
   const adapters = $derived(app.visibleAdapters);
@@ -182,7 +171,7 @@
   /** Applies the selection; plain DNS is first checked to answer from this computer. */
   async function apply(all: boolean) {
     confirmAll = false;
-    if (!adapter || !usable || !canChange) return;
+    if (!adapter || !usable || !canChange || anyBusy) return;
     const request = dns.requestFor(selection, choice, allowFallback);
     if (endpoints && mode === "none" && !app.info?.mock) {
       checking = true;
@@ -216,7 +205,7 @@
 
   async function restore() {
     const id = adapter?.id;
-    if (!id) return;
+    if (!id || anyBusy || !view?.restorable) return;
     message = null;
     try {
       message = dns.describeDnsOutcome(await api.dnsRestore(id), true);
@@ -251,6 +240,7 @@
     if (ok) {
       presetNote = t("dns.presets.deleted", { name: p.name });
       if (presetId === p.id) presetId = "";
+      void rescueFocus(() => document.querySelector<HTMLElement>("[data-preset-delete]"));
     }
   }
 
@@ -658,21 +648,24 @@
           <button
             class="btn primary"
             onclick={() => apply(false)}
-            disabled={!canChange || !usable || anyBusy}
+            disabled={!canChange}
+            aria-disabled={!usable || anyBusy}
           >
             <Zap size={16} aria-hidden="true" />{t("dns.apply")}
           </button>
           <button
             class="btn"
-            onclick={() => (confirmAll = true)}
-            disabled={!canChange || !usable || anyBusy}
+            onclick={() => usable && !anyBusy && (confirmAll = true)}
+            disabled={!canChange}
+            aria-disabled={!usable || anyBusy}
           >
             {t("dns.applyAll")}
           </button>
           <button
             class="btn end"
             onclick={restore}
-            disabled={!canChange || !view?.restorable || anyBusy}
+            disabled={!canChange}
+            aria-disabled={!view?.restorable || anyBusy}
             title={t("dns.restoreHint")}
           >
             <Undo2 size={16} aria-hidden="true" />{t("dns.restore")}
@@ -684,22 +677,12 @@
             {t("dns.checking")}
           </p>
         {/if}
-        {#if busyHere}
-          <ol class="steps" aria-label={t("dns.progress")}>
-            {#each app.busy?.stage === "rollingBack" ? [...stages, "rollingBack" as Stage] : stages as s (s)}
-              {@const current = app.busy?.stage === s}
-              {@const done = stages.indexOf(s) < stages.indexOf(app.busy?.stage ?? "preparing")}
-              <li class:current class:done aria-current={current ? "step" : undefined}>
-                {#if current}<Loader
-                    size={14}
-                    class="spin"
-                    aria-hidden="true"
-                  />{:else if done}<Check size={14} aria-hidden="true" />{/if}
-                {t(`dns.stage.${s}` as MessageKey)}
-              </li>
-            {/each}
-          </ol>
-        {/if}
+        <Steps
+          stage={app.busy?.stage ?? null}
+          active={busyHere}
+          prefix="dns.stage"
+          label={t("dns.progress")}
+        />
         <div role="status">
           {#if message && !busyHere}
             <div class="result {message.kind}">
@@ -735,7 +718,8 @@
       </div>
       <p class="sr-only" role="status">{latencyStatus}</p>
       {#if rows.length > 0}
-        <div class="table-wrap">
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <div class="table-wrap" role="region" aria-label={t("dns.latency.title")} tabindex="0">
           <table class="table">
             <caption class="sr-only">{t("dns.latency.title")}</caption>
             <thead>
@@ -797,6 +781,7 @@
               <button
                 class="btn ghost icon small"
                 onclick={() => deletePreset(p)}
+                data-preset-delete
                 aria-label={t("dns.presets.delete", { name: p.name })}
                 title={t("common.remove")}><Trash2 size={14} aria-hidden="true" /></button
               >
@@ -961,32 +946,6 @@
   }
   .buttons .end {
     margin-left: auto;
-  }
-  .steps {
-    list-style: none;
-    display: flex;
-    gap: 6px;
-    padding: 0;
-    margin: 14px 0 0;
-    flex-wrap: wrap;
-  }
-  .steps li {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: var(--surface-2);
-    color: var(--text-subtle);
-    font-size: 12.5px;
-  }
-  .steps li.current {
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-weight: 600;
-  }
-  .steps li.done {
-    color: var(--success);
   }
   .result {
     margin-top: 14px;

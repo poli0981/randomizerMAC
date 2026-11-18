@@ -96,6 +96,16 @@
   }
 
   const startup = $derived(app.info?.startup);
+
+  function focusMain() {
+    document.getElementById("main")?.focus();
+  }
+
+  /** Closes a banner; its close button disappears, so focus moves to the page. */
+  function dismiss(key: string) {
+    dismissed[key] = true;
+    void tick().then(focusMain);
+  }
 </script>
 
 <svelte:window onkeydown={onKeydown} oncontextmenu={onContextMenu} />
@@ -107,9 +117,18 @@
     <p class="mono subtle">{app.fatal}</p>
   </div>
 {:else}
+  <!-- An in-page jump, not a navigation: the webview only loads the app's own pages. -->
+  <a
+    class="skip-link"
+    href="#main"
+    onclick={(e) => {
+      e.preventDefault();
+      focusMain();
+    }}>{t("app.skipToContent")}</a
+  >
   <div class="shell">
     <Sidebar bind:collapsed />
-    <main>
+    <main id="main" tabindex="-1">
       {#if app.ready}
         <div class="banners">
           {#if app.info?.readOnly}
@@ -145,7 +164,7 @@
               <button
                 class="btn ghost icon small"
                 aria-label={t("common.close")}
-                onclick={() => (dismissed.v1 = true)}><X size={14} aria-hidden="true" /></button
+                onclick={() => dismiss("v1")}><X size={14} aria-hidden="true" /></button
               >
             </div>
           {/if}
@@ -156,7 +175,7 @@
               <button
                 class="btn ghost icon small"
                 aria-label={t("common.close")}
-                onclick={() => (dismissed.legacy = true)}><X size={14} aria-hidden="true" /></button
+                onclick={() => dismiss("legacy")}><X size={14} aria-hidden="true" /></button
               >
             </div>
           {/if}
@@ -167,13 +186,12 @@
               <button
                 class="btn ghost icon small"
                 aria-label={t("common.close")}
-                onclick={() => (dismissed.recovered = true)}
-                ><X size={14} aria-hidden="true" /></button
+                onclick={() => dismiss("recovered")}><X size={14} aria-hidden="true" /></button
               >
             </div>
           {/if}
           {#if app.update?.available && app.page !== "update" && !dismissed.update}
-            <div class="callout info">
+            <div class="callout info" role="status">
               <CloudDownload size={18} aria-hidden="true" />
               <p class="grow">{t("banner.update", { version: app.update.version ?? "" })}</p>
               <button class="btn small" onclick={() => app.navigate("update")}
@@ -182,7 +200,7 @@
               <button
                 class="btn ghost icon small"
                 aria-label={t("common.close")}
-                onclick={() => (dismissed.update = true)}><X size={14} aria-hidden="true" /></button
+                onclick={() => dismiss("update")}><X size={14} aria-hidden="true" /></button
               >
             </div>
           {/if}
@@ -208,6 +226,9 @@
   .shell {
     display: flex;
     height: 100vh;
+  }
+  main:focus {
+    outline: none;
   }
   main {
     /* Contains absolutely positioned descendants (.sr-only text deep in a long page would

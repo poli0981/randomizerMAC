@@ -5,12 +5,15 @@
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=poli0981_randomizerMAC&metric=alert_status)](https://sonarcloud.io/summary/overall?id=poli0981_randomizerMAC)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=poli0981_randomizerMAC&metric=coverage)](https://sonarcloud.io/component_measures?id=poli0981_randomizerMAC&metric=coverage)
 [![Release](https://img.shields.io/github/v/release/poli0981/randomizerMAC?sort=semver)](https://github.com/poli0981/randomizerMAC/releases/latest)
+[![Status: maintenance mode](https://img.shields.io/badge/status-maintenance_mode-yellow)](#project-status)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%2010%2F11%20%7C%20Ubuntu%20%7C%20Fedora-61AFEF)
 
 RandomMac changes the MAC address of your Ethernet and Wi-Fi adapters, so networks you don't control
-can't recognize your device by its hardware address. It is a small desktop app for **Windows 10/11
-and Linux (Ubuntu, Fedora and other distributions)**, with a command-line tool for scripts.
+can't recognize your device by its hardware address. It also sets the DNS servers each adapter
+uses — a public provider, with or without filtering, or your own — encrypted where the system
+supports it. It is a small desktop app for **Windows 10/11 and Linux (Ubuntu, Fedora and other
+distributions)**, with a command-line tool for scripts.
 
 > **v2.0.0 is a complete rewrite** (Rust + Tauri 2 instead of .NET/WinUI 3): Linux support, a CLI,
 > installers that are ~20× smaller, signed automatic updates and many fixes. Coming from 1.x? See
@@ -29,6 +32,25 @@ and Linux (Ubuntu, Fedora and other distributions)**, with a command-line tool f
 
 <sub>Screenshots use the built-in demo data; no real adapter is shown.</sub>
 
+## Project status
+
+RandomMac has been in **maintenance mode** since 2.1.0 (November 2026), its last feature release.
+It is still maintained, and these changes still land:
+
+- dependency updates;
+- security fixes: dependencies with a high or critical CVE and serious security issues in runtimes
+  such as Node.js — and a new feature only when it is genuinely necessary;
+- major upgrades of a language, runtime or framework (for example Node.js 24 → 26 or TypeScript
+  6 → 7);
+- bug fixes, UI/UX and accessibility fixes;
+- language fixes: wording that does not fit a culture or regional dialect, and spelling mistakes
+  that make a text misleading.
+
+Feature requests and `feat:` pull requests from outside contributors are closed automatically with
+the `out-of-scope` label. Ideas are still welcome in
+[Discussions → Ideas](https://github.com/poli0981/randomizerMAC/discussions/categories/ideas).
+Details: [CONTRIBUTING.md → Maintenance mode](CONTRIBUTING.md#maintenance-mode).
+
 ## Features
 
 - **New address in two clicks.** Generate a preview, check its vendor and warnings, then apply.
@@ -44,15 +66,25 @@ and Linux (Ubuntu, Fedora and other distributions)**, with a command-line tool f
   and optionally restore everything when RandomMac exits. **Restore all** is one click away in the
   tray.
 - **Blacklist.** Block exact addresses or vendor prefixes, globally or per adapter; import/export.
-- **History.** Every change made by the app, the CLI or automation, with search and CSV/JSON export.
+- **DNS servers per adapter.** Built-in providers with their filtering variants — Cloudflare,
+  Google, Quad9, AdGuard, CleanBrowsing, Control D, DNS4EU, DNS.SB and Cisco OpenDNS — or your own
+  servers, for IPv4 and IPv6. Encrypted where the system supports it: DNS over HTTPS on Windows 11
+  and Windows Server 2022 or later, DNS over TLS on Linux when NetworkManager uses
+  systemd-resolved. DNSCrypt stamps to copy into a client such as dnscrypt-proxy, and a *local
+  resolver* choice (`127.0.0.1` / `::1`) that points the adapter at it. Latency test, presets,
+  *Restore original* and a DNS submenu in the tray. Every change is verified, rolled back if the
+  system does not keep it, and recorded in the history.
+- **History.** Every change made by the app, the CLI or automation (MAC addresses and DNS), with
+  search, a MAC/DNS filter and CSV/JSON export.
 - **Command-line tool.** `randommac-cli list | show | random | set | restore | inspect | vendors |
-  history`, with `--json` output and stable exit codes.
+  dns | history`, with `--json` output and stable exit codes.
 - **Linux done properly.** NetworkManager (persistent, per connection) or iproute2 (temporary), with
   polkit prompts only when needed — the window itself never runs as root.
 - **Comfortable UI.** Light/dark/system theme, English and Vietnamese, keyboard shortcuts, tray
   menu, desktop notifications, live log viewer, diagnostics you can paste into a bug report.
-- **Private by design.** No telemetry. The only network request is the update check, which you can
-  turn off.
+- **Private by design.** No telemetry. The only automatic network request is the update check,
+  which you can turn off. DNS test queries are sent only when you run the latency test or switch to
+  plain DNS servers.
 
 ## Download
 
@@ -77,20 +109,20 @@ Windows 10, built into Windows 11), the installer downloads it.
 **Ubuntu / Debian**
 
 ```bash
-sudo apt install ./RandomMac_2.0.0_amd64.deb
+sudo apt install ./RandomMac_2.1.0_amd64.deb
 ```
 
 **Fedora**
 
 ```bash
-sudo dnf install ./RandomMac-2.0.0-1.x86_64.rpm
+sudo dnf install ./RandomMac-2.1.0-1.x86_64.rpm
 ```
 
 **AppImage**
 
 ```bash
-chmod +x RandomMac_2.0.0_amd64.AppImage
-./RandomMac_2.0.0_amd64.AppImage
+chmod +x RandomMac_2.1.0_amd64.AppImage
+./RandomMac_2.1.0_amd64.AppImage
 ```
 
 ### Verify your download
@@ -103,10 +135,10 @@ sha256sum --ignore-missing -c SHA256SUMS.txt
 ```
 
 ```bash
-gh attestation verify RandomMac_2.0.0_x64-setup.exe --repo poli0981/randomizerMAC
+gh attestation verify RandomMac_2.1.0_x64-setup.exe --repo poli0981/randomizerMAC
 ```
 
-On Windows without `sha256sum`: `Get-FileHash .\RandomMac_2.0.0_x64-setup.exe -Algorithm SHA256` in
+On Windows without `sha256sum`: `Get-FileHash .\RandomMac_2.1.0_x64-setup.exe -Algorithm SHA256` in
 PowerShell, then compare with the line in `SHA256SUMS.txt`.
 
 ### Updates
@@ -124,15 +156,16 @@ your password.
 | OS | Windows 10 or 11, 64-bit | x86_64 with glibc 2.39+ (Ubuntu 24.04+, Debian 13+, Fedora 41+) |
 | Runtime | Microsoft Edge WebView2 (installed if missing) | WebKitGTK 4.1, GTK 3 (pulled in by the packages; bundled in the AppImage) |
 | Changing addresses | Administrator rights (one UAC prompt per launch) | NetworkManager, or iproute2 + polkit (`pkexec`) |
+| Changing DNS | Windows 10 version 2004 or later, administrator rights; DNS over HTTPS needs Windows 11 (or Windows Server 2022+) | NetworkManager; DNS over TLS needs NetworkManager with systemd-resolved |
 | Disk | ~15 MB | ~15 MB (plus WebKitGTK if not installed) |
 
 ## Upgrading from 1.x
 
 RandomMac 1.x (WinUI 3/Velopack) cannot update itself to 2.0. Upgrade once by hand:
 
-1. **Install 2.0 first** with `RandomMac_2.0.0_x64-setup.exe`. On first start it imports your 1.x
-   settings, history and blacklist from `%LOCALAPPDATA%\RandomMac` and replaces the 1.x startup
-   task (which ran an executable from a user-writable folder with administrator rights).
+1. **Install 2.x first** with `RandomMac_<version>_x64-setup.exe`. On first start it imports your
+   1.x settings, history and blacklist from `%LOCALAPPDATA%\RandomMac` and replaces the 1.x
+   startup task (which ran an executable from a user-writable folder with administrator rights).
 2. **Then uninstall "RANDOM MAC" 1.x** in *Settings → Apps → Installed apps*. Uninstalling 1.x
    deletes `%LOCALAPPDATA%\RandomMac`, so don't do it before step 1 if you want to keep your data.
 
@@ -155,11 +188,41 @@ from RandomMac 1.x* repeats the import at any time.
 
 | Shortcut | Action |
 |---|---|
-| `Ctrl+1` … `Ctrl+7` | Dashboard, History, Settings, Log, Update, About, Social |
+| `Ctrl+1` … `Ctrl+8` | Dashboard, DNS, History, Settings, Log, Update, About, Social |
 | `Ctrl+R` | Generate a preview address |
 | `Ctrl+Enter` | Apply the preview |
 | `F5` | Refresh adapters |
+| `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | Zoom in / out / reset |
 | `Esc` | Close a dialog |
+
+### DNS page
+
+![DNS page](docs/images/dns-dark.png)
+
+The **DNS** page (`Ctrl+2`) changes the DNS servers of the adapter you pick.
+
+- **Current settings** show the servers the adapter is configured with, the ones it actually uses,
+  whether they are encrypted and which provider they belong to.
+- **Servers**: a public provider and its filtering (*No filtering*, *Blocks malware*, *Blocks ads
+  and trackers*, *Family protection*… depending on the provider), one of your presets, the *Local
+  resolver* (`127.0.0.1` and `::1`, for dnscrypt-proxy or another resolver on this computer),
+  custom servers (up to two IPv4 and two IPv6 addresses, optionally with a DNS-over-HTTPS template
+  or a DNS-over-TLS host name) or *Automatic (from the network)*. Every endpoint — IPv4, IPv6,
+  DoH, DoT and DNSCrypt stamps — has a copy button.
+- **Encryption**: *Best available*, *None (plain DNS)*, *DNS over HTTPS* or *DNS over TLS*; a
+  choice the adapter cannot use says why. You can allow a fallback to unencrypted DNS when the
+  encrypted connection fails. The tray menu uses the same choice.
+- **Apply**, **Apply to all connected adapters** (every connected physical adapter) or **Restore
+  original** (the settings from before RandomMac's first DNS change on the adapter). Before
+  switching to plain DNS servers, RandomMac checks that they answer and asks before applying
+  servers that don't.
+- **Latency test**: how fast each provider answers from this computer, filled in live; a row's
+  button picks that provider.
+- **Presets**: save custom servers under a name (up to 20). They also appear in the tray menu, and
+  *Reset settings* keeps them.
+
+The tray menu has a DNS submenu for the selected adapter (*DNS for Wi-Fi*, for example) with every
+provider, your presets, *Automatic* and *Restore original DNS*.
 
 ### How it works
 
@@ -170,6 +233,12 @@ from RandomMac 1.x* repeats the import at any time.
   re-activates it. Persistent for that connection.
 - **Linux, iproute2** — `ip link set … address …` through `pkexec`. Temporary: the hardware
   address returns after a reboot or driver reload.
+- **DNS on Windows** — the IP Helper DNS functions (Windows 10 version 2004 or later) set the
+  adapter's IPv4 and IPv6 servers and, on Windows 11 and Windows Server 2022 or later, a
+  DNS-over-HTTPS template for each server. They stay until you change or restore them.
+- **DNS on Linux** — sets the DNS servers (and DNS over TLS) of the active NetworkManager
+  connection profile and applies them with `nmcli device reapply`, without reconnecting when
+  possible. Persistent for that connection.
 
 Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -178,7 +247,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 `randommac-cli` uses the same engine, data and history as the app.
 
 - Windows: `C:\Program Files\RandomMac\randommac-cli.exe` — run it from an **elevated** terminal to
-  change addresses.
+  change addresses or DNS settings.
 - Linux (`.deb`/`.rpm`): `/usr/bin/randommac-cli` — no `sudo` needed; NetworkManager or `pkexec`
   ask for authorization when required.
 - Anywhere: the standalone `randommac-cli-<version>-<target>` archive from the release page.
@@ -194,10 +263,34 @@ randommac-cli inspect 3c:22:fb:12:34:56     # vendor, unicast/LAA bits, Wi-Fi re
 randommac-cli history --limit 10 --json
 ```
 
+DNS servers:
+
+```bash
+randommac-cli dns providers                 # built-in providers, filtering variants, endpoints
+randommac-cli dns show "Wi-Fi"              # configured and used servers, what is supported
+randommac-cli dns set "Wi-Fi" --provider quad9
+randommac-cli dns set "Wi-Fi" --provider adguard:family --encryption doh
+randommac-cli dns set wlp2s0 --provider quad9 --encryption dot
+randommac-cli dns set eth0 --servers 192.168.1.53,fd00::53
+randommac-cli dns set --all --provider cloudflare --encryption none
+randommac-cli dns auto "Wi-Fi"              # servers from the network (DHCP) again
+randommac-cli dns restore "Wi-Fi"           # settings from before RandomMac's first DNS change
+randommac-cli dns test                      # how fast every provider answers from here
+```
+
+`dns set` takes one of `--provider ID[:VARIANT]` (see `dns providers`), `--preset NAME` (your
+presets from the app, listed by `dns presets`), `--local` (`127.0.0.1` and `::1`) or `--servers`
+(up to two IPv4 and two IPv6 addresses, optionally with `--doh-template` or `--dot-host`).
+`--encryption auto|none|doh|dot` defaults to `auto`: DNS over HTTPS where the system supports it,
+else DNS over TLS, else none. `--allow-fallback` lets encrypted DNS fall back to unencrypted
+queries, and `--dry-run` only prints the configuration. Before switching to plain DNS servers,
+`dns set` checks that at least one of them answers (`--no-check` skips that). `--all` (instead of
+an adapter) works with `set`, `auto` and `restore` and changes every connected physical adapter.
+
 Adapters can be given by name, id or current MAC. Global options: `--json`, `--data-dir <DIR>`,
-`--method auto|networkmanager|iproute2` (Linux), `--mock` (demo adapters, nothing is changed).
-On Linux, `sudo randommac-cli` keeps its history and original addresses in root's own data
-folder, separate from the app's — prefer running it as your user.
+`--method auto|networkmanager|iproute2` (Linux; DNS changes always use NetworkManager), `--mock`
+(demo adapters, nothing is changed). On Linux, `sudo randommac-cli` keeps its history and original
+addresses in root's own data folder, separate from the app's — prefer running it as your user.
 
 | Exit code | Meaning |
 |---|---|
@@ -206,20 +299,30 @@ folder, separate from the app's — prefer running it as your user.
 | 2 | Invalid command line |
 | 3 | Not enough privileges, or authorization cancelled |
 | 4 | Adapter not found / ambiguous |
-| 5 | The change failed or was rolled back |
-| 6 | Invalid or blacklisted address |
+| 5 | The change failed, was rolled back or is not supported on this adapter |
+| 6 | Invalid input (address, DNS server, provider or preset) or blacklisted address |
+
+`dns set` also exits with 5 when none of the new servers answer, and `dns test` when no server
+answers.
 
 ## Where your data lives
 
 | | Windows | Linux |
 |---|---|---|
-| Settings, blacklist | `%LOCALAPPDATA%\io.github.poli0981.randommac\` | `~/.config/io.github.poli0981.randommac/` |
-| History, original addresses | `%LOCALAPPDATA%\io.github.poli0981.randommac\` | `~/.local/share/io.github.poli0981.randommac/` |
+| Settings (DNS presets included), blacklist | `%LOCALAPPDATA%\io.github.poli0981.randommac\` | `~/.config/io.github.poli0981.randommac/` |
+| History, original addresses, original DNS settings | `%LOCALAPPDATA%\io.github.poli0981.randommac\` | `~/.local/share/io.github.poli0981.randommac/` |
 | Logs (5 × 2 MB) | `%LOCALAPPDATA%\io.github.poli0981.randommac\logs\` | `~/.local/share/io.github.poli0981.randommac/logs/` |
 
+- `settings.json` also holds the DNS page's encryption and fallback choice and your DNS presets;
+  *Reset settings* keeps the presets.
+- `dns-state.json` keeps the DNS settings each adapter had before RandomMac's first DNS change on
+  it (with NetworkManager, per connection UUID), so *Restore original* can put them back. Later
+  changes never overwrite that record; it is removed once the adapter is back on those settings.
+- `history.json` lists MAC and DNS changes; DNS entries have `"kind": "dns"`.
+
 Files are plain JSON, written atomically. A damaged file is kept as `*.corrupt-<timestamp>` and
-replaced with defaults instead of crashing the app. Settings → Data can export everything as one
-zip.
+replaced with defaults instead of crashing the app. Settings → Data can export the settings,
+blacklist and history as one zip.
 
 ## FAQ
 
@@ -259,9 +362,54 @@ The window refuses to run as root (a web engine should never run with root right
 authorization only for the change itself. For headless servers use `randommac-cli` (with `sudo` if
 NetworkManager/polkit are not available).
 
+**DNS over HTTPS is not offered on Windows 10.**
+Windows supports DNS over HTTPS for an adapter only from Windows 11 and Windows Server 2022. On
+Windows 10 (version 2004 or later) RandomMac sets plain DNS servers; older Windows 10 versions
+cannot change DNS through RandomMac.
+
+**DNS over TLS is not offered on Linux.**
+RandomMac uses NetworkManager's DNS over TLS, which works only when NetworkManager hands DNS to
+systemd-resolved. With other DNS modes (`default`, `dnsmasq`) you get plain DNS. NetworkManager has
+no DNS-over-HTTPS client.
+
+**How do I use DNSCrypt?**
+RandomMac does not speak DNSCrypt itself. Install a client such as dnscrypt-proxy, add the
+provider's stamp to its configuration (copy it on the DNS page or from
+`randommac-cli dns providers --provider <id>`), then pick *Local resolver* (`127.0.0.1` and `::1`)
+for the adapter.
+
+**Websites or the Wi-Fi sign-in page stopped working after a DNS change.**
+Custom DNS servers can break captive portals (the sign-in pages of hotel, airport or café Wi-Fi)
+and company or school networks that rely on their own DNS servers. Choose *Automatic (from the
+network)* or *Restore original* on the DNS page or in the tray menu.
+
+**RandomMac says DNS servers set in Windows Settings take priority.**
+Windows 11 can keep DNS servers for a network in *Settings → Network & internet*, and those win
+over the adapter's servers that RandomMac sets. RandomMac warns about them but does not change
+them; set them back to automatic there if you want the adapter's servers to be used.
+
+**The IPv6 DNS servers were skipped.**
+Some VPN clients turn IPv6 off on your network adapters to prevent leaks. RandomMac still saves the
+IPv6 servers when Windows accepts them, so they apply once IPv6 is back; otherwise it skips them and
+says so. On Linux, a connection profile that ignores or disables IPv6 takes only the IPv4 servers.
+
+**Does the latency test send anything?**
+A few DNS queries to each server it measures (for the root zone, never a name you visit), and only
+when you run it. Before switching to plain DNS servers, RandomMac sends them the same test query to
+check that they answer. Once an adapter uses a provider's servers, that provider sees your DNS
+queries, and its own privacy policy applies.
+
 **Is changing a MAC address legal?**
 In most places, yes — but some networks forbid it in their terms of use. Read the
 [Disclaimer](DISCLAIMER.md).
+
+## Accessibility
+
+[ACCESSIBILITY.md](ACCESSIBILITY.md) describes RandomMac's accessibility goals (WCAG 2.2 AA), what
+works today with the keyboard and screen readers, how it is tested and the known limitations. If
+something gets in your way, use the
+[Accessibility issue](https://github.com/poli0981/randomizerMAC/issues/new?template=accessibility.yml)
+form or write to [accessibility@poli0981.dev](mailto:accessibility@poli0981.dev).
 
 ## Build from source
 
@@ -284,8 +432,10 @@ npm test
 ## Project structure
 
 ```
-crates/randommac-core/   MAC parsing/generation, OUI table, blacklist, history, settings, storage
-crates/randommac-net/    Windows and Linux backends, change/verify/rollback orchestration
+crates/randommac-core/   MAC parsing/generation, OUI table, DNS model and provider catalog,
+                         blacklist, history, settings, storage
+crates/randommac-net/    Windows and Linux backends (MAC and DNS), change/verify/rollback
+                         orchestration, DNS latency test
 crates/randommac-cli/    randommac-cli
 src-tauri/               desktop app: commands, tray, autostart, elevation, updater, logging
 src/                     user interface (Svelte 5 + TypeScript)
@@ -297,19 +447,23 @@ docs/                    documentation
 
 | Part | Technology |
 |---|---|
-| Core, backends, CLI | Rust 1.99 (edition 2024), clap, serde, tracing |
+| Core, backends, CLI | Rust 1.100 (edition 2024), clap, serde, tracing, time |
 | Desktop shell | Tauri 2 (WebView2 on Windows, WebKitGTK on Linux) |
 | UI | Svelte 5, TypeScript, Vite, Lucide icons |
-| Windows APIs | SetupAPI, registry, IP Helper (`windows-sys`) |
-| Linux | sysfs, ethtool ioctl, NetworkManager (`nmcli`), iproute2, polkit, D-Bus (`zbus`) |
+| Windows APIs | SetupAPI, registry, IP Helper incl. the DNS settings API (`windows-sys`) |
+| Linux | sysfs, ethtool ioctl, NetworkManager (`nmcli`), iproute2, polkit, D-Bus (`zbus`, `busctl`) |
 | Packaging | NSIS, WiX (MSI), deb, rpm, AppImage; signed updater manifest |
-| CI/CD | GitHub Actions (Windows + Ubuntu, Fedora package test), cargo-deny, CodeQL, SonarQube Cloud (cargo-llvm-cov + Vitest coverage) |
+| CI/CD | GitHub Actions (Windows + Ubuntu, real MAC and DNS changes, Fedora package test), cargo-deny, npm license check, CodeQL, SonarQube Cloud (cargo-llvm-cov + Vitest coverage), JetBrains Qodana |
 
 ## Credits
 
 - **Developer**: [poli0981](https://github.com/poli0981)
 - **Third-party components**: listed on the About page of the app and in the [EULA](EULA.md).
 - Vendor prefixes: [IEEE Registration Authority](https://standards-oui.ieee.org/) public listings.
+- DNS providers: each provider's own documentation (the pages are listed with every entry in
+  `crates/randommac-core/src/dns/catalog.json`); DNSCrypt stamps from the DNSCrypt project's
+  [public resolver list](https://github.com/DNSCrypt/dnscrypt-resolvers). The providers are
+  independent third parties; listing them is not an endorsement.
 
 ## AI acknowledgment
 
@@ -321,6 +475,7 @@ This application was built and tested with AI assistance using **Anthropic Claud
 | **AI Assistant (v1.0.0)** | Claude Opus 4.6 by [Anthropic](https://www.anthropic.com/) via [Claude Code](https://claude.com/claude-code) |
 | **AI Assistant (v1.1.x)** | Claude Opus 4.7 by [Anthropic](https://www.anthropic.com/) via [Claude Code](https://claude.com/claude-code) |
 | **AI Assistant (v2.0.0)** | Claude Opus 5.5 by [Anthropic](https://www.anthropic.com/) via [Claude Code](https://claude.com/claude-code) — cross-platform rewrite |
+| **AI Assistant (v2.1.0)** | Claude Opus 5.5 by [Anthropic](https://www.anthropic.com/) via [Claude Code](https://claude.com/claude-code) — DNS settings, accessibility, maintenance mode |
 
 **AI was used for:** architecture and code (Rust, Svelte, workflows), debugging, writing and
 running tests (CI, and real-adapter tests on the developer's machine with the developer's

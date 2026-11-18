@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pageForShortcut, pages, shortcutOf } from "./nav";
+import { ariaShortcutOf, pageForShortcut, pages, shortcutOf } from "./nav";
 
 const key = (
   k: string,
@@ -24,6 +24,7 @@ describe("navigation", () => {
     pages.forEach((page, i) => {
       expect(pageForShortcut(key(String(i + 1), { ctrl: true }))).toBe(page);
       expect(shortcutOf(page)).toBe(`Ctrl+${i + 1}`);
+      expect(ariaShortcutOf(page)).toBe(`Control+${i + 1}`);
     });
     expect(pageForShortcut(key("2", { meta: true }))).toBe("dns");
   });

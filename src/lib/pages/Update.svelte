@@ -6,7 +6,7 @@
   import { app } from "../stores/app.svelte";
   import { api } from "../api";
   import { i18n, t } from "../i18n/index.svelte";
-  import { formatDate, formatRelative } from "../format";
+  import { demoteHeadings, formatDate, formatRelative } from "../format";
 
   const RELEASES = "https://github.com/poli0981/randomizerMAC/releases";
 
@@ -25,10 +25,12 @@
     const html = marked.parse(update.notes, { async: false, gfm: true }) as string;
     // Release notes come from our own signed manifest, but are still sanitized: no images,
     // scripts, styles or inline handlers.
-    return DOMPurify.sanitize(html, {
+    const clean = DOMPurify.sanitize(html, {
       FORBID_TAGS: ["img", "style", "iframe", "form", "input", "script"],
       FORBID_ATTR: ["style", "onerror", "onclick"],
     });
+    // The notes sit under the page's h1, the card's h2 and their own h3.
+    return demoteHeadings(clean, 3);
   });
   const lastChecked = $derived(update?.checkedAt ?? app.settings?.lastUpdateCheck ?? null);
 
@@ -133,6 +135,7 @@
         <div
           class="progress"
           role="progressbar"
+          aria-label={t("update.progressLabel")}
           aria-valuemin="0"
           aria-valuemax="100"
           aria-valuenow={percent ?? undefined}
@@ -151,9 +154,19 @@
       {/if}
       {#if notesHtml}
         <h3 class="notes-title">{t("update.notes")}</h3>
+        <!-- Clicks on links inside are handled here; the links themselves are keyboard reachable. -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="notes" onclick={onNotesClick}>{@html notesHtml}</div>
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <div
+          class="notes"
+          role="region"
+          aria-label={t("update.notes")}
+          tabindex="0"
+          onclick={onNotesClick}
+        >
+          {@html notesHtml}
+        </div>
       {/if}
     </section>
   {/if}
@@ -186,6 +199,15 @@
   .bar.indeterminate {
     animation: slide 1.2s ease-in-out infinite;
   }
+  @media (forced-colors: active) {
+    .progress {
+      border: 1px solid CanvasText;
+    }
+    .bar {
+      forced-color-adjust: none;
+      background: Highlight;
+    }
+  }
   @keyframes slide {
     from {
       transform: translateX(-100%);
@@ -207,9 +229,9 @@
     border: 1px solid var(--border);
     line-height: 1.55;
   }
-  .notes :global(h1),
-  .notes :global(h2),
-  .notes :global(h3) {
+  .notes :global(h4),
+  .notes :global(h5),
+  .notes :global(h6) {
     font-size: 15px;
     margin: 12px 0 6px;
   }

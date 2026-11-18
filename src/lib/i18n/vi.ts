@@ -4,6 +4,7 @@ import type { Dictionary } from "./en";
 export const vi: Dictionary = {
   "app.name": "RandomMac",
   "app.tagline": "Đổi ngẫu nhiên, đặt và khôi phục địa chỉ MAC của card mạng",
+  "app.skipToContent": "Bỏ qua, tới nội dung",
 
   "nav.label": "Điều hướng chính",
   "nav.dashboard": "Bảng điều khiển",
@@ -16,6 +17,7 @@ export const vi: Dictionary = {
   "nav.social": "Mạng xã hội",
   "nav.collapse": "Thu gọn thanh bên",
   "nav.expand": "Mở rộng thanh bên",
+  "nav.updateAvailable": "có bản cập nhật",
 
   "status.admin": "Quản trị viên",
   "status.readOnly": "Chỉ xem",
@@ -45,6 +47,8 @@ export const vi: Dictionary = {
   "common.minutes": "{n} phút",
   "common.hours": "{n} giờ",
   "common.learnMore": "Tìm hiểu thêm",
+  "toasts.label": "Thông báo",
+  "toasts.close": "Đóng thông báo: {message}",
 
   "banner.readOnly.title": "Đang chạy không có quyền quản trị",
   "banner.readOnly.body":
@@ -61,6 +65,7 @@ export const vi: Dictionary = {
 
   "dashboard.title": "Bảng điều khiển",
   "dashboard.subtitle": "Chọn adapter, xem trước địa chỉ mới rồi áp dụng.",
+  "dashboard.busy": "Đang thay đổi…",
   "dashboard.adapters": "Adapter mạng",
   "dashboard.showVirtual": "Hiện adapter ảo",
   "dashboard.noAdapters": "Không tìm thấy adapter mạng nào.",
@@ -132,6 +137,7 @@ export const vi: Dictionary = {
   "stage.restarting": "Khởi động lại adapter",
   "stage.verifying": "Xác minh",
   "stage.rollingBack": "Hoàn tác",
+  "progress.step": "Bước {n}/{total}: {step}",
 
   "result.applied": "{adapter} đang dùng {mac}.",
   "result.restored": "{adapter} đã trở về địa chỉ gốc.",
@@ -353,6 +359,7 @@ export const vi: Dictionary = {
   "history.failed": "Thất bại",
   "history.empty": "Chưa có lịch sử.",
   "history.noMatch": "Không có mục nào khớp bộ lọc.",
+  "history.tableLabel": "Lịch sử thay đổi",
   "history.kindFilter": "Loại",
   "history.kind.mac": "Địa chỉ MAC",
   "history.kind.dns": "DNS",
@@ -467,6 +474,8 @@ export const vi: Dictionary = {
   "settings.resetBody": "Lịch sử và danh sách chặn được giữ nguyên.",
 
   "logs.title": "Nhật ký",
+  "logs.levels": "Mức log",
+  "logs.listLabel": "Các dòng log",
   "logs.subtitle": "Thông điệp chẩn đoán của phiên này.",
   "logs.filter": "Lọc thông điệp",
   "logs.autoScroll": "Tự cuộn",
@@ -488,6 +497,7 @@ export const vi: Dictionary = {
   "update.available": "Đã có phiên bản {version}",
   "update.published": "Phát hành {date}",
   "update.notes": "Có gì mới",
+  "update.progressLabel": "Tiến độ tải xuống",
   "update.install": "Tải về và cài đặt",
   "update.downloading": "Đang tải… {percent}",
   "update.installing": "Đang cài đặt… RandomMac sẽ khởi động lại.",

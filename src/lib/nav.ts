@@ -32,3 +32,8 @@ export function pageForShortcut(e: ShortcutKey): Page | null {
 export function shortcutOf(page: Page): string {
   return `Ctrl+${pages.indexOf(page) + 1}`;
 }
+
+/** The same shortcut for `aria-keyshortcuts` ("Control+2"). */
+export function ariaShortcutOf(page: Page): string {
+  return `Control+${pages.indexOf(page) + 1}`;
+}

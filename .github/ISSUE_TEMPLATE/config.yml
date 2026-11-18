@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Feature ideas (maintenance mode)
+    url: https://github.com/poli0981/randomizerMAC/discussions/categories/ideas
+    about: RandomMac is in maintenance mode, so new features are not planned. Ideas are welcome in Discussions, with no commitment.
   - name: Report a security vulnerability
     url: https://github.com/poli0981/randomizerMAC/security/advisories/new
     about: Please report vulnerabilities privately, not as a public issue.
