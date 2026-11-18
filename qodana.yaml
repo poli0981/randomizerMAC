@@ -41,12 +41,18 @@ exclude:
   - name: DuplicatedCode
     paths:
       - src/app.css
-  # The Svelte plugin's type engine neither narrows `status` inside `{#if status}`/`{@const}` nor
-  # resolves the Lucide icon components' types. svelte-check (TypeScript 7, --fail-on-warnings)
-  # type-checks this component in CI.
+  # In .svelte files the Svelte plugin's type engine does not follow the template's control flow
+  # (`{#if settings}` and `{@const}` do not narrow; discriminated unions stay wide) and does not
+  # resolve the Lucide icon components' types, so it reports values as possibly null and
+  # assignments as mistyped where they are not. svelte-check (TypeScript 7, --fail-on-warnings)
+  # type-checks every component in CI; the TypeScript modules in src/lib stay analyzed here.
   - name: TypeScriptValidateTypes
     paths:
-      - src/lib/components/Sidebar.svelte
+      - src/App.svelte
+      - src/lib/components
+      - src/lib/pages
   - name: TypeScriptUnresolvedReference
     paths:
-      - src/lib/components/Sidebar.svelte
+      - src/App.svelte
+      - src/lib/components
+      - src/lib/pages
