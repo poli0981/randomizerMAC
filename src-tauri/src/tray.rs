@@ -1,15 +1,17 @@
-//! Tray icon and menu (localized, rebuilt when the language or the selected adapter changes).
+//! Tray icon and menu (localized, rebuilt when the language, the selected adapter or the DNS
+//! presets change).
 
 use std::sync::atomic::Ordering;
 
 use randommac_core::ChangeSource;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, Wry};
 
 use crate::i18n::{Key, t};
 use crate::ops_runner;
 use crate::state::AppState;
+use crate::tray_menu::{self, DnsMenuAction, MenuEntry};
 
 pub const TRAY_ID: &str = "main";
 
@@ -34,6 +36,22 @@ fn build_menu(app: &AppHandle, target: Option<&(String, String)>) -> tauri::Resu
     let name = target
         .map(|(_, n)| n.clone())
         .unwrap_or_else(|| t(lang, Key::TrayNoAdapter, &[]));
+    let dns = Submenu::new(app, t(lang, Key::TrayDns, &[&name]), can_change)?;
+    let presets = state.settings().dns.presets;
+    for entry in tray_menu::dns_menu(randommac_core::dns::catalog(), &presets, lang) {
+        match entry {
+            MenuEntry::Item { id, label } => {
+                dns.append(&MenuItem::with_id(
+                    app,
+                    id,
+                    label,
+                    can_change,
+                    None::<&str>,
+                )?)?;
+            }
+            MenuEntry::Separator => dns.append(&PredefinedMenuItem::separator(app)?)?,
+        }
+    }
     Menu::with_items(
         app,
         &[
@@ -53,6 +71,7 @@ fn build_menu(app: &AppHandle, target: Option<&(String, String)>) -> tauri::Resu
                 can_change,
                 None::<&str>,
             )?,
+            &dns,
             &MenuItem::with_id(
                 app,
                 "restore_all",
@@ -104,6 +123,35 @@ fn on_menu(app: &AppHandle, id: &str) {
                 } else {
                     ops_runner::apply(&app, adapter_id, None, ChangeSource::Tray, false, false)
                         .await
+                };
+                if let Err(e) = result {
+                    ops_runner::notify(&app, e.message.clone(), true);
+                }
+            });
+        }
+        id if id.starts_with("dns:") => {
+            let id = id.to_string();
+            tauri::async_runtime::spawn(async move {
+                let target = {
+                    let app = app.clone();
+                    tauri::async_runtime::spawn_blocking(move || target_adapter(&app))
+                        .await
+                        .ok()
+                        .flatten()
+                };
+                let Some((adapter_id, _)) = target else {
+                    return;
+                };
+                let dns_settings = app.state::<AppState>().settings().dns;
+                let result = match tray_menu::dns_action(&id, &dns_settings) {
+                    Some(DnsMenuAction::Apply(request)) => {
+                        ops_runner::dns_apply(&app, adapter_id, request, ChangeSource::Tray, false)
+                            .await
+                    }
+                    Some(DnsMenuAction::Restore) => {
+                        ops_runner::dns_restore(&app, adapter_id, ChangeSource::Tray, false).await
+                    }
+                    None => return,
                 };
                 if let Err(e) = result {
                     ops_runner::notify(&app, e.message.clone(), true);

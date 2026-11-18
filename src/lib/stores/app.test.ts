@@ -58,6 +58,7 @@ function settings(extra: Partial<Settings> = {}): Settings {
     linux: { method: "auto" },
     history: { maxEntries: 500, retentionDays: 90 },
     legacy: {},
+    dns: { preferEncryption: true, allowFallback: false, presets: [] },
     ...extra,
   };
 }
@@ -299,13 +300,19 @@ describe("events", () => {
     await emit("op:progress", { adapterId: "eth", stage: "writing" });
     expect(app.busy).toBeNull();
     await emit("app:busy", { busy: true, adapterId: "eth" });
-    expect(app.busy).toEqual({ adapterId: "eth", stage: null });
+    expect(app.busy).toEqual({ adapterId: "eth", stage: null, kind: "mac" });
     await emit("op:progress", { adapterId: "other", stage: "writing" });
     expect(app.busy?.stage).toBeNull();
     await emit("op:progress", { adapterId: "eth", stage: "verifying" });
     expect(app.busy?.stage).toBe("verifying");
     await emit("app:busy", { busy: false, adapterId: "eth" });
     expect(app.busy).toBeNull();
+    await emit("app:busy", { busy: true, adapterId: "eth", kind: "dns" });
+    expect(app.busy).toEqual({ adapterId: "eth", stage: null, kind: "dns" });
+    await emit("app:busy", { busy: false, adapterId: "eth", kind: "dns" });
+    const revision = app.dnsRevision;
+    await emit("dns:changed", "eth");
+    expect(app.dnsRevision).toBe(revision + 1);
 
     await emit("app:navigate", "history");
     expect(app.page).toBe("history");
@@ -334,6 +341,29 @@ describe("events", () => {
     expect(be.calls).toEqual(
       expect.arrayContaining(["list_adapters", "history_list", "blacklist_get"]),
     );
+  });
+});
+
+describe("DNS catalog", () => {
+  it("is loaded once and kept", async () => {
+    const be = backend({ dns_catalog: () => ({ providers: [] }) });
+    const { app } = await load();
+    await expect(app.loadDnsCatalog()).resolves.toEqual({ providers: [] });
+    await app.loadDnsCatalog();
+    expect(be.calls.filter((c) => c === "dns_catalog")).toHaveLength(1);
+  });
+
+  it("reports a failure and stays empty", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    backend({
+      dns_catalog: () => {
+        throw { code: "INTERNAL", message: "x" };
+      },
+    });
+    const { app } = await load();
+    await expect(app.loadDnsCatalog()).resolves.toBeNull();
+    expect(app.toasts).toHaveLength(1);
+    warn.mockRestore();
   });
 });
 

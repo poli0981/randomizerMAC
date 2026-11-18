@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { emit } from "@tauri-apps/api/event";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { api, events, toApiError } from "./api";
-import type { Settings } from "./types";
+import type { DnsRequest, Settings } from "./types";
 
 afterEach(() => clearMocks());
 
@@ -32,6 +32,11 @@ describe("toApiError", () => {
 describe("api", () => {
   // Every wrapper with the command and arguments src-tauri/src/commands.rs expects.
   const settings = { schemaVersion: 2 } as Settings;
+  const request: DnsRequest = {
+    target: { kind: "provider", provider: "quad9" },
+    encryption: "preferred",
+    allowFallback: false,
+  };
   const cases: [string, () => Promise<unknown>, string, unknown][] = [
     ["appInfo", () => api.appInfo(), "app_info", {}],
     ["uiReady", () => api.uiReady(), "ui_ready", {}],
@@ -74,6 +79,18 @@ describe("api", () => {
     ],
     ["restoreMac", () => api.restoreMac("a1"), "restore_mac", { adapterId: "a1" }],
     ["restoreAll", () => api.restoreAll(), "restore_all", {}],
+    ["dnsCatalog", () => api.dnsCatalog(), "dns_catalog", {}],
+    ["dnsView", () => api.dnsView("a1"), "dns_view", { adapterId: "a1" }],
+    ["dnsApply", () => api.dnsApply("a1", request), "dns_apply", { adapterId: "a1", request }],
+    ["dnsApplyAll", () => api.dnsApplyAll(request), "dns_apply_all", { request }],
+    ["dnsRestore", () => api.dnsRestore("a1"), "dns_restore", { adapterId: "a1" }],
+    [
+      "dnsLatencyTest",
+      () => api.dnsLatencyTest(["9.9.9.9"], 2),
+      "dns_latency_test",
+      { servers: ["9.9.9.9"], attempts: 2 },
+    ],
+    ["dnsLatencyCancel", () => api.dnsLatencyCancel(), "dns_latency_cancel", {}],
     ["historyList", () => api.historyList(), "history_list", {}],
     ["historyClear", () => api.historyClear(), "history_clear", {}],
     ["historyExport", () => api.historyExport("csv"), "history_export", { format: "csv" }],
@@ -140,8 +157,10 @@ describe("api", () => {
 
 describe("events", () => {
   const payloads: [keyof typeof events, string, unknown][] = [
-    ["onProgress", "op:progress", { adapterId: "a1", stage: "writing" }],
-    ["onBusy", "app:busy", { busy: true, adapterId: "a1" }],
+    ["onProgress", "op:progress", { adapterId: "a1", stage: "writing", kind: "mac" }],
+    ["onBusy", "app:busy", { busy: true, adapterId: "a1", kind: "dns" }],
+    ["onDnsChanged", "dns:changed", "a1"],
+    ["onLatency", "dns:latency", { index: 0, addr: "9.9.9.9", outcome: { kind: "timeout" } }],
     ["onSettingsChanged", "settings:changed", { schemaVersion: 2 }],
     ["onNavigate", "app:navigate", "history"],
     ["onUpdateAvailable", "update:available", { version: "9.9.9" }],

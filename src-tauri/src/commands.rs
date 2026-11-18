@@ -2,16 +2,20 @@
 //! capabilities/main.json; arguments are validated here, never trusted.
 
 use std::io::Write as _;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use randommac_core::blacklist::{BlacklistEntry, MacPattern};
+use randommac_core::dns::{Catalog, DnsRequest};
 use randommac_core::timefmt;
 use randommac_core::{
     ChangeSource, GenerateRequest, GenerationMode, HistoryEntry, MacAddress, OsRandom, Settings,
     generate, history, oui,
 };
+use randommac_net::dns_ops::{self, DnsView};
+use randommac_net::dns_probe::{self, ProbeOptions, ProbeOutcome, ProbeTarget};
 use randommac_net::{Adapter, Capabilities, ops};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -20,7 +24,7 @@ use tauri_plugin_dialog::DialogExt;
 use crate::error::{ApiError, ApiResult};
 use crate::i18n::{Key, t};
 use crate::logging::LogEntry;
-use crate::ops_runner::{self, OpResult};
+use crate::ops_runner::{self, DnsOpResult, OpResult};
 use crate::state::{AppState, StartupReport};
 use crate::updater::{self, UpdateInfo};
 use crate::{autostart, links, platform, scheduler, tray};
@@ -477,6 +481,133 @@ pub async fn restore_all(app: AppHandle) -> ApiResult<Vec<OpResult>> {
 }
 
 // ---------------------------------------------------------------------------------------------
+// DNS
+// ---------------------------------------------------------------------------------------------
+
+/// The built-in provider catalog (static; the UI loads it once).
+#[tauri::command]
+pub fn dns_catalog() -> &'static Catalog {
+    randommac_core::dns::catalog()
+}
+
+/// What the DNS page shows for one adapter: capabilities, configured and effective servers.
+#[tauri::command]
+pub async fn dns_view(state: State<'_, AppState>, adapter_id: String) -> ApiResult<DnsView> {
+    let backend = Arc::clone(&state.backend);
+    let store = state.store.clone();
+    let settings = state.settings();
+    blocking(move || {
+        Ok(dns_ops::dns_view(
+            backend.as_ref(),
+            &store,
+            &settings,
+            &adapter_id,
+        )?)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn dns_apply(
+    app: AppHandle,
+    adapter_id: String,
+    request: DnsRequest,
+) -> ApiResult<DnsOpResult> {
+    ops_runner::dns_apply(&app, adapter_id, request, ChangeSource::Ui, false).await
+}
+
+#[tauri::command]
+pub async fn dns_apply_all(app: AppHandle, request: DnsRequest) -> ApiResult<Vec<DnsOpResult>> {
+    ops_runner::dns_apply_all(&app, request, ChangeSource::Ui).await
+}
+
+#[tauri::command]
+pub async fn dns_restore(app: AppHandle, adapter_id: String) -> ApiResult<DnsOpResult> {
+    ops_runner::dns_restore(&app, adapter_id, ChangeSource::Ui, false).await
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LatencyEvent {
+    index: usize,
+    addr: IpAddr,
+    outcome: ProbeOutcome,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LatencyResult {
+    addr: IpAddr,
+    outcome: ProbeOutcome,
+}
+
+/// Measures how fast each server answers a DNS query from this computer. Every finished server
+/// is also sent as `dns:latency` (by its index), so the page fills in while the test runs. One
+/// test at a time; [`dns_latency_cancel`] stops it.
+#[tauri::command]
+pub async fn dns_latency_test(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    servers: Vec<IpAddr>,
+    attempts: Option<u8>,
+) -> ApiResult<Vec<LatencyResult>> {
+    if servers.is_empty() || servers.len() > dns_probe::MAX_TARGETS {
+        return Err(ApiError::new(
+            "INVALID_INPUT",
+            format!("between 1 and {} servers", dns_probe::MAX_TARGETS),
+        ));
+    }
+    if state.dns_probe_running.swap(true, Ordering::SeqCst) {
+        return Err(ApiError::busy());
+    }
+    state.dns_probe_cancel.store(false, Ordering::SeqCst);
+    let cancel = Arc::clone(&state.dns_probe_cancel);
+    let opts = ProbeOptions {
+        attempts: attempts.unwrap_or(3).clamp(1, 5),
+        ..ProbeOptions::default()
+    };
+    let result = blocking(move || {
+        let targets: Vec<ProbeTarget> = servers
+            .iter()
+            .map(|addr| ProbeTarget {
+                label: addr.to_string(),
+                addr: *addr,
+            })
+            .collect();
+        let mut outcomes: Vec<Option<ProbeOutcome>> = vec![None; targets.len()];
+        dns_probe::probe_all(&targets, &opts, &cancel, &mut |index, outcome| {
+            let _ = app.emit(
+                "dns:latency",
+                LatencyEvent {
+                    index,
+                    addr: servers[index],
+                    outcome: outcome.clone(),
+                },
+            );
+            if let Some(slot) = outcomes.get_mut(index) {
+                *slot = Some(outcome);
+            }
+        });
+        Ok(servers
+            .into_iter()
+            .zip(outcomes)
+            .map(|(addr, outcome)| LatencyResult {
+                addr,
+                outcome: outcome.unwrap_or(ProbeOutcome::Cancelled),
+            })
+            .collect())
+    })
+    .await;
+    state.dns_probe_running.store(false, Ordering::SeqCst);
+    result
+}
+
+#[tauri::command]
+pub fn dns_latency_cancel(state: State<'_, AppState>) {
+    state.dns_probe_cancel.store(true, Ordering::SeqCst);
+}
+
+// ---------------------------------------------------------------------------------------------
 // History
 // ---------------------------------------------------------------------------------------------
 
@@ -695,6 +826,7 @@ fn apply_settings(app: &AppHandle, mut next: Settings) -> ApiResult<Settings> {
     }
     if next.language != previous.language
         || next.selected_adapter_id != previous.selected_adapter_id
+        || next.dns.presets != previous.dns.presets
     {
         tray::refresh(app);
     }
@@ -712,7 +844,13 @@ pub async fn settings_update(app: AppHandle, settings: Settings) -> ApiResult<Se
 
 #[tauri::command]
 pub async fn settings_reset(app: AppHandle) -> ApiResult<Settings> {
-    blocking(move || apply_settings(&app, Settings::default())).await
+    blocking(move || {
+        let mut fresh = Settings::default();
+        // DNS presets are the user's data, like the blacklist: a reset keeps them.
+        fresh.dns.presets = app.state::<AppState>().settings().dns.presets;
+        apply_settings(&app, fresh)
+    })
+    .await
 }
 
 #[tauri::command]

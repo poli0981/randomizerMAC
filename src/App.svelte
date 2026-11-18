@@ -4,6 +4,7 @@
   import Sidebar from "./lib/components/Sidebar.svelte";
   import Toasts from "./lib/components/Toasts.svelte";
   import Dashboard from "./lib/pages/Dashboard.svelte";
+  import Dns from "./lib/pages/Dns.svelte";
   import History from "./lib/pages/History.svelte";
   import Settings from "./lib/pages/Settings.svelte";
   import Logs from "./lib/pages/Logs.svelte";
@@ -13,9 +14,9 @@
   import { app } from "./lib/stores/app.svelte";
   import { api } from "./lib/api";
   import { t } from "./lib/i18n/index.svelte";
+  import { pageForShortcut } from "./lib/nav";
   import type { Page } from "./lib/types";
 
-  const pages: Page[] = ["dashboard", "history", "settings", "logs", "update", "about", "social"];
   const isDev = import.meta.env.DEV;
 
   let collapsed = $state(readCollapsed());
@@ -66,9 +67,10 @@
   function onKeydown(e: KeyboardEvent) {
     const ctrl = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
-    if (ctrl && !e.shiftKey && /^[1-7]$/.test(e.key)) {
+    const shortcut = pageForShortcut(e);
+    if (shortcut) {
       e.preventDefault();
-      app.navigate(pages[Number(e.key) - 1]!);
+      app.navigate(shortcut);
       return;
     }
     if (e.key === "F5") {
@@ -187,6 +189,7 @@
         </div>
 
         {#if app.page === "dashboard"}<Dashboard />
+        {:else if app.page === "dns"}<Dns />
         {:else if app.page === "history"}<History />
         {:else if app.page === "settings"}<Settings />
         {:else if app.page === "logs"}<Logs />
@@ -207,6 +210,9 @@
     height: 100vh;
   }
   main {
+    /* Contains absolutely positioned descendants (.sr-only text deep in a long page would
+       otherwise extend the document and scroll the whole window, sidebar included). */
+    position: relative;
     flex: 1;
     min-width: 0;
     overflow-y: auto;

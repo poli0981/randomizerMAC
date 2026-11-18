@@ -66,6 +66,7 @@ describe("formatBytes", () => {
 describe("methodLabel", () => {
   it("names the known methods and passes others through", () => {
     expect(methodLabel("windowsRegistry")).toBe("Windows (NetworkAddress)");
+    expect(methodLabel("windowsIpHelper")).toBe("Windows (IP Helper)");
     expect(methodLabel("networkManager")).toBe("NetworkManager");
     expect(methodLabel("iproute2")).toBe("iproute2");
     expect(methodLabel("mock")).toBe("Demo");
