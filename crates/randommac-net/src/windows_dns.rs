@@ -278,11 +278,10 @@ fn require_change(adapter: &Adapter) -> Result<&'static DnsApi, NetError> {
 
 /// Waits until the adapter uses the first requested server (or the timeout passes).
 fn wait_until_in_use(guid: &str, config: &DnsConfig, timeout: Duration) -> (Vec<IpAddr>, bool) {
-    let wanted = config.servers().first().copied();
     let deadline = Instant::now() + timeout;
     loop {
         let servers = dns_servers(guid);
-        let ok = wanted.is_none_or(|w| servers.first() == Some(&w));
+        let ok = win_dns::in_use(config, &servers);
         if ok || Instant::now() >= deadline {
             return (servers, ok);
         }
@@ -329,10 +328,11 @@ pub(super) fn capabilities(adapter: &Adapter) -> DnsCapabilities {
         can_change: change_reason.is_none(),
         change_reason,
         ipv4: FeatureSupport::YES,
+        // IPv6 unbound from the adapter (Internet Protocol Version 6 unticked in its properties).
         ipv6: if ipv6_bound(guid) {
             FeatureSupport::YES
         } else {
-            FeatureSupport::no(DnsReason::UnsupportedPlatform)
+            FeatureSupport::no(DnsReason::FamilyDisabled)
         },
         doh,
         dot: FeatureSupport::no(DnsReason::DotUnsupportedWindows),
@@ -399,26 +399,36 @@ pub(super) fn apply(
     };
     let mut warnings = Vec::new();
     let v6_bound = ipv6_bound(guid);
-    let mut calls = win_dns::plan_apply(config, v3).to_vec();
-    if !v6_bound {
-        calls.retain(|c| !c.ipv6);
-        if !matches!(config.ipv6, FamilyDns::Automatic) {
-            warnings.push(codes::DNS_IPV6_SKIPPED.to_string());
-        }
-    }
-    let rollback: Vec<FamilyCall> = win_dns::plan_restore(&prev4, &prev6, v3)
-        .into_iter()
-        .filter(|c| v6_bound || !c.ipv6)
-        .collect();
+    // What puts the families written so far back.
+    let undo = |written: &[FamilyCall]| -> Vec<FamilyCall> {
+        win_dns::plan_restore(&prev4, &prev6, v3)
+            .into_iter()
+            .filter(|r| written.iter().any(|w| w.ipv6 == r.ipv6))
+            .collect()
+    };
 
     progress(Stage::Writing);
-    if let Err(e) = write_all(api, guid, &calls, v3) {
-        progress(Stage::RollingBack);
-        return match write_all(api, guid, &rollback, v3) {
-            Ok(()) => Err(e),
-            Err(again) => Err(NetError::RollbackFailed(format!("{e}; restoring: {again}"))),
-        };
+    let mut calls: Vec<FamilyCall> = Vec::new();
+    for call in win_dns::plan_apply(config, v3) {
+        match write_family(api, guid, &call, v3) {
+            Ok(()) => calls.push(call),
+            // IPv6 unbound from the adapter (VPN clients do that against leaks): its settings
+            // only matter once it is bound again, and Windows may refuse them meanwhile.
+            Err(_) if call.ipv6 && !v6_bound => {
+                if !matches!(config.ipv6, FamilyDns::Automatic) {
+                    warnings.push(codes::DNS_IPV6_SKIPPED.to_string());
+                }
+            }
+            Err(e) => {
+                progress(Stage::RollingBack);
+                return match write_all(api, guid, &undo(&calls), v3) {
+                    Ok(()) => Err(e),
+                    Err(again) => Err(NetError::RollbackFailed(format!("{e}; restoring: {again}"))),
+                };
+            }
+        }
     }
+    let rollback = undo(&calls);
 
     progress(Stage::Verifying);
     let (read4, read6, _) = read_both(api, guid)?;
@@ -483,12 +493,23 @@ pub(super) fn restore(
     let guid = guid_of(&guid_text)?;
     let (cur4, cur6, v3) = read_both(api, guid)?;
     let v6_bound = ipv6_bound(guid);
-    let calls: Vec<FamilyCall> = win_dns::plan_restore(ipv4, ipv6, v3)
-        .into_iter()
-        .filter(|c| v6_bound || !c.ipv6)
-        .collect();
+    let mut warnings = Vec::new();
     progress(Stage::Writing);
-    write_all(api, guid, &calls, v3)?;
+    let mut calls: Vec<FamilyCall> = Vec::new();
+    for call in win_dns::plan_restore(ipv4, ipv6, v3) {
+        // IPv6 may have been unbound since the change (see `apply`): its settings are still put
+        // back when Windows takes them, so they are right once it is bound again.
+        if call.ipv6 && !v6_bound && win_dns::matches(&call, &cur6) {
+            continue;
+        }
+        match write_family(api, guid, &call, v3) {
+            Ok(()) => calls.push(call),
+            Err(_) if call.ipv6 && !v6_bound => {
+                warnings.push(codes::DNS_IPV6_SKIPPED.to_string());
+            }
+            Err(e) => return Err(e),
+        }
+    }
     progress(Stage::Verifying);
     let (read4, read6, _) = read_both(api, guid)?;
     let written = calls
@@ -506,7 +527,7 @@ pub(super) fn restore(
         observed: Some(win_dns::summary(&read4, &read6)),
         effective: dns_servers(&guid_text),
         detail_code: (!written).then(|| codes::DNS_NOT_APPLIED.to_string()),
-        warnings: Vec::new(),
+        warnings,
         cache_flushed: false,
         nm_connection_uuid: None,
     };

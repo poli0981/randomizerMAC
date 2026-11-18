@@ -348,33 +348,34 @@ jobs:
           GUID: ${{ steps.adapter.outputs.guid }}
         run: |
           cargo llvm-cov show-env --pwsh | Invoke-Expression
-          function cli {
+          # Not `cli`: that is PowerShell's alias of Clear-Item, and aliases win over functions.
+          function Invoke-RandomMac {
             & ./target/debug/randommac-cli.exe --data-dir "$env:RUNNER_TEMP/randommac" @args
             if ($LASTEXITCODE -ne 0) { throw "randommac-cli $args exited with $LASTEXITCODE" }
           }
           function servers {
             (Get-DnsClientServerAddress -InterfaceAlias $env:ADAPTER -AddressFamily IPv4).ServerAddresses -join ','
           }
-          function doh { (cli --json dns show $env:ADAPTER | ConvertFrom-Json).status.dohTemplate }
+          function doh { (Invoke-RandomMac --json dns show $env:ADAPTER | ConvertFrom-Json).status.dohTemplate }
           $quad9 = "HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\InterfaceSpecificParameters\$env:GUID\DohInterfaceSettings\Doh\9.9.9.9"
           $dhcp = servers
-          cli dns show $env:ADAPTER
-          cli dns set $env:ADAPTER --provider quad9 --encryption none --no-check
+          Invoke-RandomMac dns show $env:ADAPTER
+          Invoke-RandomMac dns set $env:ADAPTER --provider quad9 --encryption none --no-check
           if ((servers) -ne '9.9.9.9,149.112.112.112') { throw "IPv4 servers: $(servers)" }
           if (doh) { throw "unexpected DoH template: $(doh)" }
-          cli dns set $env:ADAPTER --provider quad9 --encryption doh --no-check
+          Invoke-RandomMac dns set $env:ADAPTER --provider quad9 --encryption doh --no-check
           if ((doh) -ne 'https://dns.quad9.net/dns-query') { throw "DoH template: $(doh)" }
           if (-not (Test-Path $quad9)) { throw 'no DoH settings for 9.9.9.9' }
-          cli dns show $env:ADAPTER
+          Invoke-RandomMac dns show $env:ADAPTER
           # Back to DHCP, without the DoH settings of the servers that were set.
-          cli dns restore $env:ADAPTER
+          Invoke-RandomMac dns restore $env:ADAPTER
           if ((servers) -ne $dhcp) { throw "after restore: $(servers), expected $dhcp" }
           if (Test-Path $quad9) { throw 'the DoH settings of 9.9.9.9 were left behind' }
-          cli dns set $env:ADAPTER --provider cloudflare --encryption none --no-check
-          cli dns auto $env:ADAPTER
+          Invoke-RandomMac dns set $env:ADAPTER --provider cloudflare --encryption none --no-check
+          Invoke-RandomMac dns auto $env:ADAPTER
           if ((servers) -ne $dhcp) { throw "after automatic: $(servers), expected $dhcp" }
-          cli dns restore $env:ADAPTER
-          cli history
+          Invoke-RandomMac dns restore $env:ADAPTER
+          Invoke-RandomMac history
       - name: Reset the adapter's DNS servers
         if: always() && steps.adapter.outputs.name != ''
         env:

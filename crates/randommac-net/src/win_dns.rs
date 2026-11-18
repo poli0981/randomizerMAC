@@ -175,6 +175,15 @@ pub fn doh_details(
     }
 }
 
+/// True when the adapter uses the first server of `config` (any server, for "automatic"). Windows
+/// may list an adapter's IPv6 servers before its IPv4 ones, so the position does not matter.
+pub fn in_use(config: &DnsConfig, effective: &[IpAddr]) -> bool {
+    config
+        .servers()
+        .first()
+        .is_none_or(|wanted| effective.contains(wanted))
+}
+
 /// Windows reports these site-local addresses as the DNS servers of an IPv6 interface that has
 /// none.
 pub fn is_placeholder_dns(ip: &IpAddr) -> bool {
@@ -341,6 +350,27 @@ mod tests {
             summary(&snap("2620:fe::fe,x", vec![]), &ipv6).ipv4,
             FamilyDns::Automatic
         );
+    }
+
+    #[test]
+    fn in_use_ignores_the_order_windows_lists_servers_in() {
+        let ip = |s: &str| s.parse::<IpAddr>().expect("ip");
+        let quad9 = config(
+            &["9.9.9.9", "149.112.112.112"],
+            &["2620:fe::fe"],
+            DnsEncryption::None,
+        );
+        // Seen on Windows 11 24H2: the IPv6 servers come first.
+        let effective = [ip("2620:fe::fe"), ip("9.9.9.9"), ip("149.112.112.112")];
+        assert!(in_use(&quad9, &effective));
+        assert!(!in_use(&quad9, &[ip("192.168.1.1"), ip("2620:fe::fe")]));
+        assert!(!in_use(&quad9, &[]));
+        let v6_only = config(&[], &["2620:fe::9"], DnsEncryption::None);
+        assert!(in_use(&v6_only, &[ip("192.168.1.1"), ip("2620:fe::9")]));
+        // Automatic: whatever the network hands out.
+        let automatic = config(&[], &[], DnsEncryption::None);
+        assert!(in_use(&automatic, &[]));
+        assert!(in_use(&automatic, &[ip("192.168.1.1")]));
     }
 
     #[test]
