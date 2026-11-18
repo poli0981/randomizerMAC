@@ -1,0 +1,119 @@
+name: Maintenance triage
+
+# RandomMac is in maintenance mode (CONTRIBUTING.md → Maintenance mode). This workflow closes, with
+# a bilingual comment and the `out-of-scope` label:
+#   • any issue or pull request the maintainer labels `out-of-scope`;
+#   • when opened by an outside contributor: issues titled [Feature] (the prefix of the old feature
+#     request form) or labelled `enhancement`, and every pull request titled `feat:`, `feat!:` or
+#     `feat(scope):`, whatever the scope. The owner, members, collaborators and bots are skipped.
+# pull_request_target runs in the base repository so it can comment on and close pull requests from
+# forks. It never checks out or runs pull request code, and the script reads titles from the event
+# payload itself instead of having untrusted text interpolated into it.
+
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request_target:
+    types: [opened, labeled]
+
+permissions: {}
+
+concurrency:
+  group: maintenance-triage-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    name: Close out-of-scope requests
+    if: >-
+      (github.event.action == 'labeled' && github.event.label.name == 'out-of-scope') ||
+      (github.event.action == 'opened' &&
+       !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+                 github.event.issue.author_association || github.event.pull_request.author_association))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Close if out of scope
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const OUT_OF_SCOPE = 'out-of-scope';
+            const TRUSTED = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+            const { payload } = context;
+            const isPR = Boolean(payload.pull_request);
+            const item = payload.pull_request ?? payload.issue;
+            if (!item || item.state !== 'open') return;
+
+            const labels = (item.labels ?? []).map((label) => label.name);
+            let reason = null;
+            if (payload.action === 'labeled') {
+              if (payload.label?.name === OUT_OF_SCOPE) reason = 'labelled out-of-scope';
+            } else if (payload.action === 'opened') {
+              const trusted = TRUSTED.includes(item.author_association);
+              const bot = item.user?.type === 'Bot';
+              const title = String(item.title ?? '').trim();
+              if (!trusted && !bot) {
+                if (isPR) {
+                  // Conventional Commits: feat:, feat(scope):, feat!: — whatever the scope.
+                  if (/^feat(?:\([^)]*\))?!?:/i.test(title)) reason = 'feat: pull request';
+                } else if (/^\[feature\]/i.test(title) || labels.includes('enhancement')) {
+                  // "[Feature]: " was the title prefix of the old feature request form.
+                  reason = 'feature request';
+                }
+              }
+            }
+            if (!reason) {
+              core.info(`#${item.number}: within scope, nothing to do.`);
+              return;
+            }
+
+            const ideas = 'https://github.com/poli0981/randomizerMAC/discussions/categories/ideas';
+            const policy = 'https://github.com/poli0981/randomizerMAC/blob/master/CONTRIBUTING.md#maintenance-mode';
+            const form = 'https://github.com/poli0981/randomizerMAC/issues/new?template=';
+            const advisory = 'https://github.com/poli0981/randomizerMAC/security/advisories/new';
+            const en = isPR ? 'pull request' : 'issue';
+            const vi = isPR ? 'Pull request' : 'Issue';
+            const body = [
+              '<!-- maintenance-triage -->',
+              'Thanks for taking the time to write this. RandomMac 2.1.0 is the last feature release: the project is in **maintenance mode**. It stays maintained, but it will not grow new features. What still lands:',
+              '',
+              '1. regular dependency updates;',
+              '2. fixes for dependencies with high or critical CVEs and for serious security issues in runtimes such as Node.js, and features only when they are judged genuinely necessary;',
+              '3. major language, runtime or framework upgrades (for example Node 24 → 26, TypeScript 6 → 7);',
+              '4. issues and pull requests that fix bugs, broken UI/UX or accessibility barriers;',
+              '5. language fixes: wording that does not fit a culture or a regional dialect, and spelling mistakes that could mislead.',
+              '',
+              `This ${en} falls outside that scope, so it has been closed. If it is really a bug, accessibility or language fix, reply here and the maintainer will take another look. Ideas are welcome in [Discussions → Ideas](${ideas}), with no commitment.`,
+              '',
+              `Bugs go in the [Bug Report](${form}bug_report.yml) form, accessibility barriers in the [Accessibility issue](${form}accessibility.yml) form or to accessibility@poli0981.dev, translation fixes in the [Language / Translation Fix](${form}fix_lang.yml) form, and vulnerabilities privately in a [security advisory](${advisory}), never in a public issue. The full policy is in [CONTRIBUTING.md → Maintenance mode](${policy}).`,
+              '',
+              '---',
+              '',
+              'Cảm ơn bạn đã dành thời gian. RandomMac 2.1.0 là phiên bản cuối cùng có tính năng mới: dự án đang ở **giai đoạn bảo trì (maintenance mode)**, vẫn được duy trì nhưng không phát triển thêm tính năng. Những thay đổi vẫn được chấp nhận:',
+              '',
+              '1. cập nhật thư viện phụ thuộc (dependency) định kỳ;',
+              '2. bản sửa cho thư viện có CVE mức cao hoặc nghiêm trọng (high/critical), cho lỗ hổng bảo mật nghiêm trọng trong runtime như Node.js, và tính năng mới chỉ khi được đánh giá là thật sự cần thiết;',
+              '3. nâng cấp lớn về ngôn ngữ, runtime hoặc framework (ví dụ Node 24 → 26, TypeScript 6 → 7);',
+              '4. issue và pull request sửa lỗi, sửa UI/UX bị hỏng hoặc gỡ bỏ rào cản trợ năng (accessibility);',
+              '5. sửa ngôn ngữ/bản dịch: cách diễn đạt không phù hợp với một nền văn hóa hay phương ngữ vùng miền, và lỗi chính tả có thể gây hiểu nhầm.',
+              '',
+              `${vi} này nằm ngoài phạm vi đó nên đã được đóng. Nếu thực ra đây là lỗi, vấn đề trợ năng hoặc sửa ngôn ngữ/bản dịch, hãy trả lời ngay tại đây để maintainer xem lại. Ý tưởng luôn được chào đón ở [Discussions → Ideas](${ideas}), nhưng không có cam kết sẽ thực hiện.`,
+              '',
+              `Báo lỗi qua mẫu [Bug Report](${form}bug_report.yml), rào cản trợ năng qua mẫu [Accessibility issue](${form}accessibility.yml) hoặc email accessibility@poli0981.dev, lỗi bản dịch/ngôn ngữ qua mẫu [Language / Translation Fix](${form}fix_lang.yml); lỗ hổng bảo mật thì báo riêng, không công khai, qua [Security Advisory](${advisory}). Chính sách đầy đủ: [CONTRIBUTING.md → Maintenance mode](${policy}).`,
+            ].join('\n');
+
+            const { owner, repo } = context.repo;
+            const number = item.number;
+            await github.rest.issues.createComment({ owner, repo, issue_number: number, body });
+            if (!labels.includes(OUT_OF_SCOPE)) {
+              await github.rest.issues.addLabels({ owner, repo, issue_number: number, labels: [OUT_OF_SCOPE] });
+            }
+            if (isPR) {
+              await github.rest.pulls.update({ owner, repo, pull_number: number, state: 'closed' });
+            } else {
+              await github.rest.issues.update({ owner, repo, issue_number: number, state: 'closed', state_reason: 'not_planned' });
+            }
+            core.notice(`Closed ${en} #${number} as out of scope (${reason}).`);

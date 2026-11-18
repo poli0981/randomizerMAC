@@ -5,6 +5,7 @@ import {
   formatDateTime,
   formatRelative,
   formatTime,
+  demoteHeadings,
   methodLabel,
 } from "./format";
 
@@ -60,6 +61,15 @@ describe("formatBytes", () => {
     expect(formatBytes(1023)).toBe("1023 B");
     expect(formatBytes(1536)).toBe("1.5 KB");
     expect(formatBytes(5 * 1024 * 1024)).toBe("5.0 MB");
+  });
+});
+
+describe("demoteHeadings", () => {
+  it("moves headings down and stops at h6", () => {
+    expect(demoteHeadings("<h1>A</h1><h2 id=x>B</h2><H5>C</H5><p>h1</p>", 3)).toBe(
+      "<h4>A</h4><h5 id=x>B</h5><h6>C</h6><p>h1</p>",
+    );
+    expect(demoteHeadings("<h6>Z</h6>", 2)).toBe("<h6>Z</h6>");
   });
 });
 

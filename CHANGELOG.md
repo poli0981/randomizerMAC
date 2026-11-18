@@ -5,7 +5,14 @@ All notable changes to RandomMac (named "RANDOM MAC" in 1.x) are documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-11-18
+
+The last feature release. RandomMac now sets DNS servers too, per adapter, with encryption where
+the system supports it, and it is easier to use with a keyboard, a screen reader, zoom and
+Windows contrast themes. From this release on the project is in **maintenance mode**: it keeps
+getting dependency and security updates and fixes, but no new features (see
+[Project status](https://github.com/poli0981/randomizerMAC#project-status)). Settings, history,
+blacklist and state from 2.0.x are kept, and 2.0.x can still read them.
 
 ### Added
 
@@ -38,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     skips that); `dns test` measures the latency of providers or servers.
   - Windows uses the IP Helper DNS API (Windows 10 2004 or later), Linux the active
     NetworkManager profile (`nmcli device reapply`, no reconnect).
+- **Accessibility statement** ([ACCESSIBILITY.md](ACCESSIBILITY.md), also in Vietnamese): goals
+  (WCAG 2.2 AA), what works, how it is tested, known limitations, and how to report a barrier —
+  the new *Accessibility issue* form or accessibility@poli0981.dev.
 
 ### Security
 
@@ -52,9 +62,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings changed in quick succession (two selects, or a select while an earlier change was
   still being saved) could fail with "Something went wrong" and be undone.
 - On long pages the whole window, sidebar included, could scroll out of place.
+- Accessibility (keyboard): a **Skip to content** link; when the focused control goes away (a
+  closed banner or notification, a removed blacklist rule, a cleared history) focus moves to a
+  sensible place; dialogs start on **Cancel** and give focus back to the button that opened them;
+  Randomize, Apply and Restore stay focusable while a change runs; scrollable tables, the log and
+  the update notes take focus; shortcuts are announced (`aria-keyshortcuts`) and the shortcut hints
+  are no longer read as part of the button names.
+- Accessibility (screen readers): a change's progress is announced step by step ("Step 2 of 4:
+  …") and its result once; notifications are no longer read twice, errors stay until closed,
+  others pause while hovered or focused, and each close button says which notification it closes;
+  the update banner, the sidebar's update dot and the download progress bar have text; busy
+  adapters say so; switches are described by their explanations; the History table has a caption
+  and shows error details as text, not only in a tooltip; `<html lang>` is right from the start
+  and each language name has its own language; tray notifications about a failed action are
+  translated and give the error code.
+- Accessibility (display): subtle text, accent text and placeholders reach 4.5:1 contrast and
+  input outlines and the switch track 3:1, in both themes; Windows contrast themes draw switches,
+  the selected adapter, the current page, selected chips, the update dot, progress bars and
+  primary buttons in system colours; with reduced motion, spinners and progress animations stand
+  still; Ctrl+= / Ctrl+− / Ctrl+0 zoom the window and the sidebar scrolls when it doesn't fit.
 
 ### Changed
 
+- **Maintenance mode.** Feature issues and `feat:` pull requests from outside contributors are
+  closed automatically with the `out-of-scope` label (`maintenance-triage` workflow); the feature
+  request form is gone and ideas go to Discussions → Ideas. What still lands is listed in
+  [CONTRIBUTING.md](CONTRIBUTING.md#maintenance-mode). Supported versions: 2.1.x.
+- Every page, the DNS page included, and an open dialog are checked with axe-core in CI
+  (`npm test`), together with the roles and names keyboard and screen-reader users rely on.
 - Keyboard shortcuts: the DNS page is second, so Ctrl+2 … Ctrl+8 now open DNS, History,
   Settings, Log, Update, About and Social (History moved from Ctrl+2 to Ctrl+3).
 - CI: JetBrains Qodana (Ultimate) analyzes the Rust workspace and the TypeScript/Svelte UI on
@@ -69,9 +104,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   restore, automatic) and through the stand-in NetworkManager of the Linux job.
 - Dependencies: Rust 1.100.0 (the workspace's minimum is now Rust 1.90, as Tauri requires),
   tauri-plugin-notification 2.8.1, zip 9.5.1 and the other Rust crates; jsdom 31, Vite 8.3.8,
-  ESLint 10.15, eslint-plugin-svelte 3.24.1, typescript-eslint 8.72.2, Prettier 3.10.1,
+  ESLint 10.15, eslint-plugin-svelte 3.24.1, typescript-eslint 8.73.0 (with minimatch 11, a
+  security update for a moderate advisory in a development tool), Prettier 3.10.1,
   @lucide/svelte 1.73, marked 18.2.0, DOMPurify 3.4.18; CI actions SonarQube scan 8.5.0 and
-  taiki-e/install-action 2.90.3. New releases are taken only after they have been public for three
+  taiki-e/install-action 2.90.4. New releases are taken only after they have been public for three
   days, as Dependabot does.
 
 ## [2.0.2] - 2026-11-04
@@ -525,6 +561,7 @@ First public release of RANDOM MAC, a lightweight Windows utility for randomizin
 - **Start Minimized** toggle may not function correctly in all scenarios
 - **App Icon** is placeholder only (no custom icon designed yet)
 
+[2.1.0]: https://github.com/poli0981/randomizerMAC/releases/tag/v2.1.0
 [2.0.2]: https://github.com/poli0981/randomizerMAC/releases/tag/v2.0.2
 [2.0.1]: https://github.com/poli0981/randomizerMAC/releases/tag/v2.0.1
 [2.0.0]: https://github.com/poli0981/randomizerMAC/releases/tag/v2.0.0

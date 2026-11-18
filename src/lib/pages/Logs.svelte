@@ -102,7 +102,7 @@
 
 <section class="card log-card">
   <div class="toolbar">
-    <div class="chips" role="group" aria-label="Levels">
+    <div class="chips" role="group" aria-label={t("logs.levels")}>
       {#each levels as l (l)}
         <button
           class="chip {l}"
@@ -123,7 +123,14 @@
 
   <!-- The scrollable log must be focusable so keyboard users can scroll it. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-  <div class="lines mono" bind:this={list} role="log" aria-live="off" tabindex="0">
+  <div
+    class="lines mono"
+    bind:this={list}
+    role="log"
+    aria-live="off"
+    aria-label={t("logs.listLabel")}
+    tabindex="0"
+  >
     {#if filtered.length === 0}
       <p class="empty muted">{t("logs.empty")}</p>
     {:else}
@@ -180,6 +187,11 @@
     background: var(--warning-soft);
     border-color: var(--warning);
     color: var(--warning);
+  }
+  @media (forced-colors: active) {
+    .chip[aria-pressed="true"] {
+      outline: 2px solid Highlight;
+    }
   }
   .filter {
     flex: 1;

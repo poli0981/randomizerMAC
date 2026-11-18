@@ -51,6 +51,17 @@ export function formatTime(iso: string): string {
 }
 
 /** Human-readable name of a change method reported by the backend. */
+/**
+ * Moves the headings of rendered Markdown `by` levels down (at most h6), so that release notes
+ * shown under a page's own headings keep a correct outline.
+ */
+export function demoteHeadings(html: string, by: number): string {
+  return html.replace(
+    /<(\/?)h([1-6])\b/gi,
+    (_, slash: string, level: string) => `<${slash}h${Math.min(6, Number(level) + by)}`,
+  );
+}
+
 export function methodLabel(method: string): string {
   const labels: Record<string, string> = {
     windowsRegistry: "Windows (NetworkAddress)",

@@ -3,6 +3,7 @@
 export const en = {
   "app.name": "RandomMac",
   "app.tagline": "Randomize, set and restore network adapter MAC addresses",
+  "app.skipToContent": "Skip to content",
 
   "nav.label": "Main navigation",
   "nav.dashboard": "Dashboard",
@@ -15,6 +16,7 @@ export const en = {
   "nav.social": "Social",
   "nav.collapse": "Collapse sidebar",
   "nav.expand": "Expand sidebar",
+  "nav.updateAvailable": "update available",
 
   "status.admin": "Administrator",
   "status.readOnly": "Read-only",
@@ -44,6 +46,8 @@ export const en = {
   "common.minutes": "{n} min",
   "common.hours": "{n} h",
   "common.learnMore": "Learn more",
+  "toasts.label": "Notifications",
+  "toasts.close": "Close notification: {message}",
 
   "banner.readOnly.title": "Running without administrator rights",
   "banner.readOnly.body":
@@ -60,6 +64,7 @@ export const en = {
 
   "dashboard.title": "Dashboard",
   "dashboard.subtitle": "Pick an adapter, preview a new address and apply it.",
+  "dashboard.busy": "Changing…",
   "dashboard.adapters": "Network adapters",
   "dashboard.showVirtual": "Show virtual adapters",
   "dashboard.noAdapters": "No network adapters found.",
@@ -131,6 +136,7 @@ export const en = {
   "stage.restarting": "Restarting adapter",
   "stage.verifying": "Verifying",
   "stage.rollingBack": "Rolling back",
+  "progress.step": "Step {n} of {total}: {step}",
 
   "result.applied": "{adapter} now uses {mac}.",
   "result.restored": "{adapter} is back to its original address.",
@@ -354,6 +360,7 @@ export const en = {
   "history.failed": "Failed",
   "history.empty": "No history yet.",
   "history.noMatch": "No entries match the filters.",
+  "history.tableLabel": "Change history",
   "history.kindFilter": "Kind",
   "history.kind.mac": "MAC address",
   "history.kind.dns": "DNS",
@@ -468,6 +475,8 @@ export const en = {
   "settings.resetBody": "History and the blacklist are kept.",
 
   "logs.title": "Log",
+  "logs.levels": "Levels",
+  "logs.listLabel": "Log entries",
   "logs.subtitle": "Diagnostic messages from this session.",
   "logs.filter": "Filter messages",
   "logs.autoScroll": "Auto-scroll",
@@ -489,6 +498,7 @@ export const en = {
   "update.available": "Version {version} is available",
   "update.published": "Published {date}",
   "update.notes": "What's new",
+  "update.progressLabel": "Download progress",
   "update.install": "Download and install",
   "update.downloading": "Downloading… {percent}",
   "update.installing": "Installing… RandomMac will restart.",

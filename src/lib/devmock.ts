@@ -3,6 +3,7 @@
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import catalogJson from "../../crates/randommac-core/src/dns/catalog.json";
+import { version } from "../../package.json";
 import type {
   Adapter,
   DnsCatalog,
@@ -399,7 +400,7 @@ export function installDevMock() {
       switch (cmd) {
         case "app_info":
           return {
-            version: "2.0.0",
+            version,
             os: "windows",
             arch: "x86_64",
             osVersion: "Windows 11",
@@ -478,7 +479,7 @@ export function installDevMock() {
                   timestamp: iso(1),
                   level: "info",
                   target: "randommac_lib",
-                  message: "RandomMac starting version=2.0.0 os=windows elevated=true",
+                  message: `RandomMac starting version=${version} os=windows elevated=true`,
                 },
                 {
                   seq: 2,
@@ -490,7 +491,7 @@ export function installDevMock() {
               ];
         case "update_check":
           return {
-            currentVersion: "2.0.0",
+            currentVersion: version,
             available: false,
             version: null,
             date: null,

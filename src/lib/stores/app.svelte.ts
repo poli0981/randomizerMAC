@@ -49,6 +49,11 @@ class AppStore {
   fatal = $state<string | null>(null);
 
   #toastId = 0;
+  /** Auto-close timers of the notifications that close by themselves (errors do not). */
+  #toastTimers = new Map<
+    number,
+    { handle: ReturnType<typeof setTimeout> | null; remaining: number; started: number }
+  >();
   #saveQueue: Promise<unknown> = Promise.resolve();
   #pendingSaves = 0;
 
@@ -211,9 +216,33 @@ class AppStore {
   toast(kind: ToastKind, message: string) {
     const id = ++this.#toastId;
     this.toasts.push({ id, kind, message });
-    if (this.toasts.length > 4) this.toasts.shift();
-    const timeout = kind === "error" ? 8000 : kind === "warning" ? 6500 : 4500;
-    setTimeout(() => this.dismiss(id), timeout);
+    if (this.toasts.length > 4) this.dismiss(this.toasts[0]!.id);
+    // Errors stay until they are closed; the others close by themselves.
+    if (kind !== "error") {
+      this.#toastTimers.set(id, {
+        handle: null,
+        remaining: kind === "warning" ? 6500 : 4500,
+        started: 0,
+      });
+      this.resumeToast(id);
+    }
+  }
+
+  /** Keeps a notification open while it is hovered or focused. */
+  pauseToast(id: number) {
+    const timer = this.#toastTimers.get(id);
+    if (!timer?.handle) return;
+    clearTimeout(timer.handle);
+    timer.handle = null;
+    timer.remaining -= Date.now() - timer.started;
+  }
+
+  /** Lets a paused notification close again, after at least a second. */
+  resumeToast(id: number) {
+    const timer = this.#toastTimers.get(id);
+    if (!timer || timer.handle) return;
+    timer.started = Date.now();
+    timer.handle = setTimeout(() => this.dismiss(id), Math.max(timer.remaining, 1000));
   }
 
   toastError(e: unknown) {
@@ -223,6 +252,9 @@ class AppStore {
   }
 
   dismiss(id: number) {
+    const timer = this.#toastTimers.get(id);
+    if (timer?.handle) clearTimeout(timer.handle);
+    this.#toastTimers.delete(id);
     this.toasts = this.toasts.filter((t) => t.id !== id);
   }
 }

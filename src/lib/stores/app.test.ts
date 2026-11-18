@@ -368,7 +368,7 @@ describe("DNS catalog", () => {
 });
 
 describe("toasts", () => {
-  it("keeps the newest four and dismisses them after a while", async () => {
+  it("keeps the newest four, closes them after a while and keeps errors", async () => {
     backend();
     const { app } = await load();
     vi.useFakeTimers();
@@ -380,8 +380,37 @@ describe("toasts", () => {
     expect(app.toasts.map((t) => t.message)).toEqual(["warning", "error"]);
     vi.advanceTimersByTime(2000);
     expect(app.toasts.map((t) => t.message)).toEqual(["error"]);
-    vi.advanceTimersByTime(1500);
+    vi.advanceTimersByTime(60_000);
+    expect(app.toasts.map((t) => t.message)).toEqual(["error"]);
+    app.dismiss(app.toasts[0]!.id);
     expect(app.toasts).toEqual([]);
+  });
+
+  it("pauses while hovered or focused", async () => {
+    backend();
+    const { app } = await load();
+    vi.useFakeTimers();
+    app.toast("info", "paused");
+    const id = app.toasts[0]!.id;
+    vi.advanceTimersByTime(2000);
+    app.pauseToast(id);
+    app.pauseToast(id);
+    vi.advanceTimersByTime(30_000);
+    expect(app.toasts).toHaveLength(1);
+    app.resumeToast(id);
+    app.resumeToast(id);
+    vi.advanceTimersByTime(2400);
+    expect(app.toasts).toHaveLength(1);
+    vi.advanceTimersByTime(200);
+    expect(app.toasts).toEqual([]);
+    // Unknown or already closed notifications are ignored.
+    app.pauseToast(id);
+    app.resumeToast(id);
+    app.toast("error", "stays");
+    app.pauseToast(app.toasts[0]!.id);
+    app.resumeToast(app.toasts[0]!.id);
+    vi.advanceTimersByTime(60_000);
+    expect(app.toasts).toHaveLength(1);
   });
 
   it("translates errors", async () => {

@@ -1,5 +1,6 @@
 /* RandomMac design tokens and base components. Dark palette continues v1's look
-   (brand blue #61AFEF on a Catppuccin-like base); the light palette meets WCAG AA. */
+   (brand blue #61AFEF on a Catppuccin-like base). Both palettes meet WCAG 2.2 AA: text 4.5:1
+   or more on every surface it is used on, control outlines 3:1 or more. */
 
 :root {
   --font-ui:
@@ -30,11 +31,13 @@
   --sidebar: #eceef4;
   --border: #d8dce6;
   --border-strong: #c3c8d6;
+  /* Outlines that identify a control (inputs, selects, the switch track): 3:1 or more. */
+  --input-border: #80869a;
   --text: #1b1e27;
   --text-muted: #565c70;
-  --text-subtle: #6c7286;
-  --accent: #1d6fd0;
-  --accent-hover: #175db0;
+  --text-subtle: #5c6276;
+  --accent: #1960b6;
+  --accent-hover: #154f99;
   --accent-soft: #e3eefc;
   --accent-contrast: #ffffff;
   --success: #1c7c3a;
@@ -58,9 +61,10 @@
     --sidebar: #181825;
     --border: #3a3a55;
     --border-strong: #4a4a68;
+    --input-border: #7d81a0;
     --text: #e6e9f5;
     --text-muted: #a6adc8;
-    --text-subtle: #9399b2;
+    --text-subtle: #a0a5bd;
     --accent: #61afef;
     --accent-hover: #7cbdf2;
     --accent-soft: #1f3550;
@@ -87,9 +91,10 @@
   --sidebar: #181825;
   --border: #3a3a55;
   --border-strong: #4a4a68;
+  --input-border: #7d81a0;
   --text: #e6e9f5;
   --text-muted: #a6adc8;
-  --text-subtle: #9399b2;
+  --text-subtle: #a0a5bd;
   --accent: #61afef;
   --accent-hover: #7cbdf2;
   --accent-soft: #1f3550;
@@ -174,6 +179,32 @@ textarea {
   font-size: 12.5px;
 }
 
+/* "Skip to content": the first Tab stop, visible only while focused. */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 12px;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -206,14 +237,16 @@ textarea {
     border-color 0.15s var(--ease),
     transform 0.05s;
 }
-.btn:hover:not(:disabled) {
+.btn:hover:not(:disabled, [aria-disabled="true"]) {
   background: var(--surface-3);
   border-color: var(--border-strong);
 }
-.btn:active:not(:disabled) {
+.btn:active:not(:disabled, [aria-disabled="true"]) {
   transform: translateY(1px);
 }
-.btn:disabled {
+/* aria-disabled: unavailable for now but still focusable (focus is not lost while a change runs). */
+.btn:disabled,
+.btn[aria-disabled="true"] {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -222,14 +255,14 @@ textarea {
   border-color: var(--accent);
   color: var(--accent-contrast);
 }
-.btn.primary:hover:not(:disabled) {
+.btn.primary:hover:not(:disabled, [aria-disabled="true"]) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
 }
 .btn.danger {
   color: var(--danger);
 }
-.btn.danger:hover:not(:disabled) {
+.btn.danger:hover:not(:disabled, [aria-disabled="true"]) {
   background: var(--danger-soft);
   border-color: var(--danger);
 }
@@ -237,7 +270,7 @@ textarea {
   background: transparent;
   border-color: transparent;
 }
-.btn.ghost:hover:not(:disabled) {
+.btn.ghost:hover:not(:disabled, [aria-disabled="true"]) {
   background: var(--surface-2);
   border-color: transparent;
 }
@@ -301,10 +334,14 @@ textarea {
   min-height: 34px;
   padding: 6px 10px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--input-border);
   background: var(--surface);
   color: var(--text);
   width: 100%;
+}
+.input::placeholder {
+  color: var(--text-subtle);
+  opacity: 1;
 }
 .input:focus-visible,
 .select:focus-visible {
@@ -410,15 +447,19 @@ textarea {
   border-bottom: none;
 }
 
+/* Reduced motion: no animation at all; spinners and indeterminate bars stand still. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
+/* Windows contrast themes: states drawn with backgrounds get system colours. */
 @media (forced-colors: active) {
   .btn,
   .card,
@@ -426,5 +467,19 @@ textarea {
   .select,
   .badge {
     border: 1px solid CanvasText;
+  }
+  .btn.primary {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+  }
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    color: GrayText;
+    border-color: GrayText;
+  }
+  .skip-link {
+    border: 2px solid CanvasText;
   }
 }

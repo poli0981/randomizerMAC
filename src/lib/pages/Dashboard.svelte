@@ -14,16 +14,16 @@
   import PageHeader from "../components/PageHeader.svelte";
   import MacValue from "../components/MacValue.svelte";
   import ConfirmDialog from "../components/ConfirmDialog.svelte";
+  import Steps from "../components/Steps.svelte";
   import { app } from "../stores/app.svelte";
   import { api } from "../api";
   import { i18n, t, type MessageKey } from "../i18n/index.svelte";
   import { canonical, formatMac, parseMac } from "../mac";
   import { formatRelative, methodLabel } from "../format";
   import { describeOutcome } from "../outcome";
-  import type { Adapter, GenerationMode, MacInfo, Stage } from "../types";
+  import type { Adapter, GenerationMode, MacInfo } from "../types";
 
   const kindIcon = { ethernet: Cable, wireless: Wifi, other: Network };
-  const stages: Stage[] = ["preparing", "writing", "restarting", "verifying"];
 
   let input = $state("");
   let info = $state<MacInfo | null>(null);
@@ -118,8 +118,11 @@
     try {
       const result = await api.applyMac(target.id, mac);
       const out = describeOutcome(result, false, target, app.format, app.info?.os);
-      app.toast(out.kind, out.message);
-      if (adapter?.id !== target.id) return;
+      // Said once: on this page when the result shows here, else as a notification.
+      if (adapter?.id !== target.id || app.page !== "dashboard") {
+        app.toast(out.kind, out.message);
+        return;
+      }
       lastMessage = out;
       if (result.success) {
         inspectSeq++;
@@ -133,13 +136,13 @@
 
   async function restore() {
     const target = adapter;
-    if (!target || anyBusy) return;
+    if (!target || anyBusy || app.readOnly || (!target.restorable && !target.changed)) return;
     restoring = true;
     try {
       const result = await api.restoreMac(target.id);
       const out = describeOutcome(result, true, target, app.format, app.info?.os);
-      app.toast(out.kind, out.message);
-      if (adapter?.id === target.id) lastMessage = out;
+      if (adapter?.id === target.id && app.page === "dashboard") lastMessage = out;
+      else app.toast(out.kind, out.message);
     } catch (e) {
       app.toastError(e);
     } finally {
@@ -222,8 +225,9 @@
   {#snippet actions()}
     <button
       class="btn"
-      onclick={() => app.refreshAdapters()}
-      disabled={app.adaptersLoading}
+      onclick={() => !app.adaptersLoading && app.refreshAdapters()}
+      aria-disabled={app.adaptersLoading}
+      aria-keyshortcuts="F5"
       title="F5"
     >
       <RefreshCw size={16} aria-hidden="true" class={app.adaptersLoading ? "spin" : ""} />
@@ -304,7 +308,7 @@
                 size={16}
                 class="spin"
                 aria-hidden="true"
-              />{/if}
+              /><span class="sr-only">{t("dashboard.busy")}</span>{/if}
           </li>
         {/each}
       </ul>
@@ -471,13 +475,24 @@
         </div>
 
         <div class="buttons">
-          <button class="btn" onclick={randomize} disabled={anyBusy}>
+          <!-- aria-disabled, not disabled: these stay focusable while a change runs. -->
+          <button
+            class="btn"
+            onclick={randomize}
+            aria-disabled={anyBusy}
+            aria-keyshortcuts="Control+R"
+          >
             <Shuffle size={16} aria-hidden="true" />{t("dashboard.randomize")}<kbd
-              >{t("dashboard.shortcutRandomize")}</kbd
+              aria-hidden="true">{t("dashboard.shortcutRandomize")}</kbd
             >
           </button>
-          <button class="btn primary" onclick={requestApply} disabled={!canApply}>
-            <Check size={16} aria-hidden="true" />{t("dashboard.apply")}<kbd
+          <button
+            class="btn primary"
+            onclick={requestApply}
+            aria-disabled={!canApply}
+            aria-keyshortcuts="Control+Enter"
+          >
+            <Check size={16} aria-hidden="true" />{t("dashboard.apply")}<kbd aria-hidden="true"
               >{t("dashboard.shortcutApply")}</kbd
             >
           </button>
@@ -485,8 +500,8 @@
             {#if adapter.originalMac && adapter.changed}
               <button
                 class="btn ghost"
-                onclick={() => onInput(formatMac(adapter.originalMac, app.format))}
-                disabled={anyBusy}
+                onclick={() => !anyBusy && onInput(formatMac(adapter.originalMac, app.format))}
+                aria-disabled={anyBusy}
               >
                 {t("dashboard.useOriginal")}
               </button>
@@ -494,31 +509,25 @@
             <button
               class="btn"
               onclick={restore}
-              disabled={anyBusy || app.readOnly || (!adapter.restorable && !adapter.changed)}
+              disabled={app.readOnly}
+              aria-disabled={anyBusy || (!adapter.restorable && !adapter.changed)}
             >
               <Undo2 size={16} aria-hidden="true" />{t("dashboard.restore")}
             </button>
           </span>
         </div>
 
-        {#if busyHere && app.busy?.kind !== "dns"}
-          <ol class="steps" aria-live="polite" aria-label={t("common.loading")}>
-            {#each app.busy?.stage === "rollingBack" ? [...stages, "rollingBack" as Stage] : stages as s (s)}
-              {@const current = app.busy?.stage === s}
-              {@const done = stages.indexOf(s) < stages.indexOf(app.busy?.stage ?? "preparing")}
-              <li class:current class:done>
-                {#if current}<Loader
-                    size={14}
-                    class="spin"
-                    aria-hidden="true"
-                  />{:else if done}<Check size={14} aria-hidden="true" />{/if}
-                {t(`stage.${s}` as MessageKey)}
-              </li>
-            {/each}
-          </ol>
-        {:else if lastMessage && !restoring}
-          <p class="result {lastMessage.kind}" role="status">{lastMessage.message}</p>
-        {/if}
+        <Steps
+          stage={app.busy?.stage ?? null}
+          active={busyHere && app.busy?.kind !== "dns"}
+          prefix="stage"
+          label={t("common.loading")}
+        />
+        <div role="status">
+          {#if lastMessage && !restoring && !(busyHere && app.busy?.kind !== "dns")}
+            <p class="result {lastMessage.kind}">{lastMessage.message}</p>
+          {/if}
+        </div>
       </section>
 
       <section class="card" aria-labelledby="recent-title">
@@ -776,32 +785,6 @@
     flex-wrap: wrap;
     margin-left: auto;
   }
-  .steps {
-    list-style: none;
-    display: flex;
-    gap: 6px;
-    padding: 0;
-    margin: 14px 0 0;
-    flex-wrap: wrap;
-  }
-  .steps li {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: var(--surface-2);
-    color: var(--text-subtle);
-    font-size: 12.5px;
-  }
-  .steps li.current {
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-weight: 600;
-  }
-  .steps li.done {
-    color: var(--success);
-  }
   .result {
     margin-top: 14px;
     padding: 10px 12px;
@@ -853,12 +836,14 @@
     gap: 8px;
     align-items: flex-start;
   }
-  :global(.spin) {
-    animation: spin 1s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
+  @media (forced-colors: active) {
+    .adapter-list li.selected {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
+    .dot.on {
+      forced-color-adjust: none;
+      background: Highlight;
     }
   }
 </style>

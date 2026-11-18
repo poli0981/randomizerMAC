@@ -26,7 +26,7 @@ body:
         - Unnatural phrasing
         - Wrong terminology (technical terms)
         - Missing translation (English text shown)
-        - Add a new language
+        - Add a new language (agree on it in Discussions → Ideas first)
     validations:
       required: true
 
