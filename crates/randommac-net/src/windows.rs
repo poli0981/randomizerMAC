@@ -967,39 +967,6 @@ impl NetworkBackend for WindowsBackend {
         Ok(Self::report(status, previous, permanent, observed, None))
     }
 
-    fn dns_capabilities(&self, adapter: &Adapter) -> DnsCapabilities {
-        dns::capabilities(adapter)
-    }
-
-    fn dns_status(&self, adapter: &Adapter) -> Result<DnsStatus, NetError> {
-        dns::status(adapter)
-    }
-
-    fn dns_snapshot(&self, adapter: &Adapter) -> Result<DnsSnapshot, NetError> {
-        dns::snapshot(adapter)
-    }
-
-    fn apply_dns(
-        &self,
-        adapter: &Adapter,
-        config: &DnsConfig,
-        previous: &DnsSnapshot,
-        opts: &DnsOptions,
-        progress: &mut dyn FnMut(Stage),
-    ) -> Result<DnsReport, NetError> {
-        dns::apply(adapter, config, previous, opts, progress)
-    }
-
-    fn restore_dns(
-        &self,
-        adapter: &Adapter,
-        original: &DnsOriginalRecord,
-        opts: &DnsOptions,
-        progress: &mut dyn FnMut(Stage),
-    ) -> Result<DnsReport, NetError> {
-        dns::restore(adapter, original, opts, progress)
-    }
-
     fn set_enabled(&self, adapter: &Adapter, enabled: bool) -> Result<(), NetError> {
         Self::require_elevation()?;
         if enabled {
@@ -1010,6 +977,8 @@ impl NetworkBackend for WindowsBackend {
         }
         Ok(())
     }
+
+    dns_methods!();
 }
 
 #[cfg(test)]

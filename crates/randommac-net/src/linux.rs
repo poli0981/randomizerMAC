@@ -471,39 +471,6 @@ pub fn permanent_address(ifname: &str) -> Option<MacAddress> {
 }
 
 impl NetworkBackend for LinuxBackend {
-    fn dns_capabilities(&self, adapter: &Adapter) -> DnsCapabilities {
-        dns::capabilities(adapter)
-    }
-
-    fn dns_status(&self, adapter: &Adapter) -> Result<DnsStatus, NetError> {
-        dns::status(adapter)
-    }
-
-    fn dns_snapshot(&self, adapter: &Adapter) -> Result<DnsSnapshot, NetError> {
-        dns::snapshot(adapter)
-    }
-
-    fn apply_dns(
-        &self,
-        adapter: &Adapter,
-        config: &DnsConfig,
-        previous: &DnsSnapshot,
-        opts: &DnsOptions,
-        progress: &mut dyn FnMut(Stage),
-    ) -> Result<DnsReport, NetError> {
-        dns::apply(adapter, config, previous, opts, progress)
-    }
-
-    fn restore_dns(
-        &self,
-        adapter: &Adapter,
-        original: &DnsOriginalRecord,
-        opts: &DnsOptions,
-        progress: &mut dyn FnMut(Stage),
-    ) -> Result<DnsReport, NetError> {
-        dns::restore(adapter, original, opts, progress)
-    }
-
     fn capabilities(&self) -> Capabilities {
         let root = Self::is_root();
         let ip = process::find_program(IP).is_some();
@@ -741,6 +708,8 @@ impl NetworkBackend for LinuxBackend {
         }
         self.apply_ip(adapter, target, opts, progress)
     }
+
+    dns_methods!();
 }
 
 /// Root of the sysfs tree used by tests that point the backend at fixtures.

@@ -17,6 +17,47 @@ pub mod types;
 pub mod win_classify;
 pub mod win_dns;
 
+/// The DNS methods of [`NetworkBackend`] for a backend whose `dns` module provides
+/// `capabilities`, `status`, `snapshot`, `apply` and `restore` (Windows and Linux): written once
+/// for both `impl` blocks, after their MAC methods.
+#[cfg(any(windows, target_os = "linux"))]
+macro_rules! dns_methods {
+    () => {
+        fn dns_capabilities(&self, adapter: &Adapter) -> DnsCapabilities {
+            dns::capabilities(adapter)
+        }
+
+        fn dns_status(&self, adapter: &Adapter) -> Result<DnsStatus, NetError> {
+            dns::status(adapter)
+        }
+
+        fn dns_snapshot(&self, adapter: &Adapter) -> Result<DnsSnapshot, NetError> {
+            dns::snapshot(adapter)
+        }
+
+        fn apply_dns(
+            &self,
+            adapter: &Adapter,
+            config: &DnsConfig,
+            previous: &DnsSnapshot,
+            opts: &DnsOptions,
+            progress: &mut dyn FnMut(Stage),
+        ) -> Result<DnsReport, NetError> {
+            dns::apply(adapter, config, previous, opts, progress)
+        }
+
+        fn restore_dns(
+            &self,
+            adapter: &Adapter,
+            original: &DnsOriginalRecord,
+            opts: &DnsOptions,
+            progress: &mut dyn FnMut(Stage),
+        ) -> Result<DnsReport, NetError> {
+            dns::restore(adapter, original, opts, progress)
+        }
+    };
+}
+
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(windows)]

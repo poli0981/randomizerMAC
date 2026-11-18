@@ -275,6 +275,28 @@ struct AllResult {
 
 /// Runs a change on one adapter or on every connected one, prints the outcome(s) and maps them
 /// to the exit code.
+/// Applies `request` to the target adapter (or every connected one).
+fn apply_request(
+    ctx: &Ctx,
+    target: &TargetArgs,
+    request: &DnsRequest,
+    opts: &DnsOptions,
+) -> anyhow::Result<()> {
+    change(ctx, target, &|ctx: &Ctx, id: &str| {
+        let settings = ctx.settings();
+        dns_ops::apply_dns(
+            ctx.backend.as_ref(),
+            &ctx.store,
+            &settings,
+            id,
+            request,
+            ChangeSource::Cli,
+            opts,
+            &mut progress(ctx),
+        )
+    })
+}
+
 fn change(
     ctx: &Ctx,
     target: &TargetArgs,
@@ -337,18 +359,23 @@ fn change(
 
 /// Before switching to plain DNS: at least one of the servers must answer from here.
 fn check_servers(ctx: &Ctx, request: &DnsRequest) -> anyhow::Result<()> {
-    if request.encryption != EncryptionChoice::None || ctx.backend.capabilities().platform == "mock"
-    {
+    if ctx.backend.capabilities().platform == "mock" {
         return Ok(());
     }
+    // Only for plain DNS: encrypted DNS uses other ports, which may be open where port 53 is not.
+    // With every kind of encryption assumed available, a request that still resolves to plain
+    // DNS is plain on any adapter ("auto" for servers without DoH or DoT endpoints, "none").
     let settings = ctx.settings();
-    let all = dns::EncryptionSupport {
-        doh: false,
-        dot: false,
+    let any = dns::EncryptionSupport {
+        doh: true,
+        dot: true,
     };
-    let Ok(resolved) = dns::resolve_request(request, catalog(), &settings.dns.presets, all) else {
+    let Ok(resolved) = dns::resolve_request(request, catalog(), &settings.dns.presets, any) else {
         return Ok(()); // the change itself reports the problem
     };
+    if !matches!(resolved.config.encryption, dns::DnsEncryption::None) {
+        return Ok(());
+    }
     let targets: Vec<ProbeTarget> = resolved
         .config
         .servers()
@@ -672,19 +699,7 @@ pub(crate) fn run(ctx: &Ctx, command: DnsCommand) -> anyhow::Result<()> {
             if !args.no_check {
                 check_servers(ctx, &request)?;
             }
-            change(ctx, &args.target, &|ctx: &Ctx, id: &str| {
-                let settings = ctx.settings();
-                dns_ops::apply_dns(
-                    ctx.backend.as_ref(),
-                    &ctx.store,
-                    &settings,
-                    id,
-                    &request,
-                    ChangeSource::Cli,
-                    &opts,
-                    &mut progress(ctx),
-                )
-            })
+            apply_request(ctx, &args.target, &request, &opts)
         }
         DnsCommand::Auto(target) => {
             let request = DnsRequest {
@@ -692,19 +707,7 @@ pub(crate) fn run(ctx: &Ctx, command: DnsCommand) -> anyhow::Result<()> {
                 encryption: EncryptionChoice::None,
                 allow_fallback: false,
             };
-            change(ctx, &target, &|ctx: &Ctx, id: &str| {
-                let settings = ctx.settings();
-                dns_ops::apply_dns(
-                    ctx.backend.as_ref(),
-                    &ctx.store,
-                    &settings,
-                    id,
-                    &request,
-                    ChangeSource::Cli,
-                    &opts,
-                    &mut progress(ctx),
-                )
-            })
+            apply_request(ctx, &target, &request, &opts)
         }
         DnsCommand::Restore(target) => change(ctx, &target, &|ctx: &Ctx, id: &str| {
             let settings = ctx.settings();
