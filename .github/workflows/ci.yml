@@ -90,7 +90,7 @@ jobs:
       - name: Install the pinned Rust toolchain
         run: rustup toolchain install --profile minimal --component rustfmt,clippy,llvm-tools
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-llvm-cov
       - uses: actions/setup-node@v7
@@ -134,7 +134,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: cli
-      - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-llvm-cov
       # The real changes below run this instrumented CLI; its coverage of the Linux backend is
@@ -148,7 +148,10 @@ jobs:
         run: |
           set -euo pipefail
           source <(cargo llvm-cov show-env --sh)
-          sudo ip link add dummy0 type dummy
+          # An address given at creation (addr_assign_type 3) is left alone by udev; a random one
+          # is rewritten by MACAddressPolicy=persistent shortly after creation, racing `before`.
+          sudo ip link add dummy0 address 02:00:00:00:00:10 type dummy
+          sudo udevadm settle
           sudo ip link set dummy0 up
           cli() {
             sudo LLVM_PROFILE_FILE="$LLVM_PROFILE_FILE" ./target/debug/randommac-cli \
@@ -329,6 +332,27 @@ jobs:
           node-version-file: .nvmrc
       - name: npm audit (production dependencies)
         run: npm audit --omit=dev --audit-level=high
+      # cargo-deny above checks the crates' licenses (deny.toml); this checks every npm package in
+      # package-lock.json against the allow-list in scripts/lib/licenses.mjs.
+      - name: npm licenses
+        run: node scripts/check-licenses.mjs
+
+  dependency-review:
+    name: Dependency review
+    # Blocks a pull request that adds a dependency with a high or critical advisory (any ecosystem,
+    # GitHub Actions included). Licenses are checked for the whole tree in "Dependency audit": the
+    # dependency graph's license data is incomplete for npm and Cargo.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          license-check: false
 
   sonar:
     name: SonarQube Cloud
@@ -363,7 +387,7 @@ jobs:
         id: version
         run: echo "version=$(node scripts/version.mjs get)" >> "$GITHUB_OUTPUT"
       - name: Scan
-        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
+        uses: SonarSource/sonarqube-scan-action@59202af334b4ba7b5db01b701b8e79f8b3bef0f4 # v8.5.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:

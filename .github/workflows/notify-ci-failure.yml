@@ -6,6 +6,7 @@ on:
     # notify-release-pipeline.yml instead.
     workflows:
       - "CI"
+      - "Qodana"
     types: [completed]
 
 permissions:

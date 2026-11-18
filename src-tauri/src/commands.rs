@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-use chrono::Utc;
 use randommac_core::blacklist::{BlacklistEntry, MacPattern};
+use randommac_core::timefmt;
 use randommac_core::{
     ChangeSource, GenerateRequest, GenerationMode, HistoryEntry, MacAddress, OsRandom, Settings,
     generate, history, oui,
@@ -531,7 +531,7 @@ fn write_file(path: &PathBuf, bytes: &[u8]) -> ApiResult<()> {
 }
 
 fn stamp() -> String {
-    Utc::now().format("%Y%m%d-%H%M%S").to_string()
+    timefmt::file_stamp(timefmt::now())
 }
 
 #[tauri::command]
@@ -593,7 +593,7 @@ pub async fn blacklist_add(
     let entry = blocking(move || {
         let (mut bl, _) = store.load_blacklist();
         let entry = bl
-            .add(pattern, adapter_id, note, Utc::now())
+            .add(pattern, adapter_id, note, timefmt::now())
             .map_err(|e| ApiError::new("BLACKLIST_REJECTED", e.to_string()))?;
         store.save_blacklist(&bl)?;
         Ok(entry)
@@ -658,10 +658,10 @@ pub async fn blacklist_import(
         // Accept RandomMac 2 files and RandomMac 1.x files.
         let incoming = match serde_json::from_value::<randommac_core::Blacklist>(value.clone()) {
             Ok(bl) if !bl.entries.is_empty() => bl,
-            _ => randommac_core::legacy_v1::parse_v1_blacklist(&value, Utc::now()),
+            _ => randommac_core::legacy_v1::parse_v1_blacklist(&value, timefmt::now()),
         };
         let (mut bl, _) = store.load_blacklist();
-        let added = bl.merge(incoming, Utc::now());
+        let added = bl.merge(incoming, timefmt::now());
         store.save_blacklist(&bl)?;
         Ok(Some(added))
     })

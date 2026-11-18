@@ -10,7 +10,6 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-chrono.workspace = true
 randommac-core.workspace = true
 serde.workspace = true
 thiserror.workspace = true

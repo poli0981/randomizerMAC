@@ -11,7 +11,6 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
-use chrono::Utc;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -135,7 +134,7 @@ fn quarantine(path: &Path) -> io::Result<PathBuf> {
         .and_then(|n| n.to_str())
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "bad file name"))?
         .to_string();
-    let stamp = Utc::now().format("%Y%m%d%H%M%S%3f");
+    let stamp = crate::timefmt::compact_millis(crate::timefmt::now());
     let target = path.with_file_name(format!("{name}.corrupt-{stamp}"));
     fs::rename(path, &target)?;
     prune_corrupt(path, &name);

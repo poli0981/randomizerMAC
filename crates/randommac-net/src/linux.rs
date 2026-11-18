@@ -956,7 +956,7 @@ mod tests {
         let original = OriginalRecord {
             mac: a.current_mac,
             nm_profiles: Default::default(),
-            recorded_at: chrono::Utc::now(),
+            recorded_at: randommac_core::timefmt::now(),
         };
         let report = backend
             .restore(&a, Some(&original), &opts, &mut |_| {})
@@ -1001,7 +1001,7 @@ mod tests {
         let original = OriginalRecord {
             mac: Some(mac("52:54:00:12:34:56")),
             nm_profiles: [("old-profile".to_string(), String::new())].into(),
-            recorded_at: chrono::Utc::now(),
+            recorded_at: randommac_core::timefmt::now(),
         };
         let err = backend
             .restore(

@@ -22,7 +22,7 @@ export default defineConfig({
   resolve: process.env.VITEST ? { conditions: ["browser"] } : undefined,
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "scripts/**/*.test.mjs"],
     // `npm run test:coverage` → coverage/lcov.info, imported by SonarQube Cloud (.svelte files
     // are not analyzed there, so only TypeScript modules are measured).
     coverage: {

@@ -117,8 +117,6 @@ pub fn generate(
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
-
     use super::*;
     use crate::random::test_support::{ScriptedRandom, SeqRandom};
 
@@ -192,7 +190,7 @@ mod tests {
 
     #[test]
     fn respects_blacklist_and_reports_exhaustion() {
-        let now = Utc::now();
+        let now = crate::timefmt::now();
         let mut bl = Blacklist::default();
         // Block the whole prefix the scripted RNG always produces.
         bl.add("02:01:01".parse().expect("p"), None, None, now)

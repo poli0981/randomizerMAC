@@ -574,7 +574,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
                         };
                         format!(
                             "{}  {:<20} {:<8} {} -> {}  {:?}",
-                            e.timestamp.format("%Y-%m-%d %H:%M:%S"),
+                            randommac_core::timefmt::display(e.timestamp),
                             e.adapter_name.chars().take(20).collect::<String>(),
                             format!("{:?}", e.action).to_lowercase(),
                             mac(e.previous_mac),

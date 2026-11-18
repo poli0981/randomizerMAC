@@ -42,7 +42,7 @@ impl LogBuffer {
     pub fn push(&self, level: &str, target: &str, message: String) -> LogEntry {
         let entry = LogEntry {
             seq: self.seq.fetch_add(1, Ordering::Relaxed) + 1,
-            timestamp: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            timestamp: randommac_core::timefmt::to_rfc3339_millis(randommac_core::timefmt::now()),
             level: level.to_string(),
             target: target.to_string(),
             message,

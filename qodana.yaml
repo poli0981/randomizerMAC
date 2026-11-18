@@ -1,0 +1,28 @@
+# Qodana for JavaScript / TypeScript: the Svelte UI (src/), the build configuration, scripts/ and
+# the workflows. Run by .github/workflows/qodana.yml (job `typescript`, Docker), reported to the
+# Qodana Cloud project randomMAC-TS-JS (secret QODANA_TOKEN_TS_JS). The Rust workspace has its own
+# project and configuration (qodana-rust.yaml).
+version: "1.0"
+linter: qodana-js
+# The components are .svelte files, which the linter reads only with JetBrains' Svelte plugin. It is
+# not bundled with Qodana for JS and installs in Docker mode only.
+plugins:
+  - id: dev.blachut.svelte.lang
+profile:
+  name: qodana.recommended
+# The quality gate: any problem fails the job.
+failureConditions:
+  severityThresholds:
+    any: 0
+exclude:
+  - name: All
+    paths:
+      # The Rust workspace is the Rust project (qodana-rust.yaml).
+      - crates
+      - src-tauri
+      # Build output, caches and reports.
+      - target
+      - dist
+      - coverage
+      - node_modules
+      - .svelte-check

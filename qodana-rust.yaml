@@ -1,0 +1,38 @@
+# Qodana for Rust (Early Access): the Cargo workspace — crates/randommac-core, randommac-net,
+# randommac-cli and the Tauri shell in src-tauri/. Run by .github/workflows/qodana.yml (job `rust`,
+# Docker, `--config qodana-rust.yaml`), reported to the Qodana Cloud project randomMAC-Rust (secret
+# QODANA_TOKEN_RUST). The UI, scripts and workflows belong to the JS/TS project (qodana.yaml).
+version: "1.0"
+linter: qodana-rust
+profile:
+  name: qodana.recommended
+# The quality gate: any problem fails the job.
+failureConditions:
+  severityThresholds:
+    any: 0
+# The linter evaluates build scripts and expands macros with `cargo check`, and its image has
+# neither a C toolchain nor the libraries Tauri links against (the packages ci.yml installs). Needs
+# root in the container: the workflow passes `-u root`.
+bootstrap: |
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends build-essential pkg-config libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+exclude:
+  - name: All
+    paths:
+      # The JS/TS project's files (qodana.yaml).
+      - src
+      - scripts
+      - docs
+      - .github
+      - node_modules
+      - index.html
+      - vite.config.ts
+      - svelte.config.js
+      - eslint.config.js
+      # Build output, reports and generated files.
+      - target
+      - dist
+      - coverage
+      - src-tauri/gen
+      # Generated from the IEEE registry by scripts/gen-oui.mjs.
+      - crates/randommac-core/src/oui/vendors.rs

@@ -1,9 +1,9 @@
 //! Bounded history of MAC changes.
 
-use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::mac::MacAddress;
+use crate::timefmt::{self, Duration, OffsetDateTime};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,7 +55,8 @@ impl ChangeStatus {
 #[serde(rename_all = "camelCase")]
 pub struct HistoryEntry {
     pub id: String,
-    pub timestamp: DateTime<Utc>,
+    #[serde(with = "timefmt::rfc3339")]
+    pub timestamp: OffsetDateTime,
     pub adapter_id: String,
     pub adapter_name: String,
     pub action: HistoryAction,
@@ -111,13 +112,13 @@ pub struct History {
 }
 
 impl History {
-    pub fn push(&mut self, entry: HistoryEntry, policy: HistoryPolicy, now: DateTime<Utc>) {
+    pub fn push(&mut self, entry: HistoryEntry, policy: HistoryPolicy, now: OffsetDateTime) {
         self.entries.insert(0, entry);
         self.prune(policy, now);
     }
 
     /// Sorts newest-first and applies the retention policy.
-    pub fn prune(&mut self, policy: HistoryPolicy, now: DateTime<Utc>) {
+    pub fn prune(&mut self, policy: HistoryPolicy, now: OffsetDateTime) {
         self.entries.sort_by_key(|e| std::cmp::Reverse(e.timestamp));
         if policy.retention_days > 0 {
             let cutoff = now - Duration::days(i64::from(policy.retention_days));
@@ -193,7 +194,7 @@ pub fn to_csv(entries: &[HistoryEntry]) -> String {
         let mac = |m: Option<MacAddress>| m.map(|m| m.to_string()).unwrap_or_default();
         let enum_str = |v: serde_json::Value| v.as_str().unwrap_or_default().to_string();
         let row = [
-            e.timestamp.to_rfc3339(),
+            timefmt::to_rfc3339(e.timestamp),
             e.adapter_name.clone(),
             e.adapter_id.clone(),
             enum_str(serde_json::to_value(e.action).unwrap_or_default()),
@@ -221,7 +222,7 @@ pub fn to_csv(entries: &[HistoryEntry]) -> String {
 mod tests {
     use super::*;
 
-    fn entry(id: &str, ts: DateTime<Utc>, name: &str) -> HistoryEntry {
+    fn entry(id: &str, ts: OffsetDateTime, name: &str) -> HistoryEntry {
         HistoryEntry {
             id: id.into(),
             timestamp: ts,
@@ -241,7 +242,7 @@ mod tests {
 
     #[test]
     fn push_orders_and_prunes() {
-        let now = Utc::now();
+        let now = timefmt::now();
         let mut h = History::default();
         let policy = HistoryPolicy {
             max_entries: 3,
@@ -285,7 +286,7 @@ mod tests {
 
     #[test]
     fn search_matches_names_and_any_mac_format() {
-        let now = Utc::now();
+        let now = timefmt::now();
         let mut h = History::default();
         h.push(entry("a", now, "Wi-Fi"), HistoryPolicy::default(), now);
         h.push(entry("b", now, "Ethernet"), HistoryPolicy::default(), now);
@@ -299,7 +300,7 @@ mod tests {
 
     #[test]
     fn csv_is_escaped() {
-        let now = Utc::now();
+        let now = timefmt::now();
         let mut e = entry("a", now, "=HYPERLINK(\"x\")");
         e.error = Some("said \"no\"".into());
         let csv = to_csv(&[e]);

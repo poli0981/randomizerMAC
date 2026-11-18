@@ -23,7 +23,6 @@ tauri-build = { version = "2.7", features = [] }
 
 [dependencies]
 anyhow.workspace = true
-chrono.workspace = true
 dirs.workspace = true
 randommac-core.workspace = true
 randommac-net.workspace = true
