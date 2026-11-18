@@ -8,7 +8,7 @@ use std::path::Path;
 use serde_json::Value;
 
 use crate::blacklist::{Blacklist, MacPattern};
-use crate::history::{ChangeSource, ChangeStatus, HistoryAction, HistoryEntry};
+use crate::history::{ChangeSource, ChangeStatus, HistoryAction, HistoryEntry, HistoryKind};
 use crate::mac::MacAddress;
 use crate::random::new_id;
 use crate::settings::{Language, Settings, Theme};
@@ -124,6 +124,8 @@ pub fn parse_v1_history(v1: &Value) -> Vec<HistoryEntry> {
                 error: get(item, "ErrorMessage")
                     .and_then(Value::as_str)
                     .map(|s| s.chars().take(1000).collect()),
+                kind: HistoryKind::Mac,
+                dns: None,
             })
         })
         .collect()

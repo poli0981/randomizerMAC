@@ -341,3 +341,235 @@ fn linux_method_and_json_details() {
     let list: serde_json::Value = serde_json::from_slice(&out).expect("json");
     assert_eq!(list.as_array().map(Vec::len), Some(4));
 }
+
+#[test]
+fn dns_providers_show_set_and_restore() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    cli(dir.path())
+        .args(["dns", "providers"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Quad9 (quad9)").and(predicate::str::contains("DNS4EU")));
+    cli(dir.path())
+        .args(["dns", "providers", "--provider", "adguard"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("sdns://"));
+    cli(dir.path())
+        .args(["dns", "providers", "--provider", "nope"])
+        .assert()
+        .code(6);
+    cli(dir.path())
+        .args(["dns", "show", "Ethernet"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Configured:  IPv4 automatic")
+                .and(predicate::str::contains("DoH yes")),
+        );
+
+    let out = cli(dir.path())
+        .args([
+            "--json",
+            "dns",
+            "set",
+            "Ethernet",
+            "--provider",
+            "quad9",
+            "--encryption",
+            "doh",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let entry: serde_json::Value = serde_json::from_slice(&out).expect("json");
+    assert_eq!(entry["kind"], "dns");
+    assert_eq!(entry["action"], "apply");
+    assert_eq!(entry["dns"]["requested"]["encryption"], "doh");
+    assert_eq!(entry["dns"]["label"]["provider"], "quad9");
+
+    cli(dir.path())
+        .args(["dns", "show", "Ethernet"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Restorable:  yes"));
+    cli(dir.path())
+        .args(["history", "--limit", "1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("dns-apply"));
+    cli(dir.path())
+        .args(["dns", "restore", "Ethernet"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("dns Ethernet ->"))
+        .stderr(predicate::str::contains("... writing the DNS settings"));
+    cli(dir.path())
+        .args(["dns", "restore", "Ethernet"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("NOTHING_TO_RESTORE"));
+}
+
+#[test]
+fn dns_set_variants_all_auto_and_errors() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    cli(dir.path())
+        .args([
+            "dns",
+            "set",
+            "Ethernet",
+            "--servers",
+            "192.0.2.53,2001:db8::53",
+            "--encryption",
+            "none",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("IPv4 192.0.2.53; IPv6 2001:db8::53")
+                .and(predicate::str::contains("custom servers")),
+        );
+    cli(dir.path())
+        .args(["dns", "set", "Ethernet", "--local", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("local resolver"));
+    cli(dir.path())
+        .args([
+            "dns",
+            "set",
+            "Ethernet",
+            "--provider",
+            "quad9:ecs",
+            "--encryption",
+            "dot",
+            "--allow-fallback",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("DoT"));
+    let out = cli(dir.path())
+        .args(["--json", "dns", "set", "--all", "--provider", "cloudflare"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let all: serde_json::Value = serde_json::from_slice(&out).expect("json");
+    assert_eq!(all.as_array().map(Vec::len), Some(2));
+    cli(dir.path())
+        .args(["dns", "auto", "--all"])
+        .assert()
+        .success();
+    cli(dir.path())
+        .args(["dns", "restore", "--all"])
+        .assert()
+        .success();
+
+    // Invalid input → 6; unknown adapter → 4; disabled adapter → 5; usage → 2.
+    cli(dir.path())
+        .args(["dns", "set", "Ethernet", "--servers", "not-an-ip"])
+        .assert()
+        .code(6);
+    cli(dir.path())
+        .args(["dns", "set", "Ethernet", "--servers", "224.0.0.1"])
+        .assert()
+        .code(6);
+    cli(dir.path())
+        .args(["dns", "set", "Ethernet", "--provider", "quad9:nope"])
+        .assert()
+        .code(6);
+    cli(dir.path())
+        .args(["dns", "set", "Ethernet", "--preset", "missing"])
+        .assert()
+        .code(6);
+    cli(dir.path())
+        .args(["dns", "set", "Nope", "--provider", "quad9"])
+        .assert()
+        .code(4);
+    cli(dir.path())
+        .args(["dns", "set", "Ethernet 3", "--provider", "quad9"])
+        .assert()
+        .code(5);
+    cli(dir.path())
+        .args(["dns", "set", "Ethernet"])
+        .assert()
+        .code(2);
+    cli(dir.path())
+        .args(["dns", "set", "Ethernet", "--all", "--local"])
+        .assert()
+        .code(2);
+    cli(dir.path())
+        .args(["dns", "presets"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("no presets"));
+}
+
+#[test]
+fn dns_rolled_back_and_latency_test() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    cli(dir.path())
+        .env("RANDOMMAC_MOCK_SCENARIO", "driver_ignores")
+        .args(["dns", "set", "Ethernet", "--provider", "google"])
+        .assert()
+        .code(5)
+        .stdout(predicate::str::contains("DNS_NOT_APPLIED"));
+
+    // A local "DNS server" for the latency test.
+    let socket = std::net::UdpSocket::bind("127.0.0.1:0").expect("bind");
+    let port = socket.local_addr().expect("addr").port();
+    std::thread::spawn(move || {
+        let mut buf = [0u8; 512];
+        while let Ok((n, from)) = socket.recv_from(&mut buf) {
+            let mut reply = buf[..n].to_vec();
+            if reply.len() >= 12 {
+                reply[2] |= 0x80;
+                let _ = socket.send_to(&reply, from);
+            }
+        }
+    });
+    let out = cli(dir.path())
+        .args([
+            "--json",
+            "dns",
+            "test",
+            "--server",
+            "127.0.0.1",
+            "--port",
+            &port.to_string(),
+            "--attempts",
+            "2",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let rows: serde_json::Value = serde_json::from_slice(&out).expect("json");
+    assert_eq!(rows[0]["outcome"]["kind"], "answered");
+    assert_eq!(rows[0]["outcome"]["answered"], 2);
+    // Nothing answers on a port nobody listens on.
+    let free = std::net::UdpSocket::bind("127.0.0.1:0").expect("bind");
+    let dead = free.local_addr().expect("addr").port();
+    drop(free);
+    cli(dir.path())
+        .args([
+            "dns",
+            "test",
+            "--server",
+            "127.0.0.1",
+            "--port",
+            &dead.to_string(),
+            "--attempts",
+            "1",
+            "--timeout-ms",
+            "200",
+        ])
+        .assert()
+        .code(5);
+}

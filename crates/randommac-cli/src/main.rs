@@ -1,7 +1,10 @@
 //! `randommac-cli` — scriptable access to RandomMac.
 //!
 //! Exit codes: 0 success · 1 error · 2 usage · 3 insufficient privileges / authentication ·
-//! 4 adapter not found · 5 change failed or was rolled back · 6 invalid or blacklisted address.
+//! 4 adapter not found · 5 change failed, was rolled back or is not supported · 6 invalid input
+//! (address, DNS server, provider or preset) or blacklisted address.
+
+mod dns;
 
 use std::io::Write;
 use std::path::PathBuf;
@@ -123,6 +126,11 @@ enum Command {
     },
     /// List vendors known to the OUI table.
     Vendors,
+    /// DNS servers per adapter: providers, show, set, auto, restore, test, presets.
+    Dns {
+        #[command(subcommand)]
+        command: dns::DnsCommand,
+    },
     /// Show recent changes.
     History {
         /// Maximum number of entries to show.
@@ -191,6 +199,7 @@ fn op_exit(e: &OpError) -> u8 {
     match e {
         OpError::Net(n) => net_exit(n),
         OpError::NotAssignable(_) | OpError::Blacklisted { .. } => 6,
+        OpError::InvalidDns(_) => 6,
         OpError::Busy | OpError::Storage(_) => 1,
     }
 }
@@ -549,6 +558,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
                     .join("\n")
             })
         }
+        Command::Dns { command } => dns::run(&ctx, command),
         Command::History { limit, adapter } => {
             let (history, _) = ctx.store.load_history();
             let filter_id = adapter
@@ -566,6 +576,22 @@ fn run(cli: Cli) -> anyhow::Result<()> {
                 entries
                     .iter()
                     .map(|e| {
+                        if let Some(d) = &e.dns {
+                            let text = |s: &Option<randommac_core::dns::DnsSummary>| {
+                                s.as_ref()
+                                    .map(ToString::to_string)
+                                    .unwrap_or_else(|| "-".into())
+                            };
+                            return format!(
+                                "{}  {:<20} dns-{:<4} {} -> {}  {:?}",
+                                randommac_core::timefmt::display(e.timestamp),
+                                e.adapter_name.chars().take(20).collect::<String>(),
+                                format!("{:?}", e.action).to_lowercase(),
+                                text(&d.previous),
+                                text(&d.observed.clone().or(d.requested.clone())),
+                                e.status
+                            );
+                        }
                         let mac = |m: Option<MacAddress>| {
                             m.map(|m| m.to_string()).unwrap_or_else(|| "-".into())
                         };

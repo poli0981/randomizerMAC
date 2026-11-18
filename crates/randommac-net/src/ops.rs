@@ -9,13 +9,14 @@ use std::io;
 use std::time::Duration;
 
 use randommac_core::blacklist::BlockReason;
+use randommac_core::dns::{DnsInputError, DnsState};
 use randommac_core::history::HistoryPolicy;
 use randommac_core::lock::OperationLock;
 use randommac_core::storage::{self, LoadStatus};
 use randommac_core::timefmt;
 use randommac_core::{
     AppPaths, AppState, Blacklist, ChangeSource, ChangeStatus, History, HistoryAction,
-    HistoryEntry, MacAddress, Settings, random::new_id,
+    HistoryEntry, HistoryKind, MacAddress, Settings, random::new_id,
 };
 
 use crate::{Adapter, ChangeOptions, ChangeReport, NetError, NetworkBackend, Stage};
@@ -30,10 +31,13 @@ pub enum OpError {
     NotAssignable(MacAddress),
     #[error("{mac} is blocked by the blacklist ({reason})")]
     Blacklisted { mac: MacAddress, reason: String },
-    #[error("another MAC change is in progress")]
+    #[error("another change is in progress")]
     Busy,
     #[error("storage error: {0}")]
     Storage(String),
+    /// A DNS request that cannot be applied as given.
+    #[error(transparent)]
+    InvalidDns(#[from] DnsInputError),
 }
 
 impl OpError {
@@ -44,6 +48,7 @@ impl OpError {
             OpError::Blacklisted { .. } => "BLACKLISTED",
             OpError::Busy => "BUSY",
             OpError::Storage(_) => "STORAGE_ERROR",
+            OpError::InvalidDns(e) => e.code(),
         }
     }
 }
@@ -104,6 +109,14 @@ impl DataStore {
 
     pub fn save_state(&self, state: &AppState) -> io::Result<()> {
         storage::save_json(&self.paths.state_file(), state)
+    }
+
+    pub fn load_dns_state(&self) -> (DnsState, LoadStatus) {
+        storage::load_json(&self.paths.dns_state_file())
+    }
+
+    pub fn save_dns_state(&self, state: &DnsState) -> io::Result<()> {
+        storage::save_json(&self.paths.dns_state_file(), state)
     }
 
     /// Appends one entry under the retention policy.
@@ -184,6 +197,8 @@ fn history_entry(
         method,
         error_code,
         error,
+        kind: HistoryKind::Mac,
+        dns: None,
     }
 }
 

@@ -18,10 +18,15 @@ use randommac_core::settings::LinuxMethod;
 use randommac_core::{ChangeStatus, MacAddress, OriginalRecord};
 
 use crate::NetworkBackend;
+use crate::dns_types::{DnsCapabilities, DnsOptions, DnsReport, DnsStatus};
 use crate::error::NetError;
 use crate::linux_parse::*;
 use crate::process::{self, Output};
 use crate::types::*;
+use randommac_core::dns::{DnsConfig, DnsOriginalRecord, DnsSnapshot};
+
+#[path = "linux_dns.rs"]
+mod dns;
 
 const NMCLI: &[&str] = &["/usr/bin/nmcli", "/bin/nmcli", "/usr/sbin/nmcli"];
 const IP: &[&str] = &["/usr/sbin/ip", "/sbin/ip", "/usr/bin/ip", "/bin/ip"];
@@ -703,6 +708,8 @@ impl NetworkBackend for LinuxBackend {
         }
         self.apply_ip(adapter, target, opts, progress)
     }
+
+    dns_methods!();
 }
 
 /// Root of the sysfs tree used by tests that point the backend at fixtures.

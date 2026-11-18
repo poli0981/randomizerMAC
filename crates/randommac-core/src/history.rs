@@ -1,9 +1,46 @@
-//! Bounded history of MAC changes.
+//! Bounded history of MAC and DNS changes.
 
 use serde::{Deserialize, Serialize};
 
+use crate::dns::{DnsLabel, DnsSummary};
 use crate::mac::MacAddress;
 use crate::timefmt::{self, Duration, OffsetDateTime};
+
+/// What an entry changed. Files from before 2.1 have no `kind`: those entries are MAC changes.
+///
+/// New kinds are added here, never as new `HistoryAction`/`ChangeSource`/`ChangeStatus`
+/// variants: an unknown enum value would make an older version set the whole file aside.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HistoryKind {
+    #[default]
+    Mac,
+    Dns,
+}
+
+impl HistoryKind {
+    pub fn is_mac(&self) -> bool {
+        *self == Self::Mac
+    }
+}
+
+/// The DNS part of a DNS entry.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DnsHistory {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous: Option<DnsSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requested: Option<DnsSummary>,
+    /// What the system reported after the change.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observed: Option<DnsSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<DnsLabel>,
+    /// Codes of things worth knowing (`DNS_IPV6_SKIPPED`, `DNS_CACHE_NOT_FLUSHED`, …).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -76,6 +113,10 @@ pub struct HistoryEntry {
     pub error_code: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(default, skip_serializing_if = "HistoryKind::is_mac")]
+    pub kind: HistoryKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dns: Option<DnsHistory>,
 }
 
 impl HistoryEntry {
@@ -154,12 +195,34 @@ impl History {
                 haystack.push(' ');
                 haystack.push_str(&m.to_compact_upper().to_lowercase());
             }
+            let raw = query.trim().to_lowercase();
             haystack.contains(&needle)
-                || e.adapter_name
-                    .to_lowercase()
-                    .contains(&query.trim().to_lowercase())
+                || e.adapter_name.to_lowercase().contains(&raw)
+                || e.dns.as_ref().is_some_and(|d| dns_text(d).contains(&raw))
         })
     }
+}
+
+/// The searchable text of a DNS entry: its summaries and label, lowercase.
+fn dns_text(d: &DnsHistory) -> String {
+    let mut text = String::new();
+    for s in [&d.previous, &d.requested, &d.observed]
+        .into_iter()
+        .flatten()
+    {
+        text.push_str(&s.to_string());
+        text.push(' ');
+    }
+    match &d.label {
+        Some(DnsLabel::Provider { provider, variant }) => {
+            text.push_str(provider);
+            text.push(' ');
+            text.push_str(variant);
+        }
+        Some(DnsLabel::Preset { name }) => text.push_str(name),
+        _ => {}
+    }
+    text.to_lowercase()
 }
 
 fn normalize_query(q: &str) -> String {
@@ -188,11 +251,18 @@ fn csv_cell(value: &str) -> String {
 /// Renders entries as RFC 4180 CSV (with a header row).
 pub fn to_csv(entries: &[HistoryEntry]) -> String {
     let mut out = String::from(
-        "timestamp,adapter,adapterId,action,source,status,previousMac,requestedMac,newMac,method,errorCode,error\r\n",
+        "timestamp,adapter,adapterId,action,source,status,previousMac,requestedMac,newMac,method,errorCode,error,kind,previousDns,requestedDns,newDns\r\n",
     );
     for e in entries {
         let mac = |m: Option<MacAddress>| m.map(|m| m.to_string()).unwrap_or_default();
         let enum_str = |v: serde_json::Value| v.as_str().unwrap_or_default().to_string();
+        let dns = |pick: fn(&DnsHistory) -> Option<&DnsSummary>| {
+            e.dns
+                .as_ref()
+                .and_then(pick)
+                .map(ToString::to_string)
+                .unwrap_or_default()
+        };
         let row = [
             timefmt::to_rfc3339(e.timestamp),
             e.adapter_name.clone(),
@@ -206,6 +276,10 @@ pub fn to_csv(entries: &[HistoryEntry]) -> String {
             e.method.clone().unwrap_or_default(),
             e.error_code.clone().unwrap_or_default(),
             e.error.clone().unwrap_or_default(),
+            enum_str(serde_json::to_value(e.kind).unwrap_or_default()),
+            dns(|d| d.previous.as_ref()),
+            dns(|d| d.requested.as_ref()),
+            dns(|d| d.observed.as_ref()),
         ];
         out.push_str(
             &row.iter()
@@ -237,6 +311,8 @@ mod tests {
             method: Some("windowsRegistry".into()),
             error_code: None,
             error: None,
+            kind: HistoryKind::Mac,
+            dns: None,
         }
     }
 
