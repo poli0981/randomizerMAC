@@ -314,10 +314,10 @@
       <input
         type="checkbox"
         checked={app.settings?.showVirtualAdapters ?? false}
-        onchange={(e) =>
-          app.saveSettings(
-            (s) => (s.showVirtualAdapters = (e.currentTarget as HTMLInputElement).checked),
-          )}
+        onchange={(e) => {
+          const show = e.currentTarget.checked;
+          void app.saveSettings((s) => (s.showVirtualAdapters = show));
+        }}
       />
       {t("dashboard.showVirtual")}
     </label>
@@ -501,7 +501,7 @@
           </span>
         </div>
 
-        {#if busyHere}
+        {#if busyHere && app.busy?.kind !== "dns"}
           <ol class="steps" aria-live="polite" aria-label={t("common.loading")}>
             {#each app.busy?.stage === "rollingBack" ? [...stages, "rollingBack" as Stage] : stages as s (s)}
               {@const current = app.busy?.stage === s}

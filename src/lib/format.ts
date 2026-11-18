@@ -54,6 +54,7 @@ export function formatTime(iso: string): string {
 export function methodLabel(method: string): string {
   const labels: Record<string, string> = {
     windowsRegistry: "Windows (NetworkAddress)",
+    windowsIpHelper: "Windows (IP Helper)",
     networkManager: "NetworkManager",
     iproute2: "iproute2",
     mock: "Demo",

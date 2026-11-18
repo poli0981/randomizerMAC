@@ -9,7 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **DNS settings per adapter**, in the CLI for now (`randommac-cli dns`; the app's page follows).
+- **DNS settings per adapter**: a new **DNS** page, a DNS submenu in the tray and
+  `randommac-cli dns`.
+  - The page shows what an adapter is configured with, what it actually uses and whether it is
+    encrypted, and which provider that is. Pick a provider and its filtering, one of your
+    presets, the local resolver or custom servers; choose the encryption (the unavailable
+    options say why); apply to the adapter or to every connected adapter; restore the original
+    settings. Every endpoint (IPv4, IPv6, DoH, DoT, DNSCrypt stamps) can be copied.
+  - A latency test measures how fast every provider answers from this computer, live, and a row
+    picks that provider. Presets keep your own servers (up to 20) and also show up in the tray
+    menu; resetting the settings keeps them, like the blacklist.
+  - The tray's DNS submenu applies a provider, a preset, "Automatic" or "Restore original
+    DNS" to the adapter the tray works on, encrypted when the DNS page says so.
+  - The History page shows DNS changes with a DNS badge and can filter by kind.
   - `dns providers` lists the built-in providers: Cloudflare, Google, Quad9, AdGuard,
     CleanBrowsing, Control D, DNS4EU, DNS.SB and Cisco OpenDNS, each with its filtering variants,
     IPv4 and IPv6 servers, DNS-over-HTTPS template, DNS-over-TLS host and DNSCrypt stamps.
@@ -35,8 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (settings, history, blacklist, state) still store RFC 3339 timestamps with `Z`, so files written by
   2.0.x load unchanged and 2.0.x can read the new ones.
 
+### Fixed
+
+- Settings changed in quick succession (two selects, or a select while an earlier change was
+  still being saved) could fail with "Something went wrong" and be undone.
+- On long pages the whole window, sidebar included, could scroll out of place.
+
 ### Changed
 
+- Keyboard shortcuts: the DNS page is second, so Ctrl+2 … Ctrl+8 now open DNS, History,
+  Settings, Log, Update, About and Social (History moved from Ctrl+2 to Ctrl+3).
 - CI: JetBrains Qodana (Ultimate) analyzes the Rust workspace and the TypeScript/Svelte UI on
   every push and pull request, with a quality gate of zero problems. The licenses of all npm
   packages are now checked against an allow-list like the Rust crates' (`npm run check:licenses`),

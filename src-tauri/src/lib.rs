@@ -16,6 +16,7 @@ mod platform;
 mod scheduler;
 mod state;
 mod tray;
+mod tray_menu;
 mod updater;
 
 use std::path::PathBuf;
@@ -176,6 +177,8 @@ fn run_app(args: Args, elevated: bool, read_only: bool, temp_dir: Option<PathBuf
         ui_ready: AtomicBool::new(false),
         close_hint_shown: AtomicBool::new(false),
         scheduler: Mutex::new(None),
+        dns_probe_running: AtomicBool::new(false),
+        dns_probe_cancel: std::sync::Arc::new(AtomicBool::new(false)),
         temp_dir,
     };
 
@@ -214,6 +217,13 @@ fn run_app(args: Args, elevated: bool, read_only: bool, temp_dir: Option<PathBuf
             commands::apply_mac,
             commands::restore_mac,
             commands::restore_all,
+            commands::dns_catalog,
+            commands::dns_view,
+            commands::dns_apply,
+            commands::dns_apply_all,
+            commands::dns_restore,
+            commands::dns_latency_test,
+            commands::dns_latency_cancel,
             commands::history_list,
             commands::history_clear,
             commands::history_export,

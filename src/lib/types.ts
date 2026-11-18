@@ -9,6 +9,8 @@ export type Stage = "preparing" | "writing" | "restarting" | "verifying" | "roll
 export type ChangeStatus = "applied" | "unverified" | "rolledBack" | "rebootRequired" | "failed";
 export type ChangeSource = "ui" | "tray" | "startup" | "schedule" | "exit" | "cli" | "importV1";
 export type HistoryAction = "apply" | "restore";
+export type HistoryKind = "mac" | "dns";
+export type OpKind = "mac" | "dns";
 
 export interface NmConnection {
   uuid: string;
@@ -68,6 +70,9 @@ export interface HistoryEntry {
   method?: string;
   errorCode?: string;
   error?: string;
+  /** Absent for MAC entries (files written before 2.1 have no kind). */
+  kind?: HistoryKind;
+  dns?: DnsHistory;
 }
 
 export interface ApiError {
@@ -128,6 +133,7 @@ export interface Settings {
   linux: { method: "auto" | "networkManager" | "iproute2" };
   history: { maxEntries: number; retentionDays: number };
   legacy: { importedFromV1At?: string; legacyTaskRemovedAt?: string };
+  dns: DnsSettings;
 }
 
 export interface BlacklistEntry {
@@ -203,4 +209,188 @@ export interface Vendor {
   ouiCount: number;
 }
 
-export type Page = "dashboard" | "history" | "settings" | "logs" | "update" | "about" | "social";
+export type Page =
+  "dashboard" | "dns" | "history" | "settings" | "logs" | "update" | "about" | "social";
+
+// --- DNS (crates/randommac-core/src/dns, crates/randommac-net/src/dns_*.rs) ---
+
+export type FamilyDns = { mode: "automatic" } | { mode: "static"; servers: string[] };
+export type EncryptionMode = "none" | "doh" | "dot";
+export type EncryptionChoice = "none" | "doh" | "dot" | "preferred";
+
+export interface DnsSummary {
+  ipv4: FamilyDns;
+  ipv6: FamilyDns;
+  encryption: EncryptionMode;
+}
+
+export interface DnsEndpoints {
+  ipv4: string[];
+  ipv6: string[];
+  doh?: string;
+  dot?: string;
+}
+
+export type DnsTarget =
+  | { kind: "automatic" }
+  | { kind: "localResolver" }
+  | { kind: "provider"; provider: string; variant?: string }
+  | { kind: "preset"; id: string }
+  | ({ kind: "custom" } & DnsEndpoints);
+
+export interface DnsRequest {
+  target: DnsTarget;
+  encryption: EncryptionChoice;
+  allowFallback: boolean;
+}
+
+export type DnsLabel =
+  | { kind: "automatic" }
+  | { kind: "localResolver" }
+  | { kind: "provider"; provider: string; variant: string }
+  | { kind: "preset"; name: string }
+  | { kind: "custom" };
+
+export type VariantLabel =
+  | "standard"
+  | "noFiltering"
+  | "malware"
+  | "family"
+  | "adult"
+  | "adBlocking"
+  | "child"
+  | "childNoAds"
+  | "ecs"
+  | "social"
+  | "uncensored";
+
+export interface DnscryptStamp {
+  name: string;
+  address: string;
+  stamp: string;
+}
+
+export interface DnsVariant {
+  id: string;
+  default: boolean;
+  label: VariantLabel;
+  ipv4: string[];
+  ipv6: string[];
+  doh?: string;
+  dot?: string;
+  dnscrypt: DnscryptStamp[];
+}
+
+export interface DnsProvider {
+  id: string;
+  name: string;
+  homepage: string;
+  sources: string[];
+  verifiedOn: string;
+  variants: DnsVariant[];
+}
+
+export interface DnsCatalog {
+  providers: DnsProvider[];
+}
+
+export interface CustomDnsPreset {
+  id: string;
+  name: string;
+  ipv4: string[];
+  ipv6: string[];
+  dohTemplate?: string;
+  dotHost?: string;
+}
+
+export interface DnsSettings {
+  preferEncryption: boolean;
+  allowFallback: boolean;
+  presets: CustomDnsPreset[];
+}
+
+export interface FeatureSupport {
+  available: boolean;
+  reason?: string;
+}
+
+export type DnsMethod = "windowsIpHelper" | "networkManager" | "mock";
+
+export interface DnsCapabilities {
+  supported: boolean;
+  reason?: string;
+  canChange: boolean;
+  changeReason?: string;
+  ipv4: FeatureSupport;
+  ipv6: FeatureSupport;
+  doh: FeatureSupport;
+  dot: FeatureSupport;
+  method?: DnsMethod;
+}
+
+export interface DnsStatus {
+  configured: DnsSummary;
+  dohTemplate?: string;
+  dotServerName?: string;
+  fallback?: boolean;
+  effectiveIpv4: string[];
+  effectiveIpv6: string[];
+  profileOverride: boolean;
+  nmConnectionUuid?: string;
+}
+
+export interface DnsView {
+  capabilities: DnsCapabilities;
+  status?: DnsStatus;
+  statusErrorCode?: string;
+  restorable: boolean;
+  matched?: DnsLabel;
+}
+
+export interface DnsReport {
+  method: DnsMethod;
+  status: ChangeStatus;
+  previous?: DnsSummary;
+  requested?: DnsSummary;
+  observed?: DnsSummary;
+  effective: string[];
+  detailCode?: string;
+  warnings?: string[];
+  cacheFlushed: boolean;
+  nmConnectionUuid?: string;
+}
+
+export interface DnsOpResult {
+  adapterId: string;
+  adapterName: string;
+  entry: HistoryEntry | null;
+  report: DnsReport | null;
+  error: ApiError | null;
+  success: boolean;
+}
+
+export interface DnsHistory {
+  previous?: DnsSummary;
+  requested?: DnsSummary;
+  observed?: DnsSummary;
+  label?: DnsLabel;
+  warnings?: string[];
+}
+
+export interface LatencyStats {
+  medianUs: number;
+  minUs: number;
+  maxUs: number;
+}
+
+export type ProbeOutcome =
+  | { kind: "answered"; stats: LatencyStats; answered: number; attempts: number; rcode: number }
+  | { kind: "timeout" }
+  | { kind: "refused"; rcode: number }
+  | { kind: "unreachable"; message: string }
+  | { kind: "cancelled" };
+
+export interface LatencyResult {
+  addr: string;
+  outcome: ProbeOutcome;
+}

@@ -6,12 +6,19 @@ import type {
   ApiError,
   AppInfo,
   BlacklistEntry,
+  DnsCatalog,
+  DnsOpResult,
+  DnsRequest,
+  DnsView,
   GenerationMode,
   HistoryEntry,
+  LatencyResult,
   LogEntry,
   MacInfo,
+  OpKind,
   OpResult,
   Page,
+  ProbeOutcome,
   Settings,
   Stage,
   UpdateInfo,
@@ -57,6 +64,16 @@ export const api = {
   restoreMac: (adapterId: string) => call<OpResult>("restore_mac", { adapterId }),
   restoreAll: () => call<OpResult[]>("restore_all"),
 
+  dnsCatalog: () => call<DnsCatalog>("dns_catalog"),
+  dnsView: (adapterId: string) => call<DnsView>("dns_view", { adapterId }),
+  dnsApply: (adapterId: string, request: DnsRequest) =>
+    call<DnsOpResult>("dns_apply", { adapterId, request }),
+  dnsApplyAll: (request: DnsRequest) => call<DnsOpResult[]>("dns_apply_all", { request }),
+  dnsRestore: (adapterId: string) => call<DnsOpResult>("dns_restore", { adapterId }),
+  dnsLatencyTest: (servers: string[], attempts?: number) =>
+    call<LatencyResult[]>("dns_latency_test", { servers, attempts }),
+  dnsLatencyCancel: () => call<void>("dns_latency_cancel"),
+
   historyList: () => call<HistoryEntry[]>("history_list"),
   historyClear: () => call<void>("history_clear"),
   historyExport: (format: "csv" | "json") => call<string | null>("history_export", { format }),
@@ -87,11 +104,20 @@ export const api = {
 export interface ProgressEvent {
   adapterId: string;
   stage: Stage;
+  /** Absent from backends before 2.1 (always a MAC change then). */
+  kind?: OpKind;
 }
 
 export interface BusyEvent {
   busy: boolean;
   adapterId: string;
+  kind?: OpKind;
+}
+
+export interface LatencyEvent {
+  index: number;
+  addr: string;
+  outcome: ProbeOutcome;
 }
 
 export const events = {
@@ -102,6 +128,10 @@ export const events = {
   onAdaptersChanged: (cb: () => void) => listen("adapters:changed", () => cb()),
   onHistoryChanged: (cb: () => void) => listen("history:changed", () => cb()),
   onBlacklistChanged: (cb: () => void) => listen("blacklist:changed", () => cb()),
+  onDnsChanged: (cb: (adapterId: string) => void) =>
+    listen<string>("dns:changed", (e) => cb(e.payload)),
+  onLatency: (cb: (e: LatencyEvent) => void) =>
+    listen<LatencyEvent>("dns:latency", (e) => cb(e.payload)),
   onSettingsChanged: (cb: (s: Settings) => void) =>
     listen<Settings>("settings:changed", (e) => cb(e.payload)),
   onNavigate: (cb: (p: Page) => void) => listen<Page>("app:navigate", (e) => cb(e.payload)),

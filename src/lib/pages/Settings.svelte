@@ -97,12 +97,10 @@
             id="lang"
             class="select"
             value={s.language}
-            onchange={(e) =>
-              save(
-                (x) =>
-                  (x.language = (e.currentTarget as HTMLSelectElement)
-                    .value as Settings["language"]),
-              )}
+            onchange={(e) => {
+              const language = e.currentTarget.value as Settings["language"];
+              save((x) => (x.language = language));
+            }}
           >
             <option value="system">{t("settings.language.system")}</option>
             <option value="en">English</option>
@@ -115,11 +113,10 @@
             id="theme"
             class="select"
             value={s.theme}
-            onchange={(e) =>
-              save(
-                (x) =>
-                  (x.theme = (e.currentTarget as HTMLSelectElement).value as Settings["theme"]),
-              )}
+            onchange={(e) => {
+              const theme = e.currentTarget.value as Settings["theme"];
+              save((x) => (x.theme = theme));
+            }}
           >
             <option value="system">{t("settings.theme.system")}</option>
             <option value="light">{t("settings.theme.light")}</option>
@@ -132,12 +129,10 @@
             id="sep"
             class="select"
             value={s.macFormat.separator}
-            onchange={(e) =>
-              save(
-                (x) =>
-                  (x.macFormat.separator = (e.currentTarget as HTMLSelectElement)
-                    .value as Separator),
-              )}
+            onchange={(e) => {
+              const separator = e.currentTarget.value as Separator;
+              save((x) => (x.macFormat.separator = separator));
+            }}
           >
             <option value="colon">{t("settings.separator.colon")}</option>
             <option value="hyphen">{t("settings.separator.hyphen")}</option>
@@ -231,14 +226,10 @@
             id="vendor"
             class="select"
             value={s.generationMode.vendorId}
-            onchange={(e) =>
-              save(
-                (x) =>
-                  (x.generationMode = {
-                    kind: "vendor",
-                    vendorId: (e.currentTarget as HTMLSelectElement).value,
-                  }),
-              )}
+            onchange={(e) => {
+              const vendorId = e.currentTarget.value;
+              save((x) => (x.generationMode = { kind: "vendor", vendorId }));
+            }}
           >
             {#each imitable as v (v.id)}<option value={v.id}>{v.name}</option>{/each}
           </select>
@@ -275,13 +266,10 @@
             id="interval"
             class="select"
             value={s.automation.intervalMinutes}
-            onchange={(e) =>
-              save(
-                (x) =>
-                  (x.automation.intervalMinutes = Number(
-                    (e.currentTarget as HTMLSelectElement).value,
-                  )),
-              )}
+            onchange={(e) => {
+              const minutes = Number(e.currentTarget.value);
+              save((x) => (x.automation.intervalMinutes = minutes));
+            }}
           >
             {#each intervals as m (m)}<option value={m}>{intervalLabel(m)}</option>{/each}
           </select>
@@ -462,11 +450,10 @@
           min="10"
           max="10000"
           value={s.history.maxEntries}
-          onchange={(e) =>
-            save(
-              (x) =>
-                (x.history.maxEntries = Number((e.currentTarget as HTMLInputElement).value) || 500),
-            )}
+          onchange={(e) => {
+            const max = Number(e.currentTarget.value) || 500;
+            save((x) => (x.history.maxEntries = max));
+          }}
         />
         <span class="subtle">{t("settings.historyMaxUnit")}</span>
         <label for="hist-days">{t("settings.historyDays")}</label>
@@ -477,12 +464,10 @@
           min="0"
           max="3650"
           value={s.history.retentionDays}
-          onchange={(e) =>
-            save(
-              (x) =>
-                (x.history.retentionDays =
-                  Number((e.currentTarget as HTMLInputElement).value) || 0),
-            )}
+          onchange={(e) => {
+            const days = Number(e.currentTarget.value) || 0;
+            save((x) => (x.history.retentionDays = days));
+          }}
         />
         <span class="subtle">{t("settings.historyDaysUnit")}</span>
       </div>

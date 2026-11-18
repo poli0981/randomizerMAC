@@ -13,23 +13,27 @@
     ShieldAlert,
     User,
     FlaskConical,
+    Globe,
   } from "@lucide/svelte";
   import Logo from "./Logo.svelte";
   import { app } from "../stores/app.svelte";
   import { t, type MessageKey } from "../i18n/index.svelte";
+  import { pages, shortcutOf } from "../nav";
   import type { Page } from "../types";
 
   let { collapsed = $bindable(false) }: { collapsed?: boolean } = $props();
 
-  const items: { page: Page; key: MessageKey; icon: typeof LayoutDashboard }[] = [
-    { page: "dashboard", key: "nav.dashboard", icon: LayoutDashboard },
-    { page: "history", key: "nav.history", icon: History },
-    { page: "settings", key: "nav.settings", icon: Settings },
-    { page: "logs", key: "nav.logs", icon: ScrollText },
-    { page: "update", key: "nav.update", icon: CloudDownload },
-    { page: "about", key: "nav.about", icon: Info },
-    { page: "social", key: "nav.social", icon: Heart },
-  ];
+  const meta: Record<Page, { key: MessageKey; icon: typeof LayoutDashboard }> = {
+    dashboard: { key: "nav.dashboard", icon: LayoutDashboard },
+    dns: { key: "nav.dns", icon: Globe },
+    history: { key: "nav.history", icon: History },
+    settings: { key: "nav.settings", icon: Settings },
+    logs: { key: "nav.logs", icon: ScrollText },
+    update: { key: "nav.update", icon: CloudDownload },
+    about: { key: "nav.about", icon: Info },
+    social: { key: "nav.social", icon: Heart },
+  };
+  const items = pages.map((page) => ({ page, ...meta[page] }));
 
   const status = $derived.by(() => {
     const info = app.info;
@@ -56,14 +60,14 @@
   </div>
 
   <ul>
-    {#each items as item, i (item.page)}
+    {#each items as item (item.page)}
       {@const Icon = item.icon}
       <li>
         <button
           class="nav-item"
           class:active={app.page === item.page}
           aria-current={app.page === item.page ? "page" : undefined}
-          title={collapsed ? `${t(item.key)} (Ctrl+${i + 1})` : `Ctrl+${i + 1}`}
+          title={collapsed ? `${t(item.key)} (${shortcutOf(item.page)})` : shortcutOf(item.page)}
           onclick={() => app.navigate(item.page)}
         >
           <Icon size={18} aria-hidden="true" />

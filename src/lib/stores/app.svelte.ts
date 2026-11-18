@@ -5,8 +5,10 @@ import type {
   ApiError,
   AppInfo,
   BlacklistEntry,
+  DnsCatalog,
   HistoryEntry,
   MacFormat,
+  OpKind,
   Page,
   Settings,
   Stage,
@@ -35,7 +37,10 @@ class AppStore {
   vendors = $state<Vendor[]>([]);
   page = $state<Page>("dashboard");
   selectedId = $state<string | null>(null);
-  busy = $state<{ adapterId: string; stage: Stage | null } | null>(null);
+  busy = $state<{ adapterId: string; stage: Stage | null; kind: OpKind } | null>(null);
+  dnsCatalog = $state<DnsCatalog | null>(null);
+  /** Counts DNS changes (from any source), so that the DNS page reloads what it shows. */
+  dnsRevision = $state(0);
   update = $state<UpdateInfo | null>(null);
   updateProgress = $state<{ downloaded: number; total: number | null } | null>(null);
   updateInstalling = $state(false);
@@ -90,8 +95,9 @@ class AppStore {
       if (this.busy && this.busy.adapterId === e.adapterId) this.busy.stage = e.stage;
     });
     void events.onBusy((e) => {
-      this.busy = e.busy ? { adapterId: e.adapterId, stage: null } : null;
+      this.busy = e.busy ? { adapterId: e.adapterId, stage: null, kind: e.kind ?? "mac" } : null;
     });
+    void events.onDnsChanged(() => this.dnsRevision++);
     void events.onAdaptersChanged(() => void this.refreshAdapters(true));
     void events.onHistoryChanged(() => void this.refreshHistory());
     void events.onBlacklistChanged(() => void this.refreshBlacklist());
@@ -126,6 +132,18 @@ class AppStore {
     } finally {
       this.adaptersLoading = false;
     }
+  }
+
+  /** The DNS provider catalog, loaded once. */
+  async loadDnsCatalog(): Promise<DnsCatalog | null> {
+    if (!this.dnsCatalog) {
+      try {
+        this.dnsCatalog = await api.dnsCatalog();
+      } catch (e) {
+        this.toastError(e);
+      }
+    }
+    return this.dnsCatalog;
   }
 
   async refreshHistory() {

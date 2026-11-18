@@ -55,6 +55,9 @@ pub struct AppState {
     pub ui_ready: AtomicBool,
     pub close_hint_shown: AtomicBool,
     pub scheduler: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    /// A DNS latency test is running (one at a time) and whether it was asked to stop.
+    pub dns_probe_running: AtomicBool,
+    pub dns_probe_cancel: Arc<AtomicBool>,
     pub temp_dir: Option<PathBuf>,
 }
 

@@ -6,12 +6,19 @@
   import { api } from "../api";
   import { i18n, t, type MessageKey } from "../i18n/index.svelte";
   import { formatDateTime, methodLabel } from "../format";
-  import { formatMac } from "../mac";
+  import { changeText, entryKind, filterHistory, type HistoryFilters } from "../history";
+  import { labelText } from "../dns";
 
   let query = $state("");
   let adapterFilter = $state("");
-  let statusFilter = $state<"" | "success" | "failed">("");
+  let statusFilter = $state<HistoryFilters["status"]>("");
+  let kindFilter = $state<HistoryFilters["kind"]>("");
   let confirmClear = $state(false);
+
+  // Provider names for DNS entries (the catalog is loaded once, by whichever page needs it).
+  $effect(() => {
+    if (app.history.some((h) => entryKind(h) === "dns")) void app.loadDnsCatalog();
+  });
 
   const adapterNames = $derived(
     [...new Map(app.history.map((h) => [h.adapterId, h.adapterName])).entries()].sort((a, b) =>
@@ -19,28 +26,13 @@
     ),
   );
 
-  const filtered = $derived.by(() => {
-    const q = query.trim().toLowerCase();
-    const hexQ = /^[0-9a-f:.\- ]+$/i.test(q) ? q.replace(/[^0-9a-f]/gi, "") : null;
-    return app.history.filter((h) => {
-      if (adapterFilter && h.adapterId !== adapterFilter) return false;
-      const ok =
-        h.status === "applied" || h.status === "unverified" || h.status === "rebootRequired";
-      if (statusFilter === "success" && !ok) return false;
-      if (statusFilter === "failed" && ok) return false;
-      if (!q) return true;
-      if (h.adapterName.toLowerCase().includes(q)) return true;
-      if (hexQ) {
-        return [h.previousMac, h.newMac, h.requestedMac].some((m) =>
-          m
-            ?.replace(/[^0-9a-f]/gi, "")
-            .toLowerCase()
-            .includes(hexQ.toLowerCase()),
-        );
-      }
-      return false;
-    });
-  });
+  const filtered = $derived(
+    filterHistory(
+      app.history,
+      { query, adapterId: adapterFilter, status: statusFilter, kind: kindFilter },
+      app.dnsCatalog,
+    ),
+  );
 
   async function exportAs(format: "csv" | "json") {
     try {
@@ -103,6 +95,12 @@
       <option value="">{t("history.adapterFilter")}: {t("common.all")}</option>
       {#each adapterNames as [id, name] (id)}<option value={id}>{name}</option>{/each}
     </select>
+    <label class="sr-only" for="history-kind">{t("history.kindFilter")}</label>
+    <select id="history-kind" class="select" bind:value={kindFilter}>
+      <option value="">{t("history.kindFilter")}: {t("common.all")}</option>
+      <option value="mac">{t("history.kind.mac")}</option>
+      <option value="dns">{t("history.kind.dns")}</option>
+    </select>
     <label class="sr-only" for="history-status">{t("history.statusFilter")}</label>
     <select id="history-status" class="select" bind:value={statusFilter}>
       <option value="">{t("history.statusFilter")}: {t("common.all")}</option>
@@ -133,12 +131,15 @@
             <tr>
               <td class="nowrap">{formatDateTime(h.timestamp, i18n.locale)}</td>
               <td>{h.adapterName}</td>
-              <td>{t(`history.action.${h.action}` as MessageKey)}</td>
-              <td class="mono nowrap">
-                {formatMac(h.previousMac, app.format)} → {formatMac(
-                  h.newMac ?? h.requestedMac,
-                  app.format,
-                )}
+              <td>
+                {t(`history.action.${h.action}` as MessageKey)}
+                {#if entryKind(h) === "dns"}<span class="badge accent">DNS</span>{/if}
+              </td>
+              <td class="mono" class:nowrap={entryKind(h) === "mac"}>
+                {changeText(h, app.format)}
+                {#if h.dns?.label && h.action === "apply"}
+                  <span class="subtle label">{labelText(h.dns.label, app.dnsCatalog)}</span>
+                {/if}
               </td>
               <td>
                 <span class="badge {statusTone(h.status)}" title={h.error ?? h.errorCode ?? ""}>
@@ -200,6 +201,11 @@
   }
   .nowrap {
     white-space: nowrap;
+  }
+  .label {
+    display: block;
+    font-family: var(--font-ui);
+    font-size: 12px;
   }
   .empty {
     padding: 32px;
