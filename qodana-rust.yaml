@@ -12,10 +12,13 @@ failureConditions:
     any: 0
 # The linter evaluates build scripts and expands macros with `cargo check`, and its image has
 # neither a C toolchain nor the libraries Tauri links against (the packages ci.yml installs). Needs
-# root in the container: the workflow passes `-u root`.
+# root in the container: the workflow passes `-u root`. rust-toolchain.toml installs the pinned
+# toolchain with the minimal profile, without the standard library's sources; without them the
+# linter cannot type std and reports errors in code that compiles, so rust-src is added here.
 bootstrap: |
   apt-get update -qq
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends build-essential pkg-config libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+  rustup component add rust-src || echo "rust-src not installed: std stays untyped for the linter"
 exclude:
   - name: All
     paths:
@@ -44,9 +47,12 @@ exclude:
       - src-tauri/src/lib.rs
   # rustc is the authority on type and borrow errors (CI builds everything with clippy
   # -D warnings). The Early Access linter's own checker reports errors in code that compiles, e.g.
-  # every integer operator in crates/randommac-core/src/random.rs (E0369, E0382), or `u8`, `u32`
+  # every integer operator in crates/randommac-core/src/random.rs (E0369, E0382), `u8`, `u32`
   # and `bool` fields "not implementing" Copy/Eq/Debug under a derive in
-  # crates/randommac-core/src/dns/wire.rs (E0277).
+  # crates/randommac-core/src/dns/wire.rs (E0277), a `char` "expected to be a proc_macro::Punct"
+  # and an `i32` "without Display" in crates/randommac-core/src/history.rs (E0308, E0277).
   - name: RsTraitObligations
   - name: RsBorrowChecker
   - name: RsDerivableTraitMembers
+  - name: RsTypeCheck
+  - name: RsFormatMacroErrors
