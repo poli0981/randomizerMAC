@@ -1,6 +1,6 @@
 # End User License Agreement (EULA)
 
-**Effective date:** 2026-10-15
+**Effective date:** 2026-11-18
 **Application:** RandomMac (formerly "RANDOM MAC")
 **Developer:** poli0981
 
@@ -50,9 +50,21 @@ limited to:
 ## 6. Privacy
 
 - The Software stores all data **locally** on your device.
-- No personal data, usage statistics or telemetry is collected or transmitted.
-- The only internet feature is the update check against GitHub Releases. It sends no identifying
-  information beyond what any HTTPS request to GitHub contains, and it can be turned off.
+- No personal data, usage statistics or telemetry is collected by or transmitted to the developer.
+- The Software connects to the internet only for:
+  - the update check against GitHub Releases, which sends no identifying information beyond what
+    any HTTPS request to GitHub contains and can be turned off;
+  - the DNS latency test, which sends a few DNS queries (for the root zone, without personal data)
+    to the DNS servers being tested, and only when you run it;
+  - test queries to new plain (unencrypted) DNS servers before they are applied, to check that
+    they answer.
+- When you switch an adapter to other DNS servers, your device sends its DNS queries, which reveal
+  the names of the websites and services it looks up, to the chosen provider. That provider's own
+  privacy policy and terms apply; the developer does not control third-party DNS services and is
+  not responsible for them.
+- Changing DNS servers can prevent captive portals (the sign-in pages of public Wi-Fi) and company
+  or school networks that rely on their own DNS servers from working. You are responsible for
+  choosing DNS settings that the networks you use permit.
 
 ## 7. Updates
 
@@ -73,7 +85,7 @@ The Software includes or relies on open-source components, each subject to its o
 including:
 
 - Tauri and its plugins (MIT / Apache-2.0)
-- The Rust standard library and crates such as serde, tracing, clap, chrono, windows-sys, zbus and
+- The Rust standard library and crates such as serde, tracing, clap, time, windows-sys, zbus and
   zip (MIT and/or Apache-2.0)
 - Svelte (MIT), Lucide icons (ISC), marked (MIT), DOMPurify (Apache-2.0 / MPL-2.0)
 - Vendor prefix data from the IEEE Registration Authority public listings

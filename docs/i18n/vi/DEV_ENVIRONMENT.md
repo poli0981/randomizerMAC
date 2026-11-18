@@ -9,7 +9,7 @@ Cách build, chạy, kiểm thử và phát hành RandomMac 2.x. Thiết kế t�
 | Công cụ | Phiên bản | Ghi chú |
 |---|---|---|
 | Git | 2.x | |
-| [rustup](https://rustup.rs/) | bất kỳ | `rust-toolchain.toml` cố định Rust **1.99.1** (+ rustfmt, clippy); rustup tự cài ở lần dùng đầu. MSRV là 1.89. |
+| [rustup](https://rustup.rs/) | bất kỳ | `rust-toolchain.toml` cố định Rust **1.100.0** (+ rustfmt, clippy); rustup tự cài ở lần dùng đầu. MSRV là 1.90 (mức tối thiểu của Tauri). |
 | [Node.js](https://nodejs.org/) | **26** (`.nvmrc`) | npm 11+. |
 | Thành phần cho Tauri | xem bên dưới | WebView2/WebKitGTK và công cụ build native. |
 
@@ -71,6 +71,10 @@ sudo ./target/debug/randommac-cli --data-dir /tmp/rm --method iproute2 restore d
 sudo ip link del dummy0
 ```
 
+Đổi DNS trên Linux cần NetworkManager; CI thử trên interface giả qua hai bản giả lập
+`crates/randommac-net/tests/fake-nmcli.sh` và `fake-busctl.sh` (xem job *Linux MAC change* trong
+`ci.yml`). Backend giả lập (`--mock`, `RANDOMMAC_BACKEND=mock`) cũng hỗ trợ DNS.
+
 ## Kiểm tra (giống CI)
 
 ```bash
@@ -79,17 +83,27 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 npm run lint            # eslint + prettier --check
 npm run check           # svelte-check --tsgo: kiểm tra kiểu bằng TypeScript 7 (cảnh báo cũng tính là lỗi)
-npm test                # vitest
+npm test                # vitest, gồm cả test trợ năng (axe-core)
 npm run build           # vite build ra dist/ (cần cho cargo build src-tauri)
 node scripts/version.mjs check
 cargo deny check        # advisories, giấy phép, bans (cargo install cargo-deny)
+npm run check:licenses  # đối chiếu giấy phép của mọi gói npm với scripts/lib/licenses.mjs
 ```
+
+`npm test` gồm cả test trợ năng (`src/lib/a11y.test.ts`, hàm hỗ trợ trong `src/test/axe.ts`):
+[axe-core](https://github.com/dequelabs/axe-core) quét mọi trang và một hộp thoại xác nhận đang mở,
+kèm kiểm tra role và tên mà người dùng bàn phím và trình đọc màn hình cần, chạy với dev mock trong
+jsdom. jsdom không có bố cục (layout) nên độ tương phản màu được kiểm tra thủ công (xem
+[ACCESSIBILITY.md](ACCESSIBILITY.md)). `npm run check:licenses` là bản tương ứng cho npm
+của `cargo deny check licenses` (CI chạy trong job *Dependency audit*): chỉ thêm giấy phép mới vào
+`scripts/lib/licenses.mjs` sau khi đã đọc điều khoản của nó.
 
 ### Coverage và SonarQube Cloud
 
 CI chạy test Rust bằng [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) trên Windows và
-Linux (mỗi báo cáo phủ backend của hệ điều hành đó) và test UI bằng Vitest có coverage, rồi gửi các
-báo cáo cùng lần phân tích lên
+Linux (mỗi báo cáo phủ backend của hệ điều hành đó), CLI có đo coverage trong hai job tích hợp (đổi
+MAC và DNS thật trên Linux, đổi DNS trên runner Windows) và test UI bằng Vitest có coverage, rồi gửi
+các báo cáo cùng lần phân tích lên
 [SonarQube Cloud](https://sonarcloud.io/project/overview?id=poli0981_randomizerMAC). Quality gate
 *Sonar way* làm job CI thất bại khi code mới có coverage dưới 80 %, có issue mới, trùng lặp quá 3 %
 hoặc còn security hotspot chưa review. Những phần cố ý không đo (glue của Tauri runtime, build
@@ -116,6 +130,23 @@ Từ Windows có thể kiểm tra kiểu backend Linux và CLI (không phụ thu
 rustup target add x86_64-unknown-linux-gnu
 cargo clippy -p randommac-net -p randommac-cli --target x86_64-unknown-linux-gnu -- -D warnings
 ```
+
+### JetBrains Qodana
+
+`.github/workflows/qodana.yml` (workflow *Qodana*) phân tích mọi lần push lên `master` và mọi pull
+request bằng hai linter, mỗi linter báo cáo về một project Qodana Cloud riêng:
+
+| Linter | Phạm vi | Cấu hình |
+|---|---|---|
+| `qodana-js` (Docker, kèm plugin Svelte của JetBrains) | giao diện (`src/`), cấu hình build, `scripts/`, các workflow | `qodana.yaml` |
+| `qodana-rust` (Early Access, Docker) | Cargo workspace (`crates/`, `src-tauri/`) | `qodana-rust.yaml` |
+
+Cả hai cấu hình đặt quality gate là không có vấn đề nào, và mọi loại trừ đều được ghi kèm lý do
+trong đó. Các job cần token của project — secret `QODANA_TOKEN_TS_JS` và `QODANA_TOKEN_RUST` của
+repo — nên pull request từ fork và từ Dependabot sẽ bỏ qua bước phân tích (`master` được phân tích
+sau khi merge). Cả hai linter cần giấy phép Qodana Ultimate; khi giấy phép hết hạn, cả hai job đều
+lỗi ở bước kiểm tra giấy phép. Kết quả: Qodana Cloud, chú thích trên lần chạy và artifact
+`qodana-report-*` (SARIF và log).
 
 ## Build bộ cài trên máy
 
@@ -182,13 +213,14 @@ chạy lại sẽ từ chối động vào nó. Tag có hậu tố (`v2.1.0-beta
 
 Secret của repo: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (ký bản cập nhật —
 **hãy sao lưu khoá**, mất khoá thì không thể phát hành bản cập nhật tự động nữa), các webhook
-`DISCORD_*`, `SONAR_TOKEN` (phân tích SonarQube Cloud trong CI).
+`DISCORD_*`, `SONAR_TOKEN` (phân tích SonarQube Cloud trong CI), `QODANA_TOKEN_TS_JS` và
+`QODANA_TOKEN_RUST` (hai project Qodana Cloud).
 
 ## Cấu hình đã kiểm thử
 
 | Môi trường | Phạm vi |
 |---|---|
-| Windows 11 Pro Insider (máy phát triển, xem [pc_spec.md](pc_spec.md)) | App, khay, chế độ chỉ xem, CLI, thử đổi MAC thật trên adapter Wi-Fi có hoàn tác, build bản cài NSIS/MSI có ký và kiểm tra chữ ký |
-| GitHub `windows-latest` | Build, test, cài/gỡ NSIS + MSI, dọn tác vụ cũ, smoke test GUI |
-| GitHub `ubuntu-24.04` | Build, test, đổi MAC thật trên interface giả (iproute2, và NetworkManager qua một `nmcli` giả lập), cài `.deb` + smoke test GUI (Xvfb) |
+| Windows 11 Pro Insider (máy phát triển, xem [pc_spec.md](pc_spec.md)) | App, khay, chế độ chỉ xem, CLI, thử đổi MAC thật trên adapter Wi-Fi có hoàn tác, đổi DNS thật trên adapter Wi-Fi (DNS thường, DoH, tự động, khôi phục), dùng với Narrator và chỉ bằng bàn phím, build bản cài NSIS/MSI có ký và kiểm tra chữ ký |
+| GitHub `windows-latest` | Build, test, đổi DNS thật trên adapter của runner (DNS thường, DoH, khôi phục, tự động), cài/gỡ NSIS + MSI, dọn tác vụ cũ, smoke test GUI |
+| GitHub `ubuntu-24.04` | Build, test, đổi MAC và DNS thật trên interface giả (iproute2, và NetworkManager qua `nmcli` và `busctl` giả lập), cài `.deb` + smoke test GUI (Xvfb) |
 | Container `fedora:43` | Cài `.rpm` và giải quyết phụ thuộc |
