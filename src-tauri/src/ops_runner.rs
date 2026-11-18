@@ -41,6 +41,16 @@ pub struct DnsOpResult {
     pub success: bool,
 }
 
+/// The backend's report, or the error the UI gets instead, of a finished change.
+fn split_report<R: Clone>(
+    report: &Result<R, randommac_net::NetError>,
+) -> (Option<R>, Option<ApiError>) {
+    match report {
+        Ok(r) => (Some(r.clone()), None),
+        Err(e) => (None, Some(ApiError::from(e.clone()))),
+    }
+}
+
 /// What an operation changes, sent with its events so that each page shows only its own steps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -290,16 +300,13 @@ async fn run_inner(
     }
     notify_outcome(app, &outcome, restore, source);
     crate::tray::refresh(app);
+    let (report, error) = split_report(&outcome.report);
     Ok(OpResult {
         adapter_id,
         adapter_name: outcome.adapter.name.clone(),
         entry: outcome.entry.clone(),
-        report: outcome.report.as_ref().ok().cloned(),
-        error: outcome
-            .report
-            .as_ref()
-            .err()
-            .map(|e| ApiError::from(e.clone())),
+        report,
+        error,
         success,
     })
 }
@@ -463,16 +470,13 @@ async fn run_dns(
         let outcome = result.map_err(ApiError::from)?;
         let success = outcome.report.as_ref().is_ok_and(|r| r.status.is_success());
         notify_dns_outcome(&app, &outcome, restore, source);
+        let (report, error) = split_report(&outcome.report);
         Ok(DnsOpResult {
             adapter_id,
             adapter_name: outcome.adapter.name.clone(),
             entry: outcome.entry.clone(),
-            report: outcome.report.as_ref().ok().cloned(),
-            error: outcome
-                .report
-                .as_ref()
-                .err()
-                .map(|e| ApiError::from(e.clone())),
+            report,
+            error,
             success,
         })
     })

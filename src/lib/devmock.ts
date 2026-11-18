@@ -165,13 +165,17 @@ let settings: Settings = {
   dns: {
     preferEncryption: true,
     allowFallback: false,
-    presets: [{ id: "0a1b2c3d4e5f6071", name: "Home router", ipv4: ["192.168.1.1"], ipv6: [] }],
+    presets: [{ id: "0a1b2c3d4e5f6071", name: "Home router", ipv4: ["192.0.2.1"], ipv6: [] }],
   },
 };
 
 // --- DNS ---------------------------------------------------------------------------------------
 
 const catalog = catalogJson as DnsCatalog;
+/** The demo Wi-Fi adapter starts on Quad9 with DNS over HTTPS (from the real catalog). */
+const quad9 = catalog.providers.find((p) => p.id === "quad9")?.variants.find((v) => v.default);
+/** The server "DHCP" hands out in the demo: a documentation address (RFC 5737). */
+const DHCP_DNS = "192.0.2.1";
 
 interface MockDns {
   summary: DnsSummary;
@@ -196,12 +200,12 @@ const dnsState = new Map<string, MockDns>([
     adapters[1]!.id,
     {
       summary: {
-        ipv4: family(["9.9.9.9", "149.112.112.112"]),
-        ipv6: family(["2620:fe::fe", "2620:fe::9"]),
+        ipv4: family(quad9?.ipv4 ?? []),
+        ipv6: family(quad9?.ipv6 ?? []),
         encryption: "doh",
       },
-      doh: "https://dns.quad9.net/dns-query",
-      label: { kind: "provider", provider: "quad9", variant: "recommended" },
+      doh: quad9?.doh,
+      label: { kind: "provider", provider: "quad9", variant: quad9?.id ?? "recommended" },
       original: { summary: automatic, label: { kind: "automatic" } },
     },
   ],
@@ -234,7 +238,7 @@ function dnsView(adapterId: string): DnsView {
       configured: s.summary,
       dohTemplate: s.doh,
       fallback: s.doh ? false : undefined,
-      effectiveIpv4: adapter.connected ? (static4 ?? ["192.168.1.1"]) : [],
+      effectiveIpv4: adapter.connected ? (static4 ?? [DHCP_DNS]) : [],
       effectiveIpv6: adapter.connected ? static6 : [],
       profileOverride: false,
     },

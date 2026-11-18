@@ -44,6 +44,9 @@ exclude:
       - src-tauri/src/lib.rs
   # rustc is the authority on type and borrow errors (CI builds everything with clippy
   # -D warnings). The Early Access linter's own checker reports errors in code that compiles, e.g.
-  # every integer operator in crates/randommac-core/src/random.rs (E0369, E0382).
+  # every integer operator in crates/randommac-core/src/random.rs (E0369, E0382), or `u8`, `u32`
+  # and `bool` fields "not implementing" Copy/Eq/Debug under a derive in
+  # crates/randommac-core/src/dns/wire.rs (E0277).
   - name: RsTraitObligations
   - name: RsBorrowChecker
+  - name: RsDerivableTraitMembers
