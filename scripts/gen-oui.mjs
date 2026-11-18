@@ -143,7 +143,7 @@ for (const r of rows) {
   const hex = r[1].trim().toUpperCase();
   if (!/^[0-9A-F]{6}$/.test(hex)) continue;
   const first = Number.parseInt(hex.slice(0, 2), 16);
-  if (first & 0x03) continue; // never index multicast or locally administered prefixes
+  if ((first & 0x03) !== 0) continue; // never index multicast or locally administered prefixes
   const org = r[2].trim();
   const idx = VENDORS.findIndex(([, , , pats]) => pats.some((p) => p.test(org)));
   if (idx < 0) continue;

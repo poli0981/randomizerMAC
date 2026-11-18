@@ -274,8 +274,12 @@
             tabindex={selected ? 0 : -1}
             class:selected
             onclick={() => app.select(a.id)}
-            onkeydown={(e) =>
-              (e.key === "Enter" || e.key === " ") && (e.preventDefault(), app.select(a.id))}
+            onkeydown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                app.select(a.id);
+              }
+            }}
           >
             <span class="kind" class:wireless={a.kind === "wireless"}
               ><Icon size={18} aria-hidden="true" /></span
@@ -359,7 +363,7 @@
             label={t("dashboard.currentMac")}
             mac={adapter.currentMac}
             vendor={adapter.vendor ??
-              (adapter.currentMac && (parseMac(adapter.currentMac)?.[0] ?? 0) & 2
+              (adapter.currentMac && ((parseMac(adapter.currentMac)?.[0] ?? 0) & 2) !== 0
                 ? t("dashboard.localVendor")
                 : null)}
           />

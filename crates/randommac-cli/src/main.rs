@@ -262,6 +262,29 @@ impl Ctx {
         }
     }
 
+    /// Applies `mac` to the adapter with this id and prints the outcome.
+    fn apply(
+        &self,
+        adapter_id: &str,
+        mac: MacAddress,
+        ignore_blacklist: bool,
+    ) -> anyhow::Result<()> {
+        let settings = self.settings();
+        let mut progress = self.progress();
+        let outcome = ops::apply_mac(
+            self.backend.as_ref(),
+            &self.store,
+            &settings,
+            adapter_id,
+            mac,
+            ChangeSource::Cli,
+            ignore_blacklist,
+            &mut progress,
+        )
+        .map_err(|e| fail(op_exit(&e), e))?;
+        self.report_outcome(outcome, "changed")
+    }
+
     fn report_outcome(&self, outcome: Outcome, verb: &str) -> anyhow::Result<()> {
         match &outcome.report {
             Ok(report) => {
@@ -446,20 +469,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             if dry_run {
                 return ctx.print(&mac, || mac.to_string());
             }
-            let settings = ctx.settings();
-            let mut progress = ctx.progress();
-            let outcome = ops::apply_mac(
-                ctx.backend.as_ref(),
-                &ctx.store,
-                &settings,
-                &a.id,
-                mac,
-                ChangeSource::Cli,
-                ignore_blacklist,
-                &mut progress,
-            )
-            .map_err(|e| fail(op_exit(&e), e))?;
-            ctx.report_outcome(outcome, "changed")
+            ctx.apply(&a.id, mac, ignore_blacklist)
         }
         Command::Set {
             adapter,
@@ -474,20 +484,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
                     .map_err(|e| fail(op_exit(&e), e))?;
                 return ctx.print(&mac, || format!("{mac} can be applied to {}", a.name));
             }
-            let settings = ctx.settings();
-            let mut progress = ctx.progress();
-            let outcome = ops::apply_mac(
-                ctx.backend.as_ref(),
-                &ctx.store,
-                &settings,
-                &a.id,
-                mac,
-                ChangeSource::Cli,
-                ignore_blacklist,
-                &mut progress,
-            )
-            .map_err(|e| fail(op_exit(&e), e))?;
-            ctx.report_outcome(outcome, "changed")
+            ctx.apply(&a.id, mac, ignore_blacklist)
         }
         Command::Restore { adapter } => {
             let a = ctx.find(&adapter)?;

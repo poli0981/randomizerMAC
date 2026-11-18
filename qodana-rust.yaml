@@ -36,3 +36,14 @@ exclude:
       - src-tauri/gen
       # Generated from the IEEE registry by scripts/gen-oui.mjs.
       - crates/randommac-core/src/oui/vendors.rs
+  # tauri::generate_handler! needs each command's module path (`commands::app_info`): the
+  # #[tauri::command] macro puts a hidden helper next to the function, and the handler finds it
+  # through that path. Without the prefix the crate no longer compiles.
+  - name: RsUnnecessaryQualifications
+    paths:
+      - src-tauri/src/lib.rs
+  # rustc is the authority on type and borrow errors (CI builds everything with clippy
+  # -D warnings). The Early Access linter's own checker reports errors in code that compiles, e.g.
+  # every integer operator in crates/randommac-core/src/random.rs (E0369, E0382).
+  - name: RsTraitObligations
+  - name: RsBorrowChecker

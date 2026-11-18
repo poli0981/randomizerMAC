@@ -262,16 +262,27 @@ impl TryFrom<&[u8]> for MacAddress {
     }
 }
 
+/// Deserializes a type that parses from a string (addresses, blacklist patterns).
+pub(crate) fn deserialize_parsed<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: FromStr,
+    T::Err: fmt::Display,
+{
+    String::deserialize(deserializer)?
+        .parse()
+        .map_err(serde::de::Error::custom)
+}
+
 impl Serialize for MacAddress {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
+        serializer.collect_str(self)
     }
 }
 
 impl<'de> Deserialize<'de> for MacAddress {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        s.parse().map_err(serde::de::Error::custom)
+        deserialize_parsed(deserializer)
     }
 }
 

@@ -121,14 +121,13 @@ impl fmt::Debug for MacPattern {
 
 impl Serialize for MacPattern {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
+        serializer.collect_str(self)
     }
 }
 
 impl<'de> Deserialize<'de> for MacPattern {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        s.parse().map_err(serde::de::Error::custom)
+        crate::mac::deserialize_parsed(deserializer)
     }
 }
 

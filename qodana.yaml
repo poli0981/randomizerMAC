@@ -26,3 +26,27 @@ exclude:
       - coverage
       - node_modules
       - .svelte-check
+  # `${{ secrets.DISCORD_RELEASE_PIPELINE_WEBHOOK }}` is a reference to a repository secret, not a
+  # secret: the "discord-client-secret" rule only sees the word.
+  - name: HardcodedPasswords
+    paths:
+      - .github/workflows/notify-release-pipeline.yml
+  # `\]` and `\}` outside a character class stay escaped: they read as the literal brackets they
+  # are, and the patterns stay valid if they ever get the `u` or `v` flag, where a lone `]` or `}`
+  # is a syntax error. ESLint's no-useless-escape accepts them too.
+  - name: RegExpRedundantEscape
+  # The dark palette is declared twice on purpose: for the "System" theme inside
+  # `@media (prefers-color-scheme: dark)` and for an explicit "Dark" choice (`[data-theme="dark"]`).
+  # Plain CSS cannot share one declaration block between a media query and a selector.
+  - name: DuplicatedCode
+    paths:
+      - src/app.css
+  # The Svelte plugin's type engine neither narrows `status` inside `{#if status}`/`{@const}` nor
+  # resolves the Lucide icon components' types. svelte-check (TypeScript 7, --fail-on-warnings)
+  # type-checks this component in CI.
+  - name: TypeScriptValidateTypes
+    paths:
+      - src/lib/components/Sidebar.svelte
+  - name: TypeScriptUnresolvedReference
+    paths:
+      - src/lib/components/Sidebar.svelte

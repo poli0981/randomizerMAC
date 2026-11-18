@@ -369,14 +369,17 @@ pub async fn inspect_mac(
             });
         }
     };
-    let adapter = match adapter_id {
-        Some(id) => {
-            let backend = Arc::clone(&state.backend);
-            blocking(move || Ok(backend.find_adapter(&id).ok())).await?
-        }
-        None => None,
-    };
+    let adapter = find_optional(&state, adapter_id).await?;
     Ok(inspect(&state, mac, adapter.as_ref()))
+}
+
+/// The adapter with this id, if one was given and it still exists.
+async fn find_optional(state: &AppState, adapter_id: Option<String>) -> ApiResult<Option<Adapter>> {
+    let Some(id) = adapter_id else {
+        return Ok(None);
+    };
+    let backend = Arc::clone(&state.backend);
+    blocking(move || Ok(backend.find_adapter(&id).ok())).await
 }
 
 #[tauri::command]
@@ -386,13 +389,7 @@ pub async fn generate_mac(
     mode: Option<GenerationMode>,
 ) -> ApiResult<MacInfo> {
     let mode = mode.unwrap_or_else(|| state.settings().generation_mode);
-    let adapter = match adapter_id {
-        Some(id) => {
-            let backend = Arc::clone(&state.backend);
-            blocking(move || Ok(backend.find_adapter(&id).ok())).await?
-        }
-        None => None,
-    };
+    let adapter = find_optional(&state, adapter_id).await?;
     let (blacklist, _) = state.store.load_blacklist();
     let avoid: Vec<MacAddress> = adapter
         .as_ref()
